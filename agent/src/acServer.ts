@@ -138,14 +138,14 @@ function parseCommandLineArgs(commandLine?: string): Record<string, string> {
   const args: Record<string, string> = {};
   if (!commandLine) return args;
 
-  // Regex qui gère les chemins avec espaces entre guillemets
-  const regex = /-(\w+)\s+("([^"]*)"|'([^']*)'|(\S+))/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(commandLine)) !== null) {
-    const key = match[1].toLowerCase();
-    const value = match[3] || match[4] || match[5] || '';
-    args[key] = value;
-  }
+  // PowerShell nous donne la commandLine sans guillemets, avec des espaces dans les chemins.
+  // On capture tout ce qui suit -c / -e jusqu'au prochain argument (-lettre) ou la fin.
+  const cMatch = commandLine.match(/-c\s+(.*?)(?:\s+-[a-zA-Z]|$)/);
+  if (cMatch) args.c = cMatch[1].trim();
+
+  const eMatch = commandLine.match(/-e\s+(.*?)(?:\s+-[a-zA-Z]|$)/);
+  if (eMatch) args.e = eMatch[1].trim();
+
   return args;
 }
 
