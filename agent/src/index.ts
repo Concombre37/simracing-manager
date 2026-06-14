@@ -24,6 +24,8 @@ interface LaunchConfig {
 console.log(`Agent Sim Center démarrant pour ${config.stationName} (${config.stationId})`);
 console.log(`Connexion au serveur: ${config.serverUrl}`);
 console.log(`Mode de lancement: ${config.launchMode}`);
+console.log(`Heartbeat interval: ${config.heartbeatIntervalMs}ms`);
+console.log(`Server scan interval: ${config.serverScanIntervalMs}ms`);
 
 const socket: Socket = io(config.serverUrl, {
   transports: ['websocket', 'polling'],
@@ -196,8 +198,10 @@ setInterval(async () => {
 }, config.resultCheckIntervalMs);
 
 // Surveillance périodique des serveurs dédiés AC locaux
+console.log(`[acServer] Démarrage du scan des serveurs locaux toutes les ${config.serverScanIntervalMs || 15000}ms`);
 setInterval(async () => {
   try {
+    console.log('[acServer] Scan des serveurs locaux en cours...');
     await sendServerStatus();
   } catch (err: any) {
     console.error('Erreur scan serveurs locaux:', err.message);
@@ -205,10 +209,12 @@ setInterval(async () => {
 }, config.serverScanIntervalMs || 15000);
 
 async function sendServerStatus() {
+  console.log('[acServer] Appel de getLocalAcServers()');
   const servers = await getLocalAcServers();
   const changed =
     servers.length !== lastKnownServers.length ||
     JSON.stringify(servers) !== JSON.stringify(lastKnownServers);
+  console.log(`[acServer] Changement détecté: ${changed}, serveurs: ${servers.length}`);
   if (changed) {
     lastKnownServers = servers;
     console.log(`Serveurs locaux détectés: ${servers.length}`);
