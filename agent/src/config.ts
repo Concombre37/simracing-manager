@@ -14,6 +14,7 @@ STATION_NAME=Poste 1
 
 # Chemins Windows (à adapter)
 AC_PATH=C:\\Program Files (x86)\\Steam\\steamapps\\common\\assettocorsa
+AC_SERVER_PATH=C:\\Program Files (x86)\\Steam\\steamapps\\common\\assettocorsa\\server
 CM_PATH=C:\\Program Files\\Content Manager
 DOCUMENTS_PATH=${path.join(os.homedir(), 'Documents').replace(/\\/g, '\\\\')}
 
@@ -49,6 +50,7 @@ export const config = {
 
   // Chemins Windows par défaut (à adapter selon l'installation)
   acPath: getEnv('AC_PATH', 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\assettocorsa'),
+  acServerPath: getEnv('AC_SERVER_PATH', 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\assettocorsa\\server'),
   cmPath: getEnv('CM_PATH', 'C:\\Program Files\\Content Manager'),
   documentsPath: getEnv('DOCUMENTS_PATH', path.join(os.homedir(), 'Documents')),
 

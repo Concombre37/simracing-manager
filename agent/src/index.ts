@@ -4,6 +4,7 @@ import { launchSession } from './cm';
 import { isAcRunning, isCmRunning, killAssettoCorsa } from './ac';
 import { getLatestResults } from './results';
 import { AcServerInfo, getLocalAcServers } from './acServer';
+import { launchDedicatedServer, stopDedicatedServer } from './serverLauncher';
 import { writeSessionState, clearSessionState } from './state';
 
 interface LaunchConfig {
@@ -102,6 +103,23 @@ socket.on('session:launch', async (launchConfig: LaunchConfig) => {
     currentSession = null;
     currentSessionId = undefined;
   }
+});
+
+socket.on('server:launch', async (cfg: { serverId: string; name: string; track: string; trackLayout?: string; cars: string[]; maxClients?: number; password?: string }) => {
+  console.log('[agent] Commande de lancement serveur dédié reçue:', cfg);
+  try {
+    const launched = await launchDedicatedServer(cfg);
+    socket.emit('server:started', { serverId: cfg.serverId, serverDir: launched.serverDir });
+  } catch (err: any) {
+    console.error('[agent] Erreur lancement serveur:', err.message);
+    socket.emit('server:stopped', { serverId: cfg.serverId, error: err.message });
+  }
+});
+
+socket.on('server:stop', async (data: { serverId: string }) => {
+  console.log('[agent] Commande d\'arrêt serveur dédié reçue:', data);
+  await stopDedicatedServer();
+  socket.emit('server:stopped', { serverId: data.serverId });
 });
 
 socket.on('session:stop', async (data: { sessionId: string; stationId: string }) => {

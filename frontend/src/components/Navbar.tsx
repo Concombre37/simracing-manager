@@ -27,6 +27,9 @@ export default function Navbar() {
                 <Link to="/sessions" className="text-gray-300 hover:text-white transition-colors">
                   Sessions
                 </Link>
+                <Link to="/servers" className="text-gray-300 hover:text-white transition-colors">
+                  Serveurs
+                </Link>
                 <Link to="/leaderboard" className="text-gray-300 hover:text-white transition-colors">
                   Classement
                 </Link>

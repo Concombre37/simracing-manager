@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { User, UserRole, LoginResponse, Station, Car, Track, SimSession, SessionConfig } from '../types';
+import { User, UserRole, LoginResponse, Station, Car, Track, SimSession, SessionConfig, DedicatedServer } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -80,6 +80,14 @@ export const sessionsApi = {
 export const leaderboardApi = {
   get: (params?: { trackId?: string; carId?: string }) =>
     api.get('/leaderboard', { params }).then((r) => r.data),
+};
+
+export const serversApi = {
+  getAll: () => api.get<DedicatedServer[]>('/servers').then((r) => r.data),
+  create: (data: Partial<DedicatedServer> & { stationId: string; track: string }) =>
+    api.post<DedicatedServer>('/servers', data).then((r) => r.data),
+  stop: (id: string) => api.post(`/servers/${id}/stop`).then((r) => r.data),
+  delete: (id: string) => api.delete(`/servers/${id}`),
 };
 
 export default api;

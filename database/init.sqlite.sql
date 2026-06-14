@@ -85,6 +85,24 @@ CREATE TABLE sim_sessions (
   FOREIGN KEY (launched_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
+CREATE TABLE dedicated_servers (
+  id TEXT PRIMARY KEY,
+  station_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  track TEXT,
+  track_layout TEXT,
+  cars TEXT,
+  max_clients INTEGER DEFAULT 10,
+  password TEXT,
+  status TEXT DEFAULT 'creating' CHECK(status IN ('creating', 'running', 'stopped', 'error')),
+  server_dir TEXT,
+  config_json TEXT,
+  started_at DATETIME,
+  ended_at DATETIME,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE
+);
+
 CREATE TABLE session_results (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,

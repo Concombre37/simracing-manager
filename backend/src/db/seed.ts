@@ -21,6 +21,30 @@ async function initSchema() {
     await db.exec('ALTER TABLE stations ADD COLUMN active_servers TEXT');
     console.log('Migration : colonne active_servers ajoutée à stations');
   }
+
+  const serverTable = await queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='dedicated_servers'");
+  if (!serverTable) {
+    await db.exec(`
+      CREATE TABLE dedicated_servers (
+        id TEXT PRIMARY KEY,
+        station_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        track TEXT,
+        track_layout TEXT,
+        cars TEXT,
+        max_clients INTEGER DEFAULT 10,
+        password TEXT,
+        status TEXT DEFAULT 'creating' CHECK(status IN ('creating', 'running', 'stopped', 'error')),
+        server_dir TEXT,
+        config_json TEXT,
+        started_at DATETIME,
+        ended_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (station_id) REFERENCES stations(id) ON DELETE CASCADE
+      )
+    `);
+    console.log('Migration : table dedicated_servers créée');
+  }
 }
 
 async function seed() {

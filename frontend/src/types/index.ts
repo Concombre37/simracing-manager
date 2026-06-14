@@ -94,6 +94,24 @@ export interface SimSession {
   last_name?: string;
 }
 
+export interface DedicatedServer {
+  id: string;
+  station_id: string;
+  name: string;
+  track?: string;
+  track_layout?: string;
+  cars?: string[];
+  max_clients?: number;
+  password?: string;
+  status: 'creating' | 'running' | 'stopped' | 'error';
+  server_dir?: string;
+  config_json?: Record<string, any>;
+  started_at?: string;
+  ended_at?: string;
+  created_at: string;
+  station_name?: string;
+}
+
 export interface LoginResponse {
   token: string;
   user: User;

@@ -1,6 +1,7 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { queryOne, run } from '../config/db';
 import { Station } from '../types';
+import { updateServerStatus } from '../controllers/serverController';
 
 interface AgentInfo {
   stationId: string;
@@ -77,6 +78,18 @@ export function setupAgentSocket(io: SocketIOServer) {
       } catch (err) {
         console.error('Erreur server:status:', err);
       }
+    });
+
+    socket.on('server:started', async (data: { serverId: string; serverDir?: string }) => {
+      console.log(`Serveur dédié démarré: ${data.serverId}`);
+      await updateServerStatus(data.serverId, 'running', { serverDir: data.serverDir });
+      io.emit('server:updated', { id: data.serverId, status: 'running' });
+    });
+
+    socket.on('server:stopped', async (data: { serverId: string; error?: string }) => {
+      console.log(`Serveur dédié arrêté: ${data.serverId}${data.error ? ` (erreur: ${data.error})` : ''}`);
+      await updateServerStatus(data.serverId, data.error ? 'error' : 'stopped', { error: data.error });
+      io.emit('server:updated', { id: data.serverId, status: data.error ? 'error' : 'stopped', error: data.error });
     });
 
     socket.on('session:started', async (data: { sessionId: string; stationId: string }) => {

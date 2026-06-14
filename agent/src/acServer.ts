@@ -27,6 +27,7 @@ interface ProcessInfo {
 const AC_SERVER_EXE_NAMES = ['acServer.exe', 'ACServer.exe', 'acserver.exe'];
 
 export async function findAcServerProcesses(): Promise<ProcessInfo[]> {
+  // 1. Recherche par nom exact
   for (const exeName of AC_SERVER_EXE_NAMES) {
     const processes = await findProcessesByName(exeName);
     if (processes.length > 0) {
@@ -34,8 +35,35 @@ export async function findAcServerProcesses(): Promise<ProcessInfo[]> {
       return processes;
     }
   }
+
+  // 2. Fallback : scan tous les processus et cherche ceux liés à Assetto Corsa serveur
+  console.log('[acServer] Aucun nom exact trouvé, scan étendu de tous les processus...');
+  const allProcesses = await findAllProcesses();
+  const candidates = allProcesses.filter(
+    (p) =>
+      (p.executablePath && /acserver|ac_server|assettocorsa[\\/]server/i.test(p.executablePath)) ||
+      (p.commandLine && /acserver|ac_server|server_cfg\.ini|entry_list\.ini/i.test(p.commandLine))
+  );
+
+  if (candidates.length > 0) {
+    console.log(`[acServer] ${candidates.length} candidat(s) trouvé(s) par scan étendu`);
+    return candidates;
+  }
+
   console.log('[acServer] Aucun processus acServer.exe détecté');
   return [];
+}
+
+async function findAllProcesses(): Promise<ProcessInfo[]> {
+  const psCmd =
+    'powershell -Command "Get-CimInstance Win32_Process | Select-Object ProcessId,CommandLine,ExecutablePath,Name | ConvertTo-Csv -NoTypeInformation"';
+  try {
+    const { stdout } = await execAsync(psCmd, { timeout: 15000 });
+    return parseProcessCsv(stdout);
+  } catch (err) {
+    console.error('[acServer] Échec du scan étendu:', err);
+    return [];
+  }
 }
 
 async function findProcessesByName(exeName: string): Promise<ProcessInfo[]> {

@@ -15,6 +15,7 @@ import trackRoutes from './routes/tracks';
 import sessionConfigRoutes from './routes/sessionConfigs';
 import sessionRoutes from './routes/sessions';
 import leaderboardRoutes from './routes/leaderboard';
+import serverRoutes from './routes/servers';
 
 const app = express();
 const httpServer = createServer(app);
@@ -36,6 +37,7 @@ app.use('/api/tracks', trackRoutes);
 app.use('/api/session-configs', sessionConfigRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/servers', serverRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
