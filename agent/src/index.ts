@@ -7,6 +7,8 @@ import { AcServerInfo, getLocalAcServers } from './acServer';
 import { launchDedicatedServer, stopDedicatedServer } from './serverLauncher';
 import { AcContent, scanAssettoContent } from './contentScanner';
 import { writeSessionState, clearSessionState } from './state';
+import { setupConsole, setStatus, log } from './console';
+import { triggerUpdate } from './updater';
 
 interface LaunchConfig {
   sessionId: string;
@@ -23,12 +25,20 @@ interface LaunchConfig {
   sessionType?: 'practice' | 'race' | 'hotlap';
 }
 
-console.log('Agent Sim Center v1.1.3');
-console.log(`Agent Sim Center démarrant pour ${config.stationName} (${config.stationId})`);
-console.log(`Connexion au serveur: ${config.serverUrl}`);
-console.log(`Mode de lancement: ${config.launchMode}`);
-console.log(`Heartbeat interval: ${config.heartbeatIntervalMs}ms`);
-console.log(`Server scan interval: ${config.serverScanIntervalMs}ms`);
+const AGENT_VERSION = '1.1.9';
+setupConsole();
+setStatus({
+  version: AGENT_VERSION,
+  stationName: config.stationName,
+  stationId: config.stationId,
+  serverUrl: config.serverUrl,
+  launchMode: config.launchMode,
+});
+log('info', `Poste ${config.stationName} (${config.stationId})`);
+log('info', `Serveur central ${config.serverUrl}`);
+log('info', `Mode de lancement ${config.launchMode.toUpperCase()}`);
+log('info', `Heartbeat ${config.heartbeatIntervalMs}ms`);
+log('info', `Scan serveurs ${config.serverScanIntervalMs}ms`);
 
 const socket: Socket = io(config.serverUrl, {
   transports: ['websocket', 'polling'],
@@ -46,8 +56,18 @@ let lastKnownCmRunning = false;
 let lastKnownServers: AcServerInfo[] = [];
 let lastKnownContent: AcContent | null = null;
 
+socket.on('agent:update', async () => {
+  log('info', 'Mise à jour : demande reçue');
+  try {
+    await triggerUpdate(process.execPath);
+  } catch (err: any) {
+    log('error', `Mise à jour : ${err.message}`);
+  }
+});
+
 socket.on('connect', () => {
-  console.log('Connecté au serveur central');
+  log('success', 'Connecté au serveur central');
+  setStatus({ status: 'online' });
   socket.emit('agent:register', {
     stationId: config.stationId,
     pcIdentifier: require('os').hostname(),
@@ -58,14 +78,15 @@ socket.on('connect', () => {
 });
 
 socket.on('disconnect', (reason: string) => {
-  console.log('Déconnecté du serveur central:', reason);
+  log('warn', `Déconnexion : ${reason}`);
+  setStatus({ status: 'offline' });
 });
 
 socket.on('session:launch', async (launchConfig: LaunchConfig) => {
-  console.log('Commande de lancement reçue:', launchConfig);
+  log('info', 'Session : commande de lancement reçue');
 
   if (launchConfig.stationId !== config.stationId) {
-    console.log('Session ignorée (pas pour ce poste)');
+    log('warn', 'Session : ignorée (pas pour ce poste)');
     return;
   }
 
@@ -98,7 +119,7 @@ socket.on('session:launch', async (launchConfig: LaunchConfig) => {
 
     startResultChecking(launchConfig.sessionId);
   } catch (err: any) {
-    console.error('Erreur lors du lancement:', err.message);
+    log('error', `Session : ${err.message}`);
     socket.emit('session:finished', {
       sessionId: launchConfig.sessionId,
       stationId: config.stationId,
@@ -110,28 +131,33 @@ socket.on('session:launch', async (launchConfig: LaunchConfig) => {
 });
 
 socket.on('server:launch', async (cfg: { serverId: string; name: string; track: string; trackLayout?: string; cars: string[]; maxClients?: number; password?: string }) => {
-  console.log('[agent] Commande de lancement serveur dédié reçue:', cfg);
+  log('info', 'Serveur dédié : commande de lancement reçue');
   try {
-    const launched = await launchDedicatedServer(cfg);
+    const launched = await launchDedicatedServer(cfg, (code, signal) => {
+      log('error', `Serveur dédié terminé (code ${code}, signal ${signal})`);
+      socket.emit('server:stopped', { serverId: cfg.serverId, error: `Processus terminé (code ${code}, signal ${signal})` });
+    });
+    log('success', `Serveur dédié démarré (PID ${launched.pid})`);
     socket.emit('server:started', { serverId: cfg.serverId, serverDir: launched.serverDir });
   } catch (err: any) {
-    console.error('[agent] Erreur lancement serveur:', err.message);
+    log('error', `Serveur dédié : ${err.message}`);
     socket.emit('server:stopped', { serverId: cfg.serverId, error: err.message });
   }
 });
 
 socket.on('server:stop', async (data: { serverId: string }) => {
-  console.log('[agent] Commande d\'arrêt serveur dédié reçue:', data);
+  log('info', 'Serveur dédié : commande d\'arrêt reçue');
   await stopDedicatedServer();
   socket.emit('server:stopped', { serverId: data.serverId });
 });
 
 socket.on('session:stop', async (data: { sessionId: string; stationId: string }) => {
-  console.log('Commande d\'arrêt reçue:', data);
+  log('info', 'Session : commande d\'arrêt reçue');
 
   if (data.stationId !== config.stationId) return;
 
   stopResultChecking();
+  setStatus({ status: 'online', currentSessionId: undefined });
   await killAssettoCorsa();
   await clearSessionState();
 
@@ -162,8 +188,9 @@ function startResultChecking(sessionId: string) {
     try {
       const running = await isAcRunning();
       lastKnownAcRunning = running;
+      setStatus({ acRunning: running });
       if (!running && currentSession) {
-        console.log('AC/CM ne tourne plus, récupération des résultats...');
+        log('info', 'AC/CM ne tourne plus, récupération des résultats...');
         stopResultChecking();
         const results = await getLatestResults();
         socket.emit('session:finished', {
@@ -184,7 +211,7 @@ function startResultChecking(sessionId: string) {
         currentSessionId = undefined;
       }
     } catch (err: any) {
-      console.error('Erreur surveillance AC:', err.message);
+      log('error', `Surveillance AC : ${err.message}`);
     }
   }, config.resultCheckIntervalMs);
 }
@@ -199,7 +226,7 @@ function stopResultChecking() {
 // Heartbeat simple sans dépendre de isAcRunning pour éviter les blocages
 setInterval(() => {
   const status = currentSession ? (lastKnownAcRunning ? 'in_use' : 'online') : 'online';
-  console.log(`Envoi heartbeat: ${config.stationId} -> ${status}`);
+  setStatus({ status, currentSessionId, acRunning: lastKnownAcRunning, cmRunning: lastKnownCmRunning });
   socket.emit('station:heartbeat', {
     stationId: config.stationId,
     status,
@@ -214,8 +241,9 @@ setInterval(async () => {
   try {
     lastKnownAcRunning = await isAcRunning();
     lastKnownCmRunning = await isCmRunning();
+    setStatus({ acRunning: lastKnownAcRunning, cmRunning: lastKnownCmRunning });
   } catch (err: any) {
-    console.error('Erreur isAcRunning/isCmRunning:', err.message);
+    log('error', `Surveillance : ${err.message}`);
   }
 }, config.resultCheckIntervalMs);
 
@@ -224,30 +252,27 @@ setInterval(async () => {
   try {
     await sendContentStatus();
   } catch (err: any) {
-    console.error('Erreur scan contenu AC:', err.message);
+    log('error', `Contenu AC : ${err.message}`);
   }
 }, 5 * 60 * 1000);
 
 // Surveillance périodique des serveurs dédiés AC locaux
-console.log(`[acServer] Démarrage du scan des serveurs locaux toutes les ${config.serverScanIntervalMs || 15000}ms`);
+log('info', `Démarrage du scan des serveurs locaux toutes les ${config.serverScanIntervalMs || 15000}ms`);
 setInterval(async () => {
   try {
-    console.log('[acServer] Scan des serveurs locaux en cours...');
     await sendServerStatus();
   } catch (err: any) {
-    console.error('Erreur scan serveurs locaux:', err.message);
+    log('error', `Serveurs : ${err.message}`);
   }
 }, config.serverScanIntervalMs || 15000);
 
 async function sendServerStatus() {
-  console.log('[acServer] Appel de getLocalAcServers()');
   const servers = await getLocalAcServers();
   const changed =
     servers.length !== lastKnownServers.length ||
     JSON.stringify(servers) !== JSON.stringify(lastKnownServers);
-  console.log(`[acServer] Changement détecté: ${changed}, serveurs: ${servers.length}`);
   lastKnownServers = servers;
-  console.log(`Serveurs locaux détectés: ${servers.length}`);
+  setStatus({ serversRunning: servers.length });
   socket.emit('server:status', {
     stationId: config.stationId,
     servers,
@@ -255,7 +280,7 @@ async function sendServerStatus() {
 }
 
 async function sendContentStatus() {
-  console.log('[contentScanner] Scan du contenu Assetto Corsa...');
+  log('info', 'Scan du contenu Assetto Corsa...');
   const content = await scanAssettoContent();
   const changed = JSON.stringify(content) !== JSON.stringify(lastKnownContent);
   if (changed) {
@@ -267,4 +292,4 @@ async function sendContentStatus() {
   }
 }
 
-console.log('Agent en attente de commandes...');
+log('info', 'Agent en attente de commandes...');

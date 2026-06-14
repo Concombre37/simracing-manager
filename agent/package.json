@@ -21,6 +21,10 @@
     "build:exe": "npm run build && pkg . --out-path ./exe"
   },
   "dependencies": {
+    "@types/blessed": "^0.1.27",
+    "blessed": "^0.1.81",
+    "boxen": "^5.1.2",
+    "chalk": "^4.1.2",
     "dotenv": "^16.4.5",
     "fs-extra": "^11.2.0",
     "socket.io-client": "^4.7.5"

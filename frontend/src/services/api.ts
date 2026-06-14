@@ -47,6 +47,7 @@ export const stationsApi = {
   getAll: () => api.get<Station[]>('/stations').then((r) => r.data),
   update: (id: string, data: Partial<Station>) =>
     api.patch<Station>(`/stations/${id}`, data).then((r) => r.data),
+  updateAgent: (id: string) => api.post(`/stations/${id}/update-agent`).then((r) => r.data),
 };
 
 export const carsApi = {

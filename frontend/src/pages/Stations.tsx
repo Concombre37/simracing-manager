@@ -141,18 +141,34 @@ export default function Stations() {
               </button>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-dark-600">
+            <div className="mt-4 pt-4 border-t border-dark-600 flex justify-between items-center">
+              <div>
+                <button
+                  onClick={() => setMaintenance(station.id, 'maintenance')}
+                  className="text-xs text-yellow-400 hover:text-yellow-300 mr-4"
+                >
+                  Maintenance
+                </button>
+                <button
+                  onClick={() => setMaintenance(station.id, 'online')}
+                  className="text-xs text-green-400 hover:text-green-300"
+                >
+                  En ligne
+                </button>
+              </div>
               <button
-                onClick={() => setMaintenance(station.id, 'maintenance')}
-                className="text-xs text-yellow-400 hover:text-yellow-300 mr-4"
+                onClick={async () => {
+                  try {
+                    await stationsApi.updateAgent(station.id);
+                    alert('Mise à jour de l\'agent demandée');
+                  } catch (err: any) {
+                    alert(err.response?.data?.error || 'Erreur');
+                  }
+                }}
+                disabled={station.status === 'offline'}
+                className="text-xs text-blue-400 hover:text-blue-300 disabled:opacity-50"
               >
-                Maintenance
-              </button>
-              <button
-                onClick={() => setMaintenance(station.id, 'online')}
-                className="text-xs text-green-400 hover:text-green-300"
-              >
-                En ligne
+                MAJ agent
               </button>
             </div>
           </div>
