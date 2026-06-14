@@ -26,6 +26,9 @@ AC_EXECUTABLE=acs.exe
 HEARTBEAT_INTERVAL_MS=5000
 RESULT_CHECK_INTERVAL_MS=10000
 SERVER_SCAN_INTERVAL_MS=15000
+
+# Token GitHub (optionnel, requis si le repo de releases est privé)
+# GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 `;
 
 async function ensureEnvFile() {
@@ -63,6 +66,9 @@ export const config = {
   heartbeatIntervalMs: parseInt(getEnv('HEARTBEAT_INTERVAL_MS', '5000')),
   resultCheckIntervalMs: parseInt(getEnv('RESULT_CHECK_INTERVAL_MS', '10000')),
   serverScanIntervalMs: parseInt(getEnv('SERVER_SCAN_INTERVAL_MS', '15000')),
+
+  // Token GitHub pour les mises à jour automatiques (repo privé)
+  githubToken: getEnv('GITHUB_TOKEN', ''),
 };
 
 export function getCmPresetsPath(): string {
