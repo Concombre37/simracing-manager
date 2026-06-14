@@ -31,6 +31,7 @@ export default function Servers() {
     cars: [] as string[],
     maxClients: 10,
     password: '',
+    registerToLobby: false,
   });
 
   useEffect(() => {
@@ -73,8 +74,9 @@ export default function Servers() {
         track_layout: form.trackLayout,
         max_clients: form.maxClients,
         password: form.password,
+        registerToLobby: form.registerToLobby,
       });
-      setForm({ stationId: '', name: '', track: '', trackLayout: '', cars: [], maxClients: 10, password: '' });
+      setForm({ stationId: '', name: '', track: '', trackLayout: '', cars: [], maxClients: 10, password: '', registerToLobby: false });
       loadData();
     } catch (err: any) {
       alert(err.response?.data?.error || err.message);
@@ -160,6 +162,15 @@ export default function Servers() {
               onChange={(e) => setForm({ ...form, password: e.target.value })}
             />
           </div>
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.registerToLobby}
+              onChange={(e) => setForm({ ...form, registerToLobby: e.target.checked })}
+            />
+            <span>Serveur public (lobby AC) — nécessite l'ouverture des ports</span>
+          </label>
 
           <div>
             <p className="text-sm text-gray-400 mb-2">Voitures autorisées *</p>

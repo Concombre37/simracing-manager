@@ -13,6 +13,7 @@ export interface ServerLaunchConfig {
   cars: string[];
   maxClients?: number;
   password?: string;
+  registerToLobby?: boolean;
 }
 
 export interface LaunchedServer {
@@ -128,7 +129,7 @@ RESULT_SCREEN_TIME=20
 RACE_GAS_PENALTY_DISABLED=1
 MAX_CONTACTS_PER_KM=3
 SERVER_IP=0.0.0.0
-REGISTER_TO_LOBBY=1
+REGISTER_TO_LOBBY=${cfg.registerToLobby ? 1 : 0}
 MINIMUM_SECURITY_LEVEL=1
 
 [PRACTICE]

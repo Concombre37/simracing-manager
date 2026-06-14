@@ -26,7 +26,7 @@ export async function getAllServers(req: AuthRequest, res: Response) {
 
 export async function createServer(req: AuthRequest, res: Response) {
   try {
-    const { stationId, name, track, trackLayout, cars, maxClients, password } = req.body;
+    const { stationId, name, track, trackLayout, cars, maxClients, password, registerToLobby } = req.body;
     if (!stationId || !name || !track) {
       return res.status(400).json({ error: 'stationId, name et track sont requis' });
     }
@@ -38,7 +38,7 @@ export async function createServer(req: AuthRequest, res: Response) {
 
     const id = uuidv4();
     const carsJson = cars && Array.isArray(cars) ? JSON.stringify(cars) : JSON.stringify([cars].filter(Boolean));
-    const configJson = JSON.stringify({ track, trackLayout, cars, maxClients, password });
+    const configJson = JSON.stringify({ track, trackLayout, cars, maxClients, password, registerToLobby });
 
     await run(
       `INSERT INTO dedicated_servers (id, station_id, name, track, track_layout, cars, max_clients, password, status, config_json)
@@ -64,6 +64,7 @@ export async function createServer(req: AuthRequest, res: Response) {
       cars: JSON.parse(carsJson),
       maxClients: maxClients || 10,
       password,
+      registerToLobby: !!registerToLobby,
     });
 
     const created = await queryOne<DedicatedServer>('SELECT * FROM dedicated_servers WHERE id = ?', [id]);

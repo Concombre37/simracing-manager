@@ -85,7 +85,7 @@ export const leaderboardApi = {
 
 export const serversApi = {
   getAll: () => api.get<DedicatedServer[]>('/servers').then((r) => r.data),
-  create: (data: Partial<DedicatedServer> & { stationId: string; track: string }) =>
+  create: (data: Partial<DedicatedServer> & { stationId: string; track: string; registerToLobby?: boolean }) =>
     api.post<DedicatedServer>('/servers', data).then((r) => r.data),
   stop: (id: string) => api.post(`/servers/${id}/stop`).then((r) => r.data),
   delete: (id: string) => api.delete(`/servers/${id}`),
