@@ -22,6 +22,7 @@ interface LaunchConfig {
   sessionType?: 'practice' | 'race' | 'hotlap';
 }
 
+console.log('Agent Sim Center v1.1.2');
 console.log(`Agent Sim Center démarrant pour ${config.stationName} (${config.stationId})`);
 console.log(`Connexion au serveur: ${config.serverUrl}`);
 console.log(`Mode de lancement: ${config.launchMode}`);
