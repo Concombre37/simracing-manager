@@ -47,7 +47,16 @@ export async function createServer(req: AuthRequest, res: Response) {
     );
 
     const io = getIO();
-    io.to(`station:${stationId}`).emit('server:launch', {
+    const roomName = `station:${stationId}`;
+    const roomSize = io.sockets.adapter.rooms.get(roomName)?.size || 0;
+    console.log(`[server] Envoi server:launch vers ${roomName} (connectes: ${roomSize})`);
+
+    if (roomSize === 0) {
+      await run('UPDATE dedicated_servers SET status = "error" WHERE id = ?', [id]);
+      return res.status(503).json({ error: 'Agent du poste non connecté' });
+    }
+
+    io.to(roomName).emit('server:launch', {
       serverId: id,
       name,
       track,
