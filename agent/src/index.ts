@@ -25,7 +25,7 @@ interface LaunchConfig {
   sessionType?: 'practice' | 'race' | 'hotlap';
 }
 
-const AGENT_VERSION = '1.2.0';
+const AGENT_VERSION = '1.2.1';
 setupConsole();
 setStatus({
   version: AGENT_VERSION,
