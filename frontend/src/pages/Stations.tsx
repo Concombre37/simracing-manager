@@ -93,9 +93,16 @@ export default function Stations() {
           <div key={station.id} className="card">
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-xl font-bold">{station.name}</h3>
-              <span className={`badge ${statusClasses[station.status]}`}>
-                {statusLabels[station.status]}
-              </span>
+              <div className="flex gap-2">
+                {station.active_servers && station.active_servers.length > 0 && (
+                  <span className="badge badge-green">
+                    {station.active_servers.length} serveur(s) ON
+                  </span>
+                )}
+                <span className={`badge ${statusClasses[station.status]}`}>
+                  {statusLabels[station.status]}
+                </span>
+              </div>
             </div>
 
             <p className="text-sm text-gray-400 mb-2">ID: {station.pc_identifier}</p>
