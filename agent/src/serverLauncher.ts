@@ -3,6 +3,17 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { config } from './config';
 
+// Helper pour logger stdout/stderr d'acServer.exe
+function pipeToLog(child: ReturnType<typeof spawn>, logPath: string) {
+  const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+  if (child.stdout) child.stdout.pipe(logStream);
+  if (child.stderr) child.stderr.pipe(logStream);
+  child.on('close', (code) => {
+    logStream.write(`[serverLauncher] Processus acServer.exe termine avec code ${code}\n`);
+    logStream.end();
+  });
+}
+
 export interface ServerLaunchConfig {
   serverId: string;
   name: string;
@@ -120,13 +131,20 @@ VARIATION_TRACK=2
   console.log(`[serverLauncher] Lancement serveur dédié: ${acServerExe}`);
   console.log(`[serverLauncher] Dossier serveur: ${serverDir}`);
 
-  const child = spawn(acServerExe, ['-c', 'server_cfg.ini', '-e', 'entry_list.ini'], {
-    cwd: serverDir,
+  const cfgPath = path.join(serverDir, 'server_cfg.ini');
+  const entryPath = path.join(serverDir, 'entry_list.ini');
+  const logPath = path.join(serverDir, 'server.log');
+
+  // On lance depuis le dossier d'installation d'acServer.exe pour qu'il trouve ses DLL,
+  // mais on pointe vers les fichiers de config du dossier simcenter.
+  const child = spawn(acServerExe, ['-c', cfgPath, '-e', entryPath], {
+    cwd: config.acServerPath,
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: false,
   });
 
+  pipeToLog(child, logPath);
   child.unref();
   launchedServer = { pid: child.pid || 0, serverDir };
   if (child.pid) {
