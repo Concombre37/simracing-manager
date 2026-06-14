@@ -138,12 +138,12 @@ function parseCommandLineArgs(commandLine?: string): Record<string, string> {
   const args: Record<string, string> = {};
   if (!commandLine) return args;
 
-  // Extrait les arguments style -c value, -c "value", --config=value
-  const regex = /(?:^|\s)-(-?)(\w+)(?:\s+|=)("[^"]*"|\S+)/g;
+  // Regex qui gère les chemins avec espaces entre guillemets
+  const regex = /-(\w+)\s+("([^"]*)"|'([^']*)'|(\S+))/g;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(commandLine)) !== null) {
-    const key = match[2].toLowerCase();
-    const value = match[3].replace(/^"|"$/g, '');
+    const key = match[1].toLowerCase();
+    const value = match[3] || match[4] || match[5] || '';
     args[key] = value;
   }
   return args;
