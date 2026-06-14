@@ -3,7 +3,9 @@ import fs from 'fs-extra';
 import path from 'path';
 import os from 'os';
 
-const envPath = path.resolve(process.cwd(), '.env');
+// Le .env est toujours créé/lect dans le dossier de l'exécutable, pas du shell courant.
+const baseDir = path.dirname(process.execPath);
+const envPath = path.join(baseDir, '.env');
 
 const defaultEnvContent = `# Configuration SimRacing Manager Agent
 # Généré automatiquement - modifiez selon votre installation
@@ -31,9 +33,9 @@ SERVER_SCAN_INTERVAL_MS=15000
 # GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
 `;
 
-async function ensureEnvFile() {
-  if (!(await fs.pathExists(envPath))) {
-    await fs.writeFile(envPath, defaultEnvContent, 'utf-8');
+function ensureEnvFile() {
+  if (!fs.pathExistsSync(envPath)) {
+    fs.writeFileSync(envPath, defaultEnvContent, 'utf-8');
     console.log(`Fichier .env créé: ${envPath}`);
     console.log('Vérifiez et adaptez les chemins avant de relancer.');
   }
@@ -47,6 +49,7 @@ function getEnv(name: string, defaultValue: string): string {
 }
 
 export const config = {
+  baseDir,
   serverUrl: getEnv('SERVER_URL', 'https://simracing.hytlabs.com'),
   stationId: getEnv('STATION_ID', 'poste-1'),
   stationName: getEnv('STATION_NAME', 'Poste 1'),

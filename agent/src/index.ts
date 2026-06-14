@@ -25,13 +25,15 @@ interface LaunchConfig {
   sessionType?: 'practice' | 'race' | 'hotlap';
 }
 
-const AGENT_VERSION = '1.2.2';
+const AGENT_VERSION = '1.2.3';
 
 process.on('uncaughtException', (err) => {
   const fs = require('fs');
+  const path = require('path');
+  const crashPath = path.join(config.baseDir, 'crash.log');
   const line = `[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err.stack || err.message || err}\n`;
   try {
-    fs.appendFileSync('crash.log', line);
+    fs.appendFileSync(crashPath, line);
   } catch {}
   console.error(line);
   process.exit(1);
@@ -39,9 +41,11 @@ process.on('uncaughtException', (err) => {
 
 process.on('unhandledRejection', (reason) => {
   const fs = require('fs');
+  const path = require('path');
+  const crashPath = path.join(config.baseDir, 'crash.log');
   const line = `[${new Date().toISOString()}] UNHANDLED REJECTION: ${reason}\n`;
   try {
-    fs.appendFileSync('crash.log', line);
+    fs.appendFileSync(crashPath, line);
   } catch {}
   console.error(line);
 });
