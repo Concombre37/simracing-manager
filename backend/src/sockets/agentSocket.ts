@@ -18,7 +18,7 @@ export function setupAgentSocket(io: SocketIOServer) {
       console.log(`Agent enregistré: ${info.pcIdentifier} (${info.stationId})`);
 
       await query(
-        'UPDATE stations SET status = "online", last_heartbeat = NOW() WHERE id = ?',
+        'UPDATE stations SET status = "online", last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
         [info.stationId]
       );
 
@@ -27,7 +27,7 @@ export function setupAgentSocket(io: SocketIOServer) {
 
     socket.on('station:heartbeat', async (data: { stationId: string; status: string; currentSessionId?: string; acRunning?: boolean }) => {
       await query(
-        'UPDATE stations SET status = ?, current_session_id = ?, last_heartbeat = NOW() WHERE id = ?',
+        'UPDATE stations SET status = ?, current_session_id = ?, last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
         [data.status, data.currentSessionId || null, data.stationId]
       );
       io.emit('station:updated', {
@@ -53,7 +53,7 @@ export function setupAgentSocket(io: SocketIOServer) {
 
     socket.on('session:finished', async (data: { sessionId: string; stationId: string; results?: any; error?: string }) => {
       await query(
-        'UPDATE sim_sessions SET status = "finished", ended_at = NOW() WHERE id = ?',
+        'UPDATE sim_sessions SET status = "finished", ended_at = CURRENT_TIMESTAMP WHERE id = ?',
         [data.sessionId]
       );
       await query(
