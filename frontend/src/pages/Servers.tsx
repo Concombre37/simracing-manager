@@ -125,8 +125,8 @@ export default function Servers() {
               required
             >
               <option value="">Choisir un circuit</option>
-              {tracks.map((t) => (
-                <option key={t.id} value={t.ac_id}>
+              {availableTracks.map((t) => (
+                <option key={t.acId} value={t.acId}>
                   {t.name}
                 </option>
               ))}
