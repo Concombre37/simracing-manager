@@ -1,5 +1,10 @@
 import chalk from 'chalk';
 
+// Sauvegarde des fonctions natives AVANT tout monkey-patch
+const nativeLog = console.log;
+const nativeError = console.error;
+const nativeWarn = console.warn;
+
 interface AgentStatus {
   version: string;
   stationName: string;
@@ -171,29 +176,25 @@ export function log(level: 'info' | 'success' | 'warn' | 'error', text: string) 
 
   const color = level === 'success' ? chalk.green : level === 'warn' ? chalk.yellow : level === 'error' ? chalk.red : chalk.cyan;
   const label = level === 'info' ? 'INFO' : level === 'success' ? 'OK  ' : level === 'warn' ? 'WARN' : 'ERR ';
-  console.log(`[${chalk.gray(formatTime())}] ${color(label)} ${text}`);
+  nativeLog(`[${chalk.gray(formatTime())}] ${color(label)} ${text}`);
 }
 
 export function setupConsole() {
   useBlessed = setupBlessed();
 
-  const originalLog = console.log;
-  const originalError = console.error;
-  const originalWarn = console.warn;
-
   console.log = (...args: any[]) => {
     const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
     log('info', text);
-    originalLog.call(console, text);
+    nativeLog(text);
   };
   console.error = (...args: any[]) => {
     const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
     log('error', text);
-    originalError.call(console, text);
+    nativeError(text);
   };
   console.warn = (...args: any[]) => {
     const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
     log('warn', text);
-    originalWarn.call(console, text);
+    nativeWarn(text);
   };
 }
