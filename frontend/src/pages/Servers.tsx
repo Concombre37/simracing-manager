@@ -184,7 +184,37 @@ export default function Servers() {
       </div>
 
       <div className="card">
-        <h2 className="text-xl font-bold mb-4">Serveurs existants</h2>
+        <h2 className="text-xl font-bold mb-4">Serveurs détectés en direct</h2>
+        {stations.filter((s) => s.active_servers && s.active_servers.length > 0).length === 0 ? (
+          <p className="text-gray-400">Aucun serveur AC détecté actuellement.</p>
+        ) : (
+          <div className="space-y-4">
+            {stations
+              .filter((s) => s.active_servers && s.active_servers.length > 0)
+              .flatMap((s) =>
+                (s.active_servers || []).map((srv) => (
+                  <div key={`${s.id}-${srv.pid}`} className="bg-dark-900 rounded-md p-4">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="font-bold">{srv.name}</h3>
+                      <span className="badge badge-green">En ligne</span>
+                    </div>
+                    <p className="text-sm text-gray-400">
+                      Poste: {s.name} ({s.pc_identifier}) · Circuit: {srv.track}
+                      {srv.trackLayout ? ` (${srv.trackLayout})` : ''}
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Voitures: {srv.cars?.join(', ') || '-'} · Pilotes: {srv.playerCount}
+                      {srv.maxClients ? ` / ${srv.maxClients}` : ''}
+                    </p>
+                  </div>
+                ))
+              )}
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <h2 className="text-xl font-bold mb-4">Serveurs créés via le site</h2>
         {servers.length === 0 ? (
           <p className="text-gray-400">Aucun serveur créé.</p>
         ) : (

@@ -2,18 +2,29 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { queryOne, run } from '../config/db';
 import { Station } from '../types';
 import { updateServerStatus } from '../controllers/serverController';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AgentInfo {
   stationId: string;
   pcIdentifier: string;
 }
 
-async function resolveStationId(identifier: string): Promise<string | undefined> {
+async function resolveOrCreateStationId(identifier: string, pcIdentifier?: string): Promise<string> {
   const station = await queryOne<{ id: string }>(
     'SELECT id FROM stations WHERE pc_identifier = ? OR id = ?',
     [identifier, identifier]
   );
-  return station?.id;
+  if (station?.id) return station.id;
+
+  // Création automatique du poste s'il n'existe pas
+  const id = uuidv4();
+  const name = pcIdentifier && pcIdentifier !== identifier ? pcIdentifier : identifier;
+  await run(
+    'INSERT INTO stations (id, name, pc_identifier, status, config) VALUES (?, ?, ?, "offline", ?)',
+    [id, name, identifier, JSON.stringify({})]
+  );
+  console.log(`Poste auto-créé: ${name} (${id})`);
+  return id;
 }
 
 export function setupAgentSocket(io: SocketIOServer) {
@@ -21,7 +32,7 @@ export function setupAgentSocket(io: SocketIOServer) {
     console.log('Socket connecté:', socket.id);
 
     socket.on('agent:register', async (info: AgentInfo) => {
-      const stationId = await resolveStationId(info.stationId);
+      const stationId = await resolveOrCreateStationId(info.stationId);
       if (!stationId) {
         console.warn(`Agent register: aucun poste trouvé pour ${info.stationId}`);
         return;
@@ -40,7 +51,7 @@ export function setupAgentSocket(io: SocketIOServer) {
     });
 
     socket.on('station:heartbeat', async (data: { stationId: string; status: string; currentSessionId?: string; acRunning?: boolean; cmRunning?: boolean }) => {
-      const stationId = await resolveStationId(data.stationId);
+      const stationId = await resolveOrCreateStationId(data.stationId);
       if (!stationId) {
         console.warn(`Heartbeat: aucun poste trouvé pour ${data.stationId}`);
         return;
@@ -64,7 +75,7 @@ export function setupAgentSocket(io: SocketIOServer) {
     });
 
     socket.on('server:status', async (data: { stationId: string; servers: any[] }) => {
-      const stationId = await resolveStationId(data.stationId);
+      const stationId = await resolveOrCreateStationId(data.stationId);
       if (!stationId) {
         console.warn(`server:status: aucun poste trouvé pour ${data.stationId}`);
         return;
@@ -81,7 +92,7 @@ export function setupAgentSocket(io: SocketIOServer) {
     });
 
     socket.on('station:content', async (data: { stationId: string; content: any }) => {
-      const stationId = await resolveStationId(data.stationId);
+      const stationId = await resolveOrCreateStationId(data.stationId);
       if (!stationId) {
         console.warn(`station:content: aucun poste trouvé pour ${data.stationId}`);
         return;
@@ -110,7 +121,7 @@ export function setupAgentSocket(io: SocketIOServer) {
     });
 
     socket.on('session:started', async (data: { sessionId: string; stationId: string }) => {
-      const stationId = await resolveStationId(data.stationId);
+      const stationId = await resolveOrCreateStationId(data.stationId);
       if (!stationId) return;
       await run(
         'UPDATE sim_sessions SET status = "running" WHERE id = ?',
@@ -125,7 +136,7 @@ export function setupAgentSocket(io: SocketIOServer) {
     });
 
     socket.on('session:finished', async (data: { sessionId: string; stationId: string; results?: any; error?: string }) => {
-      const stationId = await resolveStationId(data.stationId);
+      const stationId = await resolveOrCreateStationId(data.stationId);
       if (!stationId) return;
       await run(
         'UPDATE sim_sessions SET status = "finished", ended_at = CURRENT_TIMESTAMP WHERE id = ?',
