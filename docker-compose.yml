@@ -1,0 +1,18 @@
+services:
+  simracing:
+    build: .
+    container_name: simracing
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3002:3002"
+    volumes:
+      - simracing-data:/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+      - DB_NAME=/data/sim_center.sqlite
+      - JWT_SECRET=simracing_hytlabs_secret_key_change_me
+      - JWT_EXPIRES_IN=7d
+
+volumes:
+  simracing-data:

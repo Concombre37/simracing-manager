@@ -1,0 +1,108 @@
+import fs from 'fs';
+import path from 'path';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import { getDb, query, queryOne, run } from '../config/db';
+
+async function initSchema() {
+  const db = await getDb();
+  const table = await queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='users'");
+  if (!table) {
+    const schemaPath = path.resolve('/root/sim-center-manager/database/init.sqlite.sql');
+    const schema = fs.readFileSync(schemaPath, 'utf-8');
+    await db.exec(schema);
+    console.log('Schéma SQLite initialisé');
+  }
+}
+
+async function seed() {
+  console.log('Seeding database...');
+
+  await initSchema();
+
+  const adminExists = await queryOne('SELECT id FROM users WHERE email = ?', ['admin@simracing.local']);
+  if (!adminExists) {
+    const hash = await bcrypt.hash('admin123', 10);
+    await run(
+      `INSERT INTO users (id, email, password_hash, first_name, last_name, role)
+       VALUES (?, ?, ?, ?, ?, 'admin')`,
+      [uuidv4(), 'admin@simracing.local', hash, 'Admin', 'SimRacing']
+    );
+    console.log('Admin créé: admin@simracing.local / admin123');
+  }
+
+  const techExists = await queryOne('SELECT id FROM users WHERE email = ?', ['tech@simracing.local']);
+  if (!techExists) {
+    const hash = await bcrypt.hash('tech123', 10);
+    await run(
+      `INSERT INTO users (id, email, password_hash, first_name, last_name, role)
+       VALUES (?, ?, ?, ?, ?, 'technician')`,
+      [uuidv4(), 'tech@simracing.local', hash, 'Technicien', 'SimRacing']
+    );
+    console.log('Technicien créé: tech@simracing.local / tech123');
+  }
+
+  const stationsCount = await queryOne('SELECT COUNT(*) as count FROM stations');
+  if ((stationsCount as any).count === 0) {
+    const stations = [
+      { id: uuidv4(), name: 'Poste 1', pc: 'poste-1' },
+      { id: uuidv4(), name: 'Poste 2', pc: 'poste-2' },
+      { id: uuidv4(), name: 'Poste 3', pc: 'poste-3' },
+    ];
+    for (const s of stations) {
+      await run(
+        'INSERT INTO stations (id, name, pc_identifier, status, config) VALUES (?, ?, ?, "offline", ?)',
+        [s.id, s.name, s.pc, JSON.stringify({ gpu: 'RTX 4070', wheel: 'Fanatec', screens: 3 })]
+      );
+    }
+    console.log(`${stations.length} postes créés`);
+  }
+
+  const carsCount = await queryOne('SELECT COUNT(*) as count FROM cars');
+  if ((carsCount as any).count === 0) {
+    const cars = [
+      { id: uuidv4(), acId: 'ks_porsche_911_gt3_rs', name: 'Porsche 911 GT3 RS', brand: 'Porsche', category: 'GT3', premium: 1 },
+      { id: uuidv4(), acId: 'ks_ferrari_488_gt3', name: 'Ferrari 488 GT3', brand: 'Ferrari', category: 'GT3', premium: 1 },
+      { id: uuidv4(), acId: 'ks_bmw_m4', name: 'BMW M4', brand: 'BMW', category: 'Street', premium: 0 },
+      { id: uuidv4(), acId: 'ks_mazda_mx5_cup', name: 'Mazda MX-5 Cup', brand: 'Mazda', category: 'Cup', premium: 0 },
+    ];
+    for (const c of cars) {
+      await run(
+        'INSERT INTO cars (id, ac_id, name, brand, category, is_premium) VALUES (?, ?, ?, ?, ?, ?)',
+        [c.id, c.acId, c.name, c.brand, c.category, c.premium]
+      );
+    }
+    console.log(`${cars.length} voitures créées`);
+  }
+
+  const tracksCount = await queryOne('SELECT COUNT(*) as count FROM tracks');
+  if ((tracksCount as any).count === 0) {
+    const trackData = [
+      { id: uuidv4(), acId: 'spa', name: 'Circuit de Spa-Francorchamps', country: 'Belgique', length: 7.0, layouts: ['GP'] },
+      { id: uuidv4(), acId: 'monza', name: 'Autodromo Nazionale Monza', country: 'Italie', length: 5.79, layouts: ['GP'] },
+      { id: uuidv4(), acId: 'nordschleife', name: 'Nürburgring Nordschleife', country: 'Allemagne', length: 20.83, layouts: ['Tourist'] },
+      { id: uuidv4(), acId: 'brands_hatch', name: 'Brands Hatch', country: 'Royaume-Uni', length: 3.91, layouts: ['GP'] },
+    ];
+    for (const t of trackData) {
+      await run(
+        'INSERT INTO tracks (id, ac_id, name, country, length_km) VALUES (?, ?, ?, ?, ?)',
+        [t.id, t.acId, t.name, t.country, t.length]
+      );
+      for (const layout of t.layouts) {
+        await run(
+          'INSERT INTO track_layouts (id, track_id, name) VALUES (?, ?, ?)',
+          [uuidv4(), t.id, layout]
+        );
+      }
+    }
+    console.log(`${trackData.length} circuits créés`);
+  }
+
+  console.log('Seeding terminé');
+  process.exit(0);
+}
+
+seed().catch((err) => {
+  console.error('Seed error:', err);
+  process.exit(1);
+});
