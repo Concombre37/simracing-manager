@@ -21,6 +21,10 @@ async function initSchema() {
     await db.exec('ALTER TABLE stations ADD COLUMN active_servers TEXT');
     console.log('Migration : colonne active_servers ajoutée à stations');
   }
+  if (!columnNames.includes('content_data')) {
+    await db.exec('ALTER TABLE stations ADD COLUMN content_data TEXT');
+    console.log('Migration : colonne content_data ajoutée à stations');
+  }
 
   const serverTable = await queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='dedicated_servers'");
   if (!serverTable) {

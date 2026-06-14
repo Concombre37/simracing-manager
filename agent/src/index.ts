@@ -5,6 +5,7 @@ import { isAcRunning, isCmRunning, killAssettoCorsa } from './ac';
 import { getLatestResults } from './results';
 import { AcServerInfo, getLocalAcServers } from './acServer';
 import { launchDedicatedServer, stopDedicatedServer } from './serverLauncher';
+import { AcContent, scanAssettoContent } from './contentScanner';
 import { writeSessionState, clearSessionState } from './state';
 
 interface LaunchConfig {
@@ -43,6 +44,7 @@ let resultCheckInterval: NodeJS.Timeout | null = null;
 let lastKnownAcRunning = false;
 let lastKnownCmRunning = false;
 let lastKnownServers: AcServerInfo[] = [];
+let lastKnownContent: AcContent | null = null;
 
 socket.on('connect', () => {
   console.log('Connecté au serveur central');
@@ -50,8 +52,9 @@ socket.on('connect', () => {
     stationId: config.stationId,
     pcIdentifier: require('os').hostname(),
   });
-  // Envoyer immédiatement l'état des serveurs locaux à la connexion
+  // Envoyer immédiatement l'état des serveurs locaux et le contenu AC à la connexion
   sendServerStatus();
+  sendContentStatus();
 });
 
 socket.on('disconnect', (reason: string) => {
@@ -216,6 +219,15 @@ setInterval(async () => {
   }
 }, config.resultCheckIntervalMs);
 
+// Surveillance périodique du contenu Assetto Corsa (toutes les 5 min)
+setInterval(async () => {
+  try {
+    await sendContentStatus();
+  } catch (err: any) {
+    console.error('Erreur scan contenu AC:', err.message);
+  }
+}, 5 * 60 * 1000);
+
 // Surveillance périodique des serveurs dédiés AC locaux
 console.log(`[acServer] Démarrage du scan des serveurs locaux toutes les ${config.serverScanIntervalMs || 15000}ms`);
 setInterval(async () => {
@@ -240,6 +252,19 @@ async function sendServerStatus() {
     stationId: config.stationId,
     servers,
   });
+}
+
+async function sendContentStatus() {
+  console.log('[contentScanner] Scan du contenu Assetto Corsa...');
+  const content = await scanAssettoContent();
+  const changed = JSON.stringify(content) !== JSON.stringify(lastKnownContent);
+  if (changed) {
+    lastKnownContent = content;
+    socket.emit('station:content', {
+      stationId: config.stationId,
+      content,
+    });
+  }
 }
 
 console.log('Agent en attente de commandes...');

@@ -80,6 +80,23 @@ export function setupAgentSocket(io: SocketIOServer) {
       }
     });
 
+    socket.on('station:content', async (data: { stationId: string; content: any }) => {
+      const stationId = await resolveStationId(data.stationId);
+      if (!stationId) {
+        console.warn(`station:content: aucun poste trouvé pour ${data.stationId}`);
+        return;
+      }
+      try {
+        await run(
+          'UPDATE stations SET content_data = ? WHERE id = ?',
+          [JSON.stringify(data.content || {}), stationId]
+        );
+        io.emit('station:updated', { id: stationId, content_data: data.content || {} });
+      } catch (err) {
+        console.error('Erreur station:content:', err);
+      }
+    });
+
     socket.on('server:started', async (data: { serverId: string; serverDir?: string }) => {
       console.log(`Serveur dédié démarré: ${data.serverId}`);
       await updateServerStatus(data.serverId, 'running', { serverDir: data.serverDir });

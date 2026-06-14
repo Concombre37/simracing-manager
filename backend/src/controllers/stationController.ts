@@ -12,6 +12,7 @@ export async function getAllStations(req: AuthRequest, res: Response) {
       ...s,
       config: s.config ? JSON.parse(s.config as any) : undefined,
       active_servers: s.active_servers ? JSON.parse(s.active_servers as any) : undefined,
+      content_data: s.content_data ? JSON.parse(s.content_data as any) : undefined,
     }));
     return res.json(stations);
   } catch (err: any) {
@@ -32,6 +33,7 @@ export async function getStationById(req: AuthRequest, res: Response) {
       ...station,
       config: station.config ? JSON.parse(station.config as any) : undefined,
       active_servers: station.active_servers ? JSON.parse(station.active_servers as any) : undefined,
+      content_data: station.content_data ? JSON.parse(station.content_data as any) : undefined,
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

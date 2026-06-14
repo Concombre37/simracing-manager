@@ -50,7 +50,14 @@ export default function Servers() {
     carsApi.getAll().then(setCars);
   };
 
-  const selectedTrack = tracks.find((t) => t.ac_id === form.track);
+  const selectedStation = stations.find((s) => s.id === form.stationId);
+  const stationContent = selectedStation?.content_data;
+
+  // Priorité au contenu scanné localement par l'agent, sinon fallback sur la BDD
+  const availableCars = stationContent?.cars || cars.map((c) => ({ acId: c.ac_id, name: c.name }));
+  const availableTracks = stationContent?.tracks || tracks.map((t) => ({ acId: t.ac_id, name: t.name, layouts: t.layouts?.map((l) => l.name) || [] }));
+
+  const selectedTrack = availableTracks.find((t) => t.acId === form.track);
   const availableLayouts = selectedTrack?.layouts || [];
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -132,8 +139,8 @@ export default function Servers() {
             >
               <option value="">Layout par défaut</option>
               {availableLayouts.map((l) => (
-                <option key={l.id} value={l.name}>
-                  {l.name}
+                <option key={l} value={l}>
+                  {l}
                 </option>
               ))}
             </select>
@@ -157,12 +164,12 @@ export default function Servers() {
           <div>
             <p className="text-sm text-gray-400 mb-2">Voitures autorisées *</p>
             <div className="bg-dark-900 rounded-md p-3 max-h-48 overflow-y-auto grid grid-cols-2 md:grid-cols-3 gap-2">
-              {cars.map((car) => (
-                <label key={car.id} className="flex items-center gap-2 text-sm cursor-pointer">
+              {availableCars.map((car) => (
+                <label key={car.acId} className="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={form.cars.includes(car.ac_id)}
-                    onChange={() => toggleCar(car.ac_id)}
+                    checked={form.cars.includes(car.acId)}
+                    onChange={() => toggleCar(car.acId)}
                   />
                   <span>{car.name}</span>
                 </label>

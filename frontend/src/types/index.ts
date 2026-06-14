@@ -25,6 +25,11 @@ export interface AcServerInfo {
   executablePath: string;
 }
 
+export interface AcContent {
+  cars: { acId: string; name: string; brand?: string; category?: string }[];
+  tracks: { acId: string; name: string; layouts: string[] }[];
+}
+
 export interface Station {
   id: string;
   name: string;
@@ -33,6 +38,7 @@ export interface Station {
   config?: Record<string, any>;
   current_session_id?: string;
   active_servers?: AcServerInfo[];
+  content_data?: AcContent;
   last_heartbeat?: string;
 }
 
