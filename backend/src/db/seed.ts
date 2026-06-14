@@ -13,6 +13,14 @@ async function initSchema() {
     await db.exec(schema);
     console.log('Schéma SQLite initialisé');
   }
+
+  // Migration légère : ajout de colonnes manquantes
+  const stationColumns = await query<{ name: string }>("PRAGMA table_info(stations)");
+  const columnNames = stationColumns.map((c) => c.name);
+  if (!columnNames.includes('active_servers')) {
+    await db.exec('ALTER TABLE stations ADD COLUMN active_servers TEXT');
+    console.log('Migration : colonne active_servers ajoutée à stations');
+  }
 }
 
 async function seed() {

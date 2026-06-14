@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { query, queryOne } from '../config/db';
+import { query, queryOne, run } from '../config/db';
 import { v4 as uuidv4 } from 'uuid';
 import { Track, TrackLayout } from '../types';
 
@@ -23,14 +23,14 @@ export async function createTrack(req: AuthRequest, res: Response) {
   try {
     const { acId, name, country, lengthKm, imageUrl, layouts } = req.body;
     const id = uuidv4();
-    await query(
+    await run(
       'INSERT INTO tracks (id, ac_id, name, country, length_km, image_url) VALUES (?, ?, ?, ?, ?, ?)',
       [id, acId, name, country || null, lengthKm || null, imageUrl || null]
     );
 
     if (Array.isArray(layouts)) {
       for (const layoutName of layouts) {
-        await query(
+        await run(
           'INSERT INTO track_layouts (id, track_id, name) VALUES (UUID(), ?, ?)',
           [id, layoutName]
         );

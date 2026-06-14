@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { query, queryOne } from '../config/db';
+import { query, queryOne, run } from '../config/db';
 import { Station } from '../types';
 
 export async function getAllStations(req: AuthRequest, res: Response) {
@@ -11,6 +11,7 @@ export async function getAllStations(req: AuthRequest, res: Response) {
     const stations = rows.map((s) => ({
       ...s,
       config: s.config ? JSON.parse(s.config as any) : undefined,
+      active_servers: s.active_servers ? JSON.parse(s.active_servers as any) : undefined,
     }));
     return res.json(stations);
   } catch (err: any) {
@@ -30,6 +31,7 @@ export async function getStationById(req: AuthRequest, res: Response) {
     return res.json({
       ...station,
       config: station.config ? JSON.parse(station.config as any) : undefined,
+      active_servers: station.active_servers ? JSON.parse(station.active_servers as any) : undefined,
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
@@ -39,7 +41,7 @@ export async function getStationById(req: AuthRequest, res: Response) {
 export async function updateStation(req: AuthRequest, res: Response) {
   try {
     const { name, status, config: stationConfig } = req.body;
-    await query(
+    await run(
       'UPDATE stations SET name = ?, status = ?, config = ? WHERE id = ?',
       [name, status, stationConfig ? JSON.stringify(stationConfig) : null, req.params.id]
     );

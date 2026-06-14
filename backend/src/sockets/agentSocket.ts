@@ -1,5 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { query } from '../config/db';
+import { queryOne, run } from '../config/db';
 import { Station } from '../types';
 
 interface AgentInfo {
@@ -7,62 +7,107 @@ interface AgentInfo {
   pcIdentifier: string;
 }
 
+async function resolveStationId(identifier: string): Promise<string | undefined> {
+  const station = await queryOne<{ id: string }>(
+    'SELECT id FROM stations WHERE pc_identifier = ? OR id = ?',
+    [identifier, identifier]
+  );
+  return station?.id;
+}
+
 export function setupAgentSocket(io: SocketIOServer) {
   io.on('connection', (socket: Socket) => {
     console.log('Socket connecté:', socket.id);
 
     socket.on('agent:register', async (info: AgentInfo) => {
-      socket.data.stationId = info.stationId;
+      const stationId = await resolveStationId(info.stationId);
+      if (!stationId) {
+        console.warn(`Agent register: aucun poste trouvé pour ${info.stationId}`);
+        return;
+      }
+      socket.data.stationId = stationId;
       socket.data.pcIdentifier = info.pcIdentifier;
-      socket.join(`station:${info.stationId}`);
-      console.log(`Agent enregistré: ${info.pcIdentifier} (${info.stationId})`);
+      socket.join(`station:${stationId}`);
+      console.log(`Agent enregistré: ${info.pcIdentifier} (${stationId})`);
 
-      await query(
+      await run(
         'UPDATE stations SET status = "online", last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
-        [info.stationId]
+        [stationId]
       );
 
-      io.emit('station:updated', { id: info.stationId, status: 'online' });
+      io.emit('station:updated', { id: stationId, status: 'online' });
     });
 
-    socket.on('station:heartbeat', async (data: { stationId: string; status: string; currentSessionId?: string; acRunning?: boolean }) => {
-      await query(
-        'UPDATE stations SET status = ?, current_session_id = ?, last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
-        [data.status, data.currentSessionId || null, data.stationId]
-      );
-      io.emit('station:updated', {
-        id: data.stationId,
-        status: data.status,
-        currentSessionId: data.currentSessionId,
-        acRunning: data.acRunning,
-      });
+    socket.on('station:heartbeat', async (data: { stationId: string; status: string; currentSessionId?: string; acRunning?: boolean; cmRunning?: boolean }) => {
+      const stationId = await resolveStationId(data.stationId);
+      if (!stationId) {
+        console.warn(`Heartbeat: aucun poste trouvé pour ${data.stationId}`);
+        return;
+      }
+      console.log(`Heartbeat reçu: ${stationId} -> ${data.status}`);
+      try {
+        await run(
+          'UPDATE stations SET status = ?, current_session_id = ?, last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
+          [data.status, data.currentSessionId || null, stationId]
+        );
+        io.emit('station:updated', {
+          id: stationId,
+          status: data.status,
+          currentSessionId: data.currentSessionId,
+          acRunning: data.acRunning,
+          cmRunning: data.cmRunning,
+        });
+      } catch (err) {
+        console.error('Erreur heartbeat:', err);
+      }
+    });
+
+    socket.on('server:status', async (data: { stationId: string; servers: any[] }) => {
+      const stationId = await resolveStationId(data.stationId);
+      if (!stationId) {
+        console.warn(`server:status: aucun poste trouvé pour ${data.stationId}`);
+        return;
+      }
+      try {
+        await run(
+          'UPDATE stations SET active_servers = ? WHERE id = ?',
+          [JSON.stringify(data.servers || []), stationId]
+        );
+        io.emit('station:updated', { id: stationId, active_servers: data.servers || [] });
+      } catch (err) {
+        console.error('Erreur server:status:', err);
+      }
     });
 
     socket.on('session:started', async (data: { sessionId: string; stationId: string }) => {
-      await query(
+      const stationId = await resolveStationId(data.stationId);
+      if (!stationId) return;
+      await run(
         'UPDATE sim_sessions SET status = "running" WHERE id = ?',
         [data.sessionId]
       );
-      await query(
+      await run(
         'UPDATE stations SET status = "in_use", current_session_id = ? WHERE id = ?',
-        [data.sessionId, data.stationId]
+        [data.sessionId, stationId]
       );
       io.emit('session:updated', { id: data.sessionId, status: 'running' });
-      io.emit('station:updated', { id: data.stationId, status: 'in_use', currentSessionId: data.sessionId });
+      io.emit('station:updated', { id: stationId, status: 'in_use', currentSessionId: data.sessionId });
     });
 
     socket.on('session:finished', async (data: { sessionId: string; stationId: string; results?: any; error?: string }) => {
-      await query(
+      const stationId = await resolveStationId(data.stationId);
+      if (!stationId) return;
+      await run(
         'UPDATE sim_sessions SET status = "finished", ended_at = CURRENT_TIMESTAMP WHERE id = ?',
         [data.sessionId]
       );
-      await query(
+      await run(
         'UPDATE stations SET status = "online", current_session_id = NULL WHERE id = ?',
-        [data.stationId]
+        [stationId]
       );
 
       if (data.results) {
-        await query(
+        await run(
           `INSERT INTO session_results (id, session_id, lap_count, best_lap_time_ms, total_time_ms, position)
            VALUES (UUID(), ?, ?, ?, ?, ?)`,
           [
@@ -76,17 +121,17 @@ export function setupAgentSocket(io: SocketIOServer) {
       }
 
       io.emit('session:updated', { id: data.sessionId, status: 'finished', error: data.error });
-      io.emit('station:updated', { id: data.stationId, status: 'online', currentSessionId: null });
+      io.emit('station:updated', { id: stationId, status: 'online', currentSessionId: null });
     });
 
     socket.on('disconnect', async () => {
       const stationId = socket.data?.stationId;
       if (stationId) {
-        await query(
-          'UPDATE stations SET status = "offline", current_session_id = NULL WHERE id = ?',
+        await run(
+          'UPDATE stations SET status = "offline", current_session_id = NULL, active_servers = NULL WHERE id = ?',
           [stationId]
         );
-        io.emit('station:updated', { id: stationId, status: 'offline', currentSessionId: null });
+        io.emit('station:updated', { id: stationId, status: 'offline', currentSessionId: null, active_servers: [] });
       }
       console.log('Socket déconnecté:', socket.id);
     });

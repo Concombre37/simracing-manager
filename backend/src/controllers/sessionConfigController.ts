@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { query, queryOne } from '../config/db';
+import { query, queryOne, run } from '../config/db';
 import { v4 as uuidv4 } from 'uuid';
 import { SessionConfig } from '../types';
 
@@ -44,7 +44,7 @@ export async function createConfig(req: AuthRequest, res: Response) {
   try {
     const { name, carId, trackLayoutId, weatherPreset, sessionType, isDefault } = req.body;
     const id = uuidv4();
-    await query(
+    await run(
       `INSERT INTO session_configs (id, name, car_id, track_layout_id, weather_preset, session_type, is_default)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [id, name, carId, trackLayoutId, weatherPreset || null, sessionType || 'practice', isDefault ? 1 : 0]
@@ -59,7 +59,7 @@ export async function createConfig(req: AuthRequest, res: Response) {
 export async function updateConfig(req: AuthRequest, res: Response) {
   try {
     const { name, carId, trackLayoutId, weatherPreset, sessionType, isDefault } = req.body;
-    await query(
+    await run(
       `UPDATE session_configs
        SET name = ?, car_id = ?, track_layout_id = ?, weather_preset = ?, session_type = ?, is_default = ?
        WHERE id = ?`,
@@ -74,7 +74,7 @@ export async function updateConfig(req: AuthRequest, res: Response) {
 
 export async function deleteConfig(req: AuthRequest, res: Response) {
   try {
-    await query('DELETE FROM session_configs WHERE id = ?', [req.params.id]);
+    await run('DELETE FROM session_configs WHERE id = ?', [req.params.id]);
     return res.status(204).send();
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

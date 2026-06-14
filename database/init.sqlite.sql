@@ -29,6 +29,7 @@ CREATE TABLE stations (
   status TEXT DEFAULT 'offline' CHECK(status IN ('offline', 'online', 'in_use', 'maintenance', 'error')),
   config TEXT,
   current_session_id TEXT,
+  active_servers TEXT,
   last_heartbeat DATETIME
 );
 

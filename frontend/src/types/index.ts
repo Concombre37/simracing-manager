@@ -12,6 +12,19 @@ export interface User {
 
 export type StationStatus = 'offline' | 'online' | 'in_use' | 'maintenance' | 'error';
 
+export interface AcServerInfo {
+  pid: number;
+  name: string;
+  track?: string;
+  trackLayout?: string;
+  cars: string[];
+  maxClients?: number;
+  playerCount: number;
+  hasPassword?: boolean;
+  serverDir: string;
+  executablePath: string;
+}
+
 export interface Station {
   id: string;
   name: string;
@@ -19,6 +32,7 @@ export interface Station {
   status: StationStatus;
   config?: Record<string, any>;
   current_session_id?: string;
+  active_servers?: AcServerInfo[];
   last_heartbeat?: string;
 }
 

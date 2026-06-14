@@ -105,6 +105,37 @@ export default function Dashboard() {
               {station.config && (
                 <p className="text-sm text-gray-400">GPU: {(station.config as any).gpu}</p>
               )}
+              {station.active_servers && station.active_servers.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-dark-700">
+                  <p className="text-xs font-semibold text-accent-orange mb-2">
+                    Serveur{station.active_servers.length > 1 ? 's' : ''} actif
+                    {station.active_servers.length > 1 ? 's' : ''}
+                  </p>
+                  <div className="space-y-2">
+                    {station.active_servers.map((server) => (
+                      <div key={server.pid} className="bg-dark-800 rounded p-2 text-sm">
+                        <div className="font-medium truncate" title={server.name}>
+                          {server.name}
+                        </div>
+                        <div className="text-gray-400 text-xs">
+                          {server.track}
+                          {server.trackLayout ? ` (${server.trackLayout})` : ''}
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>
+                            {server.cars.slice(0, 3).join(', ')}
+                            {server.cars.length > 3 ? ` +${server.cars.length - 3}` : ''}
+                          </span>
+                          <span>
+                            {server.playerCount}
+                            {server.maxClients ? ` / ${server.maxClients}` : ''} pilotes
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

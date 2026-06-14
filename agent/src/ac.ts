@@ -20,6 +20,16 @@ export async function isAcRunning(): Promise<boolean> {
   }
 }
 
+export async function isCmRunning(): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync('tasklist /FI "STATUS eq RUNNING" /FO CSV /NH');
+    const lowerStdout = stdout.toLowerCase();
+    return lowerStdout.includes('content manager.exe') || lowerStdout.includes('contentmanager.exe');
+  } catch (err) {
+    return false;
+  }
+}
+
 export async function killAssettoCorsa(): Promise<void> {
   try {
     await execAsync('taskkill /F /IM acs.exe /IM ContentManager.exe /IM "Content Manager.exe"');

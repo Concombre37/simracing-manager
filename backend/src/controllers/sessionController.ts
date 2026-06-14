@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { query, queryOne } from '../config/db';
+import { query, queryOne, run } from '../config/db';
 import { v4 as uuidv4 } from 'uuid';
 import { getIO } from '../services/socketService';
 import { SimSession } from '../types';
@@ -48,7 +48,7 @@ export async function startSession(req: AuthRequest, res: Response) {
     }
 
     const id = uuidv4();
-    await query(
+    await run(
       `INSERT INTO sim_sessions (id, station_id, config_id, launched_by, status)
        VALUES (?, ?, ?, ?, 'starting')`,
       [id, stationId, configId, req.user!.userId]

@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { query, queryOne } from '../config/db';
+import { query, queryOne, run } from '../config/db';
 import { User } from '../types';
 
 export async function getAllUsers(req: AuthRequest, res: Response) {
@@ -36,7 +36,7 @@ export async function updateUserRole(req: AuthRequest, res: Response) {
       return res.status(400).json({ error: 'Rôle invalide' });
     }
 
-    await query('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
+    await run('UPDATE users SET role = ? WHERE id = ?', [role, req.params.id]);
     const user = await queryOne<User>(
       'SELECT id, email, first_name, last_name, role FROM users WHERE id = ?',
       [req.params.id]

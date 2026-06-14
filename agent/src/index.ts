@@ -1,8 +1,9 @@
 import { io, Socket } from 'socket.io-client';
 import { config } from './config';
 import { launchSession } from './cm';
-import { isAcRunning, killAssettoCorsa } from './ac';
+import { isAcRunning, isCmRunning, killAssettoCorsa } from './ac';
 import { getLatestResults } from './results';
+import { AcServerInfo, getLocalAcServers } from './acServer';
 import { writeSessionState, clearSessionState } from './state';
 
 interface LaunchConfig {
@@ -26,11 +27,18 @@ console.log(`Mode de lancement: ${config.launchMode}`);
 
 const socket: Socket = io(config.serverUrl, {
   transports: ['websocket', 'polling'],
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 10000,
 });
 
 let currentSession: LaunchConfig | null = null;
-let currentUserId: string | undefined;
+let currentSessionId: string | undefined;
 let resultCheckInterval: NodeJS.Timeout | null = null;
+let lastKnownAcRunning = false;
+let lastKnownCmRunning = false;
+let lastKnownServers: AcServerInfo[] = [];
 
 socket.on('connect', () => {
   console.log('Connecté au serveur central');
@@ -38,10 +46,12 @@ socket.on('connect', () => {
     stationId: config.stationId,
     pcIdentifier: require('os').hostname(),
   });
+  // Envoyer immédiatement l'état des serveurs locaux à la connexion
+  sendServerStatus();
 });
 
-socket.on('disconnect', () => {
-  console.log('Déconnecté du serveur central');
+socket.on('disconnect', (reason: string) => {
+  console.log('Déconnecté du serveur central:', reason);
 });
 
 socket.on('session:launch', async (launchConfig: LaunchConfig) => {
@@ -54,7 +64,7 @@ socket.on('session:launch', async (launchConfig: LaunchConfig) => {
 
   try {
     currentSession = launchConfig;
-    currentUserId = launchConfig.userId;
+    currentSessionId = launchConfig.sessionId;
 
     // Calculer l'heure de fin approximative (1h par défaut)
     const endTime = Math.floor(Date.now() / 1000) + 3600;
@@ -88,7 +98,7 @@ socket.on('session:launch', async (launchConfig: LaunchConfig) => {
       error: err.message,
     });
     currentSession = null;
-    currentUserId = undefined;
+    currentSessionId = undefined;
   }
 });
 
@@ -108,7 +118,7 @@ socket.on('session:stop', async (data: { sessionId: string; stationId: string })
     results: results
       ? {
           sessionId: data.sessionId,
-          userId: currentUserId,
+          userId: currentSession?.userId,
           lapCount: results.lapCount,
           bestLapTimeMs: results.bestLapTimeMs,
           totalTimeMs: results.totalTimeMs,
@@ -118,34 +128,39 @@ socket.on('session:stop', async (data: { sessionId: string; stationId: string })
   });
 
   currentSession = null;
-  currentUserId = undefined;
+  currentSessionId = undefined;
 });
 
 function startResultChecking(sessionId: string) {
   if (resultCheckInterval) clearInterval(resultCheckInterval);
 
   resultCheckInterval = setInterval(async () => {
-    const running = await isAcRunning();
-    if (!running && currentSession) {
-      console.log('AC/CM ne tourne plus, récupération des résultats...');
-      stopResultChecking();
-      const results = await getLatestResults();
-      socket.emit('session:finished', {
-        sessionId,
-        stationId: config.stationId,
-        results: results
-          ? {
-              sessionId,
-              userId: currentUserId,
-              lapCount: results.lapCount,
-              bestLapTimeMs: results.bestLapTimeMs,
-              totalTimeMs: results.totalTimeMs,
-              position: results.position,
-            }
-          : undefined,
-      });
-      currentSession = null;
-      currentUserId = undefined;
+    try {
+      const running = await isAcRunning();
+      lastKnownAcRunning = running;
+      if (!running && currentSession) {
+        console.log('AC/CM ne tourne plus, récupération des résultats...');
+        stopResultChecking();
+        const results = await getLatestResults();
+        socket.emit('session:finished', {
+          sessionId,
+          stationId: config.stationId,
+          results: results
+            ? {
+                sessionId,
+                userId: currentSession.userId,
+                lapCount: results.lapCount,
+                bestLapTimeMs: results.bestLapTimeMs,
+                totalTimeMs: results.totalTimeMs,
+                position: results.position,
+              }
+            : undefined,
+        });
+        currentSession = null;
+        currentSessionId = undefined;
+      }
+    } catch (err: any) {
+      console.error('Erreur surveillance AC:', err.message);
     }
   }, config.resultCheckIntervalMs);
 }
@@ -157,14 +172,51 @@ function stopResultChecking() {
   }
 }
 
-setInterval(async () => {
-  const running = await isAcRunning();
+// Heartbeat simple sans dépendre de isAcRunning pour éviter les blocages
+setInterval(() => {
+  const status = currentSession ? (lastKnownAcRunning ? 'in_use' : 'online') : 'online';
+  console.log(`Envoi heartbeat: ${config.stationId} -> ${status}`);
   socket.emit('station:heartbeat', {
     stationId: config.stationId,
-    status: currentSession ? (running ? 'in_use' : 'online') : running ? 'in_use' : 'online',
-    currentUserId: currentUserId,
-    acRunning: running,
+    status,
+    currentSessionId,
+    acRunning: lastKnownAcRunning,
+    cmRunning: lastKnownCmRunning,
   });
 }, config.heartbeatIntervalMs);
+
+// Surveillance périodique d'AC/CM (moins fréquente que le heartbeat)
+setInterval(async () => {
+  try {
+    lastKnownAcRunning = await isAcRunning();
+    lastKnownCmRunning = await isCmRunning();
+  } catch (err: any) {
+    console.error('Erreur isAcRunning/isCmRunning:', err.message);
+  }
+}, config.resultCheckIntervalMs);
+
+// Surveillance périodique des serveurs dédiés AC locaux
+setInterval(async () => {
+  try {
+    await sendServerStatus();
+  } catch (err: any) {
+    console.error('Erreur scan serveurs locaux:', err.message);
+  }
+}, config.serverScanIntervalMs || 15000);
+
+async function sendServerStatus() {
+  const servers = await getLocalAcServers();
+  const changed =
+    servers.length !== lastKnownServers.length ||
+    JSON.stringify(servers) !== JSON.stringify(lastKnownServers);
+  if (changed) {
+    lastKnownServers = servers;
+    console.log(`Serveurs locaux détectés: ${servers.length}`);
+    socket.emit('server:status', {
+      stationId: config.stationId,
+      servers,
+    });
+  }
+}
 
 console.log('Agent en attente de commandes...');

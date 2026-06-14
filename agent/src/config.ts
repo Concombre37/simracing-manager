@@ -24,6 +24,7 @@ AC_EXECUTABLE=acs.exe
 
 HEARTBEAT_INTERVAL_MS=5000
 RESULT_CHECK_INTERVAL_MS=10000
+SERVER_SCAN_INTERVAL_MS=15000
 `;
 
 async function ensureEnvFile() {
@@ -59,6 +60,7 @@ export const config = {
   // Intervalles
   heartbeatIntervalMs: parseInt(getEnv('HEARTBEAT_INTERVAL_MS', '5000')),
   resultCheckIntervalMs: parseInt(getEnv('RESULT_CHECK_INTERVAL_MS', '10000')),
+  serverScanIntervalMs: parseInt(getEnv('SERVER_SCAN_INTERVAL_MS', '15000')),
 };
 
 export function getCmPresetsPath(): string {

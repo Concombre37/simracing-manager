@@ -1,6 +1,6 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { query, queryOne } from '../config/db';
+import { query, queryOne, run } from '../config/db';
 import { v4 as uuidv4 } from 'uuid';
 import { Car } from '../types';
 
@@ -17,7 +17,7 @@ export async function createCar(req: AuthRequest, res: Response) {
   try {
     const { acId, name, brand, category, isPremium, imageUrl } = req.body;
     const id = uuidv4();
-    await query(
+    await run(
       'INSERT INTO cars (id, ac_id, name, brand, category, is_premium, image_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [id, acId, name, brand || null, category || null, isPremium || false, imageUrl || null]
     );
