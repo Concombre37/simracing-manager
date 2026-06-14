@@ -22,7 +22,7 @@ interface LaunchConfig {
   sessionType?: 'practice' | 'race' | 'hotlap';
 }
 
-console.log('Agent Sim Center v1.1.2');
+console.log('Agent Sim Center v1.1.3');
 console.log(`Agent Sim Center démarrant pour ${config.stationName} (${config.stationId})`);
 console.log(`Connexion au serveur: ${config.serverUrl}`);
 console.log(`Mode de lancement: ${config.launchMode}`);
@@ -234,14 +234,12 @@ async function sendServerStatus() {
     servers.length !== lastKnownServers.length ||
     JSON.stringify(servers) !== JSON.stringify(lastKnownServers);
   console.log(`[acServer] Changement détecté: ${changed}, serveurs: ${servers.length}`);
-  if (changed) {
-    lastKnownServers = servers;
-    console.log(`Serveurs locaux détectés: ${servers.length}`);
-    socket.emit('server:status', {
-      stationId: config.stationId,
-      servers,
-    });
-  }
+  lastKnownServers = servers;
+  console.log(`Serveurs locaux détectés: ${servers.length}`);
+  socket.emit('server:status', {
+    stationId: config.stationId,
+    servers,
+  });
 }
 
 console.log('Agent en attente de commandes...');
