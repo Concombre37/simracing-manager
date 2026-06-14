@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { exec } from 'child_process';
 import util from 'util';
+import { getKnownServerDir } from './serverLauncher';
 
 const execAsync = util.promisify(exec);
 
@@ -153,6 +154,13 @@ function resolveServerDir(proc: ProcessInfo): string | undefined {
   console.log(`[acServer] Résolution dossier pour PID ${proc.pid}`);
   console.log(`  CommandLine: ${proc.commandLine || 'non disponible'}`);
   console.log(`  ExecutablePath: ${proc.executablePath || 'non disponible'}`);
+
+  // 0. Si l'agent lui-même a lancé ce serveur, on connaît déjà le dossier
+  const knownDir = getKnownServerDir(proc.pid);
+  if (knownDir) {
+    console.log(`  Dossier serveur connu (lancé par l'agent): ${knownDir}`);
+    return knownDir;
+  }
 
   // 1. Cherche -c server_cfg.ini ou -e entry_list.ini dans la ligne de commande
   if (proc.commandLine) {

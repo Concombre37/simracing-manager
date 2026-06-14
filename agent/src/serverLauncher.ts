@@ -19,9 +19,18 @@ export interface LaunchedServer {
 }
 
 let launchedServer: LaunchedServer | null = null;
+const knownServers = new Map<number, string>();
 
 export function getLaunchedServer(): LaunchedServer | null {
   return launchedServer;
+}
+
+export function getKnownServerDir(pid: number): string | undefined {
+  return knownServers.get(pid);
+}
+
+export function registerKnownServer(pid: number, serverDir: string) {
+  knownServers.set(pid, serverDir);
 }
 
 export async function launchDedicatedServer(cfg: ServerLaunchConfig): Promise<LaunchedServer> {
@@ -120,6 +129,9 @@ VARIATION_TRACK=2
 
   child.unref();
   launchedServer = { pid: child.pid || 0, serverDir };
+  if (child.pid) {
+    registerKnownServer(child.pid, serverDir);
+  }
   return launchedServer;
 }
 
