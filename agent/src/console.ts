@@ -1,12 +1,4 @@
 import chalk from 'chalk';
-import boxen from 'boxen';
-
-let blessed: typeof import('blessed') | null = null;
-try {
-  blessed = require('blessed');
-} catch {
-  blessed = null;
-}
 
 interface AgentStatus {
   version: string;
@@ -33,26 +25,39 @@ const status: AgentStatus = {
   serversRunning: 0,
 };
 
-// Blessed plante souvent sous Windows (pas de vrai TTY) ou si l'exe est lancé en double-clic.
-const useBlessed =
-  blessed &&
-  process.stdout.isTTY === true &&
-  process.platform !== 'win32' &&
-  process.env.SIMPLE_CONSOLE !== '1';
-
 let logBox: any = null;
 let screen: any = null;
+let useBlessed = false;
 
-if (useBlessed && blessed) {
-  const b = blessed;
+function formatTime() {
+  return new Date().toLocaleTimeString('fr-FR', { hour12: false });
+}
+
+function fallbackStatusLine(): string {
+  const statusColor =
+    status.status === 'online' || status.status === 'running'
+      ? chalk.green
+      : status.status === 'in_use'
+      ? chalk.yellow
+      : chalk.gray;
+  return `[${formatTime()}] Agent ${statusColor(status.status.toUpperCase())} | AC ${status.acRunning ? chalk.green('●') : chalk.gray('●')} | CM ${status.cmRunning ? chalk.green('●') : chalk.gray('●')} | ${status.serversRunning} serveur(s)`;
+}
+
+function setupBlessed() {
   try {
-    screen = b.screen({
+    if (process.platform === 'win32') return false;
+    if (process.env.SIMPLE_CONSOLE === '1') return false;
+    if (!process.stdout.isTTY) return false;
+
+    const blessed = require('blessed');
+
+    screen = blessed.screen({
       smartCSR: true,
       title: 'SimRacing Manager Agent',
       mouse: true,
     });
 
-    const headerBox = b.box({
+    const headerBox = blessed.box({
       top: 0,
       left: 0,
       width: '100%',
@@ -63,7 +68,7 @@ if (useBlessed && blessed) {
       border: { type: 'line' },
     });
 
-    const infoBox = b.box({
+    const infoBox = blessed.box({
       top: 3,
       left: 0,
       width: '50%',
@@ -76,7 +81,7 @@ if (useBlessed && blessed) {
       alwaysScroll: true,
     });
 
-    logBox = b.log({
+    logBox = blessed.log({
       top: 3,
       left: '50%',
       width: '50%',
@@ -90,7 +95,7 @@ if (useBlessed && blessed) {
       scrollbar: { ch: ' ', style: { bg: 'gray' } },
     });
 
-    const statusBox = b.box({
+    const statusBox = blessed.box({
       top: '40%-1',
       left: 0,
       width: '100%',
@@ -140,26 +145,12 @@ if (useBlessed && blessed) {
       renderInfo();
       renderStatusLine();
     };
+
+    screen.render();
+    return true;
   } catch {
-    // En cas d'erreur blessed, on passe en mode simple
-    (setStatus as any).__render = undefined;
-    logBox = null;
-    screen = null;
+    return false;
   }
-}
-
-function formatTime() {
-  return new Date().toLocaleTimeString('fr-FR', { hour12: false });
-}
-
-function fallbackStatusLine(): string {
-  const statusColor =
-    status.status === 'online' || status.status === 'running'
-      ? chalk.green
-      : status.status === 'in_use'
-      ? chalk.yellow
-      : chalk.gray;
-  return `[${formatTime()}] Agent ${statusColor(status.status.toUpperCase())} | AC ${status.acRunning ? chalk.green('●') : chalk.gray('●')} | CM ${status.cmRunning ? chalk.green('●') : chalk.gray('●')} | ${status.serversRunning} serveur(s)`;
 }
 
 export function setStatus(update: Partial<AgentStatus>) {
@@ -184,27 +175,25 @@ export function log(level: 'info' | 'success' | 'warn' | 'error', text: string) 
 }
 
 export function setupConsole() {
-  if (useBlessed && screen) {
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
+  useBlessed = setupBlessed();
 
-    console.log = (...args: any[]) => {
-      const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      log('info', text);
-      originalLog.call(console, text);
-    };
-    console.error = (...args: any[]) => {
-      const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      log('error', text);
-      originalError.call(console, text);
-    };
-    console.warn = (...args: any[]) => {
-      const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
-      log('warn', text);
-      originalWarn.call(console, text);
-    };
+  const originalLog = console.log;
+  const originalError = console.error;
+  const originalWarn = console.warn;
 
-    screen.render();
-  }
+  console.log = (...args: any[]) => {
+    const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    log('info', text);
+    originalLog.call(console, text);
+  };
+  console.error = (...args: any[]) => {
+    const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    log('error', text);
+    originalError.call(console, text);
+  };
+  console.warn = (...args: any[]) => {
+    const text = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    log('warn', text);
+    originalWarn.call(console, text);
+  };
 }
