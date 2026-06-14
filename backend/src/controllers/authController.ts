@@ -35,7 +35,7 @@ export async function login(req: AuthRequest, res: Response) {
 export async function me(req: AuthRequest, res: Response) {
   try {
     const user = await queryOne<User>(
-      'SELECT id, email, first_name, last_name, phone, role, created_at, updated_at FROM users WHERE id = ?',
+      'SELECT id, email, first_name, last_name, role, created_at, updated_at FROM users WHERE id = ?',
       [req.user!.userId]
     );
     if (!user) {
