@@ -315,8 +315,8 @@ function Click-DriveButton {
   return $false
 }
 
-# Methode 2 : clic souris au centre de l'ecran + appui clavier
-function Click-And-Press-OnAc {
+# Methode 2 : SendInput (clavier + souris) sur la fenetre AC
+function Send-Input-ToAc {
   Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
@@ -329,13 +329,32 @@ public class WinAPI {
   public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")]
   public static extern bool SetCursorPos(int x, int y);
+}
+"@
+  Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class InputSender {
+  [StructLayout(LayoutKind.Sequential)]
+  public struct INPUT {
+    public uint type;
+    public MOUSEINPUT mi;
+    public KEYBDINPUT ki;
+  }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct MOUSEINPUT {
+    public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr dwExtraInfo;
+  }
+  [StructLayout(LayoutKind.Sequential)]
+  public struct KEYBDINPUT {
+    public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo;
+  }
   [DllImport("user32.dll")]
-  public static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, UIntPtr dwExtraInfo);
-  [DllImport("user32.dll")]
-  public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+  public static extern uint SendInput(uint nInputs, [MarshalAs(UnmanagedType.LPArray)] INPUT[] pInputs, int cbSize);
 }
 "@
   Add-Type -AssemblyName System.Windows.Forms
+
   Write-Log "Attente de la fenetre Assetto Corsa..."
   $hwnd = 0
   $timeout = 90
@@ -354,31 +373,43 @@ public class WinAPI {
   [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
   Start-Sleep -Milliseconds 500
 
+  $size = [Runtime.InteropServices.Marshal]::SizeOf([InputSender+INPUT])
+
+  # Clic souris au centre de l'ecran
   $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
   $cx = [int]($screen.Width / 2)
   $cy = [int]($screen.Height / 2)
-  Write-Log "Clic au centre de l'ecran : $cx,$cy"
+  Write-Log "Clic au centre : $cx,$cy"
   [WinAPI]::SetCursorPos($cx, $cy) | Out-Null
   Start-Sleep -Milliseconds 200
-  [WinAPI]::mouse_event(0x0002, 0, 0, 0, 0) # LEFT DOWN
-  Start-Sleep -Milliseconds 150
-  [WinAPI]::mouse_event(0x0004, 0, 0, 0, 0) # LEFT UP
+  $clickDown = New-Object InputSender+INPUT
+  $clickDown.type = 0
+  $clickDown.mi.dwFlags = 0x0002
+  $clickUp = New-Object InputSender+INPUT
+  $clickUp.type = 0
+  $clickUp.mi.dwFlags = 0x0004
+  [InputSender]::SendInput(2, @($clickDown, $clickUp), $size) | Out-Null
   Start-Sleep -Seconds 2
 
-  $VK_SPACE = 0x20
-  Write-Log "Envoi Espace (keybd_event)"
+  # Plusieurs appuis sur Espace
+  Write-Log "Envoi Espace (SendInput)"
   for ($j = 0; $j -lt 5; $j++) {
-    [WinAPI]::keybd_event($VK_SPACE, 0, 0, 0)
-    Start-Sleep -Milliseconds 150
-    [WinAPI]::keybd_event($VK_SPACE, 0, 2, 0)
+    $keyDown = New-Object InputSender+INPUT
+    $keyDown.type = 1
+    $keyDown.ki.wVk = 0x20
+    $keyUp = New-Object InputSender+INPUT
+    $keyUp.type = 1
+    $keyUp.ki.wVk = 0x20
+    $keyUp.ki.dwFlags = 2
+    [InputSender]::SendInput(2, @($keyDown, $keyUp), $size) | Out-Null
     Start-Sleep -Seconds 2
   }
-  Write-Log "Sequence clavier/souris envoyee"
+  Write-Log "Sequence SendInput terminee"
 }
 
 Write-Log "Demarrage de l'automatisation Drive..."
 if (-not (Click-DriveButton)) {
-  Click-And-Press-OnAc
+  Send-Input-ToAc
 }
 `;
   try {
