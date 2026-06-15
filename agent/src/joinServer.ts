@@ -157,7 +157,9 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
     } catch {}
 
     if (isWindows) {
-      const child = spawn('cmd.exe', ['/c', 'start', '', uri], {
+      // Utilise rundll32 pour ouvrir le protocole sans passer par cmd.exe
+      // (cmd interprèterait les & comme séparateurs de commandes)
+      const child = spawn('rundll32.exe', ['url.dll,FileProtocolHandler', uri], {
         detached: true,
         stdio: 'ignore',
         windowsHide: false,
