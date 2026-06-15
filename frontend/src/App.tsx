@@ -7,6 +7,7 @@ import Stations from './pages/Stations';
 import SessionConfigs from './pages/SessionConfigs';
 import Sessions from './pages/Sessions';
 import Servers from './pages/Servers';
+import PodControl from './pages/PodControl';
 import Leaderboard from './pages/Leaderboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminCars from './pages/admin/AdminCars';
@@ -72,6 +73,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Servers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pods"
+          element={
+            <ProtectedRoute>
+              <PodControl />
             </ProtectedRoute>
           }
         />

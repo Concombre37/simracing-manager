@@ -30,6 +30,9 @@ export default function Navbar() {
                 <Link to="/servers" className="text-gray-300 hover:text-white transition-colors">
                   Serveurs
                 </Link>
+                <Link to="/pods" className="text-gray-300 hover:text-white transition-colors">
+                  PODs
+                </Link>
                 <Link to="/leaderboard" className="text-gray-300 hover:text-white transition-colors">
                   Classement
                 </Link>

@@ -7,7 +7,7 @@ const router = Router();
 router.get('/', authenticateToken, getAllServers);
 router.post('/', authenticateToken, requireRole('admin'), createServer);
 router.post('/:id/stop', authenticateToken, requireRole('admin'), stopServer);
-router.post('/:id/join', authenticateToken, requireRole('admin'), joinServer);
+router.post('/:id/join', authenticateToken, requireRole('admin', 'technician'), joinServer);
 router.delete('/:id', authenticateToken, requireRole('admin'), deleteServer);
 
 export default router;
