@@ -1,0 +1,6 @@
+# Binaires générés par pkg
+sim-center-agent-win.exe
+sim-center-agent-linux
+sim-center-agent-win.zip
+*.old
+*.new

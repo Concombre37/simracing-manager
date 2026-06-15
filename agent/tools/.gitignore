@@ -1,0 +1,5 @@
+# Binaires generees par le build C#
+PressDriveKey.exe
+PressDriveKey.pdb
+bin/
+obj/

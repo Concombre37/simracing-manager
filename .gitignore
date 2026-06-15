@@ -6,3 +6,5 @@ backend/data/
 *.sqlite
 *.sqlite3
 .DS_Store
+agent/src/embeddedAssets.ts
+.dotnet/
