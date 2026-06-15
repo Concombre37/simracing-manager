@@ -8,7 +8,7 @@ async function initSchema() {
   const db = await getDb();
   const table = await queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='users'");
   if (!table) {
-    const schemaPath = path.resolve('/root/sim-center-manager/database/init.sqlite.sql');
+    const schemaPath = path.join(__dirname, 'init.sqlite.sql');
     const schema = fs.readFileSync(schemaPath, 'utf-8');
     await db.exec(schema);
     console.log('Schéma SQLite initialisé');
@@ -28,6 +28,10 @@ async function initSchema() {
   if (!columnNames.includes('local_ip')) {
     await db.exec('ALTER TABLE stations ADD COLUMN local_ip TEXT');
     console.log('Migration : colonne local_ip ajoutée à stations');
+  }
+  if (!columnNames.includes('agent_version')) {
+    await db.exec('ALTER TABLE stations ADD COLUMN agent_version TEXT');
+    console.log('Migration : colonne agent_version ajoutée à stations');
   }
 
   const serverTable = await queryOne("SELECT name FROM sqlite_master WHERE type='table' AND name='dedicated_servers'");

@@ -40,6 +40,7 @@ export interface Station {
   active_servers?: AcServerInfo[];
   content_data?: AcContent;
   local_ip?: string;
+  agent_version?: string;
   last_heartbeat?: string;
 }
 

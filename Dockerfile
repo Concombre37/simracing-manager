@@ -9,6 +9,9 @@ COPY backend/package.json ./
 # Copier le frontend buildé
 COPY frontend/dist ./dist
 
+# Copier le schéma SQLite pour les migrations
+COPY database/init.sqlite.sql ./db/init.sqlite.sql
+
 # Créer le dossier de données SQLite
 RUN mkdir -p /data
 

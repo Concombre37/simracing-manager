@@ -109,6 +109,7 @@ socket.on('connect', () => {
   socket.emit('agent:register', {
     stationId: config.stationId,
     pcIdentifier: require('os').hostname(),
+    version: AGENT_VERSION,
   });
   // Envoyer immédiatement l'état des serveurs locaux et le contenu AC à la connexion
   sendServerStatus();

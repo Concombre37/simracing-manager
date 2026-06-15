@@ -105,7 +105,12 @@ export default function Stations() {
               </div>
             </div>
 
-            <p className="text-sm text-gray-400 mb-2">ID: {station.pc_identifier}</p>
+            <p className="text-sm text-gray-400 mb-2">
+              ID: {station.pc_identifier}
+              {station.agent_version && (
+                <span className="ml-2 text-xs text-gray-500">(agent v{station.agent_version})</span>
+              )}
+            </p>
 
             {station.config && (
               <div className="text-sm text-gray-400 mb-4">

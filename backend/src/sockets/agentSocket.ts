@@ -7,6 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 interface AgentInfo {
   stationId: string;
   pcIdentifier: string;
+  version?: string;
 }
 
 async function resolveOrCreateStationId(identifier: string, pcIdentifier?: string): Promise<string> {
@@ -43,11 +44,11 @@ export function setupAgentSocket(io: SocketIOServer) {
       console.log(`Agent enregistré: ${info.pcIdentifier} (${stationId})`);
 
       await run(
-        'UPDATE stations SET status = "online", last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
-        [stationId]
+        'UPDATE stations SET status = "online", agent_version = ?, last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
+        [info.version || null, stationId]
       );
 
-      io.emit('station:updated', { id: stationId, status: 'online' });
+      io.emit('station:updated', { id: stationId, status: 'online', agentVersion: info.version });
     });
 
     socket.on('station:heartbeat', async (data: { stationId: string; status: string; currentSessionId?: string; acRunning?: boolean; cmRunning?: boolean; localIp?: string }) => {
