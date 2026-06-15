@@ -135,8 +135,11 @@ function buildCmUri(cfg: JoinServerConfig): string {
     params.set('skin', cfg.skin);
   }
   if (cfg.password) params.set('plainPassword', cfg.password);
-  // Permet de lancer sans Steam ID (si Steam n'est pas intégré)
-  params.set('allowWithoutSteamId', '1');
+  // Par défaut, laisse Content Manager utiliser Steam. Si Steam n'est pas
+  // disponible/intégré, activer CM_ALLOW_WITHOUT_STEAM_ID=1 dans le .env.
+  if (config.cmAllowWithoutSteamId) {
+    params.set('allowWithoutSteamId', '1');
+  }
   return `acmanager://race/online?${params.toString()}`;
 }
 
@@ -150,7 +153,7 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
   const isWindows = process.platform === 'win32';
   const cmExe = findContentManagerExe();
 
-  if (cmExe) {
+  if (config.launchMode === 'cm' && cmExe) {
     // Lancement via le protocole interne de Content Manager.
     const uri = buildCmUri(cfg);
     console.log(`[joinServer] Lancement via Content Manager : ${uri}`);
