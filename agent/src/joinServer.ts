@@ -278,6 +278,61 @@ function buildCmUri(cfg: JoinServerConfig): string {
   }
 }
 
+function scheduleDriveKeyPress(logPath: string): void {
+  const psPath = path.join(config.documentsPath, 'Assetto Corsa', 'logs', 'press_drive_key.ps1');
+  const psContent = `Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class WinAPI {
+  [DllImport("user32.dll")]
+  public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+  [DllImport("user32.dll", SetLastError = true)]
+  public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")]
+  public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@
+function Write-Log($msg) {
+  $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg"
+  Add-Content -Path "${logPath}" -Value $line -ErrorAction SilentlyContinue
+}
+Write-Log "Attente de la fenetre Assetto Corsa..."
+$hwnd = 0
+$timeout = 90
+for ($i = 0; $i -lt $timeout; $i++) {
+  $hwnd = [WinAPI]::FindWindow($null, "Assetto Corsa")
+  if ($hwnd -ne 0) { break }
+  Start-Sleep -Seconds 1
+}
+if ($hwnd -eq 0) {
+  Write-Log "Fenetre Assetto Corsa non trouvee apres $timeout secondes"
+  return
+}
+Write-Log "Fenetre trouvee, attente du chargement..."
+Start-Sleep -Seconds 12
+[WinAPI]::ShowWindow($hwnd, 1) | Out-Null
+[WinAPI]::SetForegroundWindow($hwnd) | Out-Null
+Start-Sleep -Milliseconds 500
+Add-Type -AssemblyName System.Windows.Forms
+Write-Log "Envoi de la touche Espace"
+[System.Windows.Forms.SendKeys]::SendWait(" ")
+Start-Sleep -Seconds 3
+[System.Windows.Forms.SendKeys]::SendWait(" ")
+Write-Log "Sequence envoyee"
+`;
+  try {
+    fs.writeFileSync(psPath, psContent, 'utf-8');
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psPath], {
+      detached: true,
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    child.unref();
+  } catch (err: any) {
+    console.warn('[joinServer] Impossible de planifier l appui touche:', err.message);
+  }
+}
+
 export async function joinServer(cfg: JoinServerConfig): Promise<void> {
   const raceIniPath = path.join(config.documentsPath, 'Assetto Corsa', 'cfg', 'race.ini');
   const logPath = path.join(config.documentsPath, 'Assetto Corsa', 'logs', 'spawn.log');
@@ -316,6 +371,11 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
         windowsHide: false,
       });
       child.unref();
+
+      // AC affiche parfois un ecran "appuyez sur une touche pour conduire" apres
+      // le chargement. On lance un script PowerShell qui attend la fenetre AC et
+      // envoie un appui sur Espace pour passer cet ecran automatiquement.
+      scheduleDriveKeyPress(logPath);
     } else {
       const child = spawn('xdg-open', [uri], { detached: true, stdio: 'ignore' });
       child.unref();
