@@ -118,23 +118,38 @@ export async function triggerUpdate(currentExePath: string): Promise<void> {
   await downloadFile(downloadUrl, newExePath);
   console.log(`[updater] Téléchargement terminé: ${newExePath}`);
 
-  const batchPath = path.join(currentDir, 'update_agent.bat');
-  const batchContent = `@echo off
-chcp 65001 >nul
-echo Mise a jour de SimRacing Agent...
-timeout /t 3 /nobreak >nul
-taskkill /F /PID ${pid} >nul 2>&1
-if exist "${oldExePath}" del /F /Q "${oldExePath}"
-if exist "${currentExePath}" move /Y "${currentExePath}" "${oldExePath}"
-move /Y "${newExePath}" "${currentExePath}"
-echo Lancement de la nouvelle version...
-start "" "${currentExePath}"
-del /F /Q "%~f0"
+  const psPath = path.join(currentDir, 'update_agent.ps1');
+  const logPath = path.join(currentDir, 'update_agent.log');
+  const psContent = `Start-Transcript -Path "${logPath}" -Force
+Write-Host "Mise a jour de SimRacing Agent..."
+$pidToKill = ${pid}
+$maxWait = 10
+Write-Host "Attente de l arret du processus $pidToKill..."
+for ($i = 0; $i -lt $maxWait; $i++) {
+  try {
+    Stop-Process -Id $pidToKill -Force -ErrorAction Stop
+  } catch {
+    break
+  }
+  Start-Sleep -Seconds 1
+}
+Start-Sleep -Seconds 2
+if (Test-Path "${oldExePath}") {
+  Remove-Item -Path "${oldExePath}" -Force -ErrorAction SilentlyContinue
+}
+if (Test-Path "${currentExePath}") {
+  Move-Item -Path "${currentExePath}" -Destination "${oldExePath}" -Force -ErrorAction SilentlyContinue
+}
+Move-Item -Path "${newExePath}" -Destination "${currentExePath}" -Force -ErrorAction SilentlyContinue
+Write-Host "Lancement de la nouvelle version : ${currentExePath}"
+Start-Process -FilePath "${currentExePath}" -WorkingDirectory "${currentDir}" -WindowStyle Normal
+Stop-Transcript
+Remove-Item -Path "$PSCommandPath" -Force -ErrorAction SilentlyContinue
 `;
-  await fs.writeFile(batchPath, batchContent, 'utf-8');
-  console.log(`[updater] Script de mise a jour créé: ${batchPath}`);
+  await fs.writeFile(psPath, psContent, 'utf-8');
+  console.log(`[updater] Script de mise a jour créé: ${psPath}`);
 
-  spawn('cmd.exe', ['/c', batchPath], {
+  spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psPath], {
     detached: true,
     stdio: 'ignore',
     windowsHide: false,
