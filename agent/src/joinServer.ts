@@ -29,7 +29,7 @@ function getSteamLibraries(): string[] {
       const matches = content.match(/\"path\"\s+\"(.+?)\"/g);
       if (matches) {
         for (const m of matches) {
-          const p = m.replace(/\\"/g, '"').match(/\"path\"\s+\"(.+?)\"/);
+          const p = m.replace(/\\\"/g, '"').match(/\"path\"\s+\"(.+?)\"/);
           if (p && p[1] && !libs.includes(p[1])) libs.push(p[1]);
         }
       }
@@ -75,13 +75,32 @@ function findContentManagerExe(): string | null {
   return null;
 }
 
-export async function joinServer(cfg: JoinServerConfig): Promise<void> {
-  const raceIniPath = path.join(config.documentsPath, 'Assetto Corsa', 'cfg', 'race.ini');
-  await fs.ensureDir(path.dirname(raceIniPath));
-
-  const raceIni = `[HEADER]
+function buildRaceIni(cfg: JoinServerConfig): string {
+  const password = cfg.password || '';
+  const skin = cfg.skin || 'random';
+  const car = cfg.carAcId;
+  return `[HEADER]
 VERSION=1
 TYPE=RACE
+
+[RACE]
+CARS=1
+MODEL=${car}
+MODEL_CONFIG=
+SKIN=${skin}
+TRACK=rand
+CONFIG_TRACK=rand
+PENALTIES=0
+RACE_LAPS=0
+
+[CAR_0]
+MODEL=${car}
+MODEL_CONFIG=
+SKIN=${skin}
+DRIVERNAME=
+TEAM=
+GUID=
+SPAWN_POINT=1
 
 [REMOTE]
 ACTIVE=1
@@ -89,40 +108,74 @@ SERVER_IP=${cfg.serverIp}
 SERVER_PORT=${cfg.serverPort}
 SERVER_HTTP_PORT=${cfg.serverHttpPort || 8081}
 SERVER_NAME=${cfg.serverName || 'Serveur SimCenter'}
-PASSWORD=${cfg.password || ''}
-REQUESTED_CAR=${cfg.carAcId}
+PASSWORD=${password}
+REQUESTED_CAR=${car}
+NAME=
 TEAM=
 GUID=
 __CM_EXTENDED=0
 
-MODEL=${cfg.carAcId}
-MODEL_CONFIG=
-SKIN=${cfg.skin || 'random'}
-PENALTIES=0
-RACE_LAPS=0
+[AUTOSPAWN]
+ACTIVE=1
+
+[SESSION_0]
+NAME=Practice
+TYPE=1
+DURATION_MINUTES=0
+SPAWN_SET=PIT
 `;
+}
 
-  await fs.writeFile(raceIniPath, raceIni, 'utf-8');
+export async function joinServer(cfg: JoinServerConfig): Promise<void> {
+  const raceIniPath = path.join(config.documentsPath, 'Assetto Corsa', 'cfg', 'race.ini');
+  await fs.ensureDir(path.dirname(raceIniPath));
+  await fs.writeFile(raceIniPath, buildRaceIni(cfg), 'utf-8');
 
-  // Méthode fiable : acs.exe /spawn lit race.ini et rejoint le serveur.
-  let exe = findExecutable('acs.exe');
-  let args: string[] = ['/spawn'];
+  let exe = findExecutable('AssettoCorsa.exe') || findExecutable('acs.exe');
 
   if (!exe) {
     exe = findContentManagerExe();
-    args = [];
+    if (!exe) {
+      throw new Error(`Impossible de trouver AssettoCorsa.exe, acs.exe ou Content Manager pour lancer AC`);
+    }
   }
 
-  if (!exe) {
-    throw new Error(`Impossible de trouver acs.exe ou Content Manager pour lancer AC`);
+  const workingDir = path.dirname(exe);
+  const logPath = path.join(config.documentsPath, 'Assetto Corsa', 'logs', 'spawn.log');
+  await fs.ensureDir(path.dirname(logPath));
+
+  // Utilise PowerShell Start-Process pour un lancement fiable et visible sous Windows.
+  const isWindows = process.platform === 'win32';
+  if (isWindows) {
+    const psCmd = `
+      Start-Process -FilePath '${exe.replace(/'/g, "''")}' -ArgumentList '/spawn' -WorkingDirectory '${workingDir.replace(/'/g, "''")}' -WindowStyle Normal -PassThru | Select-Object -ExpandProperty Id
+    `.trim();
+    const child = spawn('powershell.exe', ['-NoProfile', '-Command', psCmd], {
+      detached: true,
+      stdio: ['ignore', 'ignore', 'pipe'],
+      windowsHide: false,
+    });
+
+    let stderr = '';
+    child.stderr?.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    child.on('exit', (code) => {
+      const line = `[${new Date().toISOString()}] PowerShell exit code: ${code}\nstderr: ${stderr}\n`;
+      try {
+        fs.appendFileSync(logPath, line);
+      } catch {}
+    });
+    child.unref();
+  } else {
+    const child = spawn(exe, ['/spawn'], {
+      detached: true,
+      stdio: 'ignore',
+      cwd: workingDir,
+    });
+    child.unref();
   }
 
-  const child = spawn(exe, args, {
-    detached: true,
-    stdio: 'ignore',
-    windowsHide: false,
-  });
-  child.unref();
-
-  console.log(`[joinServer] Lancement de ${exe} ${args.join(' ')} pour rejoindre ${cfg.serverIp}:${cfg.serverPort}`);
+  console.log(`[joinServer] Lancement de ${exe} /spawn pour rejoindre ${cfg.serverIp}:${cfg.serverPort}`);
 }
