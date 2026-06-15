@@ -158,10 +158,14 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
       fs.appendFileSync(logPath, `[${new Date().toISOString()}] CM URI: ${uri}\n`);
     } catch {}
 
+    const cmDir = path.dirname(cmExe);
     if (isWindows) {
-      // Utilise rundll32 pour ouvrir le protocole sans passer par cmd.exe
-      // (cmd interprèterait les & comme séparateurs de commandes)
-      const child = spawn('rundll32.exe', ['url.dll,FileProtocolHandler', uri], {
+      // Lancement direct de Content Manager.exe avec l'URI en argument et le bon
+      // répertoire de travail. rundll32 utilisait System32 comme cwd ce qui pouvait
+      // provoquer des erreurs de chargement de DLLs (0xc000007b) lorsque CM
+      // démarre ensuite acs.exe.
+      const child = spawn(cmExe, [uri], {
+        cwd: cmDir,
         detached: true,
         stdio: 'ignore',
         windowsHide: false,
