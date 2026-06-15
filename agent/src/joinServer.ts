@@ -131,7 +131,9 @@ function buildCmUri(cfg: JoinServerConfig): string {
   params.set('port', String(cfg.serverPort));
   params.set('httpPort', String(cfg.serverHttpPort || 8081));
   params.set('car', cfg.carAcId);
-  params.set('skin', cfg.skin || 'random');
+  if (cfg.skin && cfg.skin !== 'random') {
+    params.set('skin', cfg.skin);
+  }
   if (cfg.password) params.set('plainPassword', cfg.password);
   // Permet de lancer sans Steam ID (si Steam n'est pas intégré)
   params.set('allowWithoutSteamId', '1');
