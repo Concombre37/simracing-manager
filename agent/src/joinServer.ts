@@ -315,8 +315,8 @@ function Click-DriveButton {
   return $false
 }
 
-# Methode 2 : appui clavier bas niveau sur la fenetre AC
-function Press-SpaceOnAc {
+# Methode 2 : clic souris au centre de l'ecran + appui clavier
+function Click-And-Press-OnAc {
   Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
@@ -328,9 +328,14 @@ public class WinAPI {
   [DllImport("user32.dll")]
   public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
   [DllImport("user32.dll")]
+  public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")]
+  public static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, UIntPtr dwExtraInfo);
+  [DllImport("user32.dll")]
   public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
+  Add-Type -AssemblyName System.Windows.Forms
   Write-Log "Attente de la fenetre Assetto Corsa..."
   $hwnd = 0
   $timeout = 90
@@ -348,6 +353,18 @@ public class WinAPI {
   [WinAPI]::ShowWindow($hwnd, 1) | Out-Null
   [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
   Start-Sleep -Milliseconds 500
+
+  $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+  $cx = [int]($screen.Width / 2)
+  $cy = [int]($screen.Height / 2)
+  Write-Log "Clic au centre de l'ecran : $cx,$cy"
+  [WinAPI]::SetCursorPos($cx, $cy) | Out-Null
+  Start-Sleep -Milliseconds 200
+  [WinAPI]::mouse_event(0x0002, 0, 0, 0, 0) # LEFT DOWN
+  Start-Sleep -Milliseconds 150
+  [WinAPI]::mouse_event(0x0004, 0, 0, 0, 0) # LEFT UP
+  Start-Sleep -Seconds 2
+
   $VK_SPACE = 0x20
   Write-Log "Envoi Espace (keybd_event)"
   for ($j = 0; $j -lt 5; $j++) {
@@ -356,12 +373,12 @@ public class WinAPI {
     [WinAPI]::keybd_event($VK_SPACE, 0, 2, 0)
     Start-Sleep -Seconds 2
   }
-  Write-Log "Sequence clavier envoyee"
+  Write-Log "Sequence clavier/souris envoyee"
 }
 
 Write-Log "Demarrage de l'automatisation Drive..."
 if (-not (Click-DriveButton)) {
-  Press-SpaceOnAc
+  Click-And-Press-OnAc
 }
 `;
   try {
