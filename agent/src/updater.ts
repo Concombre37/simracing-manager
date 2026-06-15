@@ -118,51 +118,37 @@ export async function triggerUpdate(currentExePath: string): Promise<void> {
   await downloadFile(downloadUrl, newExePath);
   console.log(`[updater] Téléchargement terminé: ${newExePath}`);
 
-  const psPath = path.join(currentDir, 'update_agent.ps1');
+  const batchPath = path.join(currentDir, 'update_agent.bat');
   const logPath = path.join(currentDir, 'update_agent.log');
-  const psContent = `$log = "${logPath}"
-function Write-Log($msg) {
-  $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg"
-  Add-Content -Path $log -Value $line -ErrorAction SilentlyContinue
-  Write-Host $line
-}
-Write-Log "Mise a jour de SimRacing Agent..."
-$pidToKill = ${pid}
-$maxWait = 15
-Write-Log "Attente de l arret du processus $pidToKill..."
-for ($i = 0; $i -lt $maxWait; $i++) {
-  try {
-    Stop-Process -Id $pidToKill -Force -ErrorAction Stop
-  } catch {
-    break
-  }
-  Start-Sleep -Milliseconds 500
-}
-Start-Sleep -Seconds 2
-if (Test-Path "${oldExePath}") {
-  try { Remove-Item -Path "${oldExePath}" -Force -ErrorAction Stop } catch { Write-Log "Impossible de supprimer l ancien exe : $_" }
-}
-if (Test-Path "${currentExePath}") {
-  try { Move-Item -Path "${currentExePath}" -Destination "${oldExePath}" -Force -ErrorAction Stop } catch { Write-Log "Impossible de renommer l exe actuel : $_" }
-}
-try {
-  Move-Item -Path "${newExePath}" -Destination "${currentExePath}" -Force -ErrorAction Stop
-} catch {
-  Write-Log "Impossible de deplacer le nouvel exe : $_"
-  return
-}
-Write-Log "Lancement de la nouvelle version : ${currentExePath}"
-try {
-  Start-Process -FilePath "${currentExePath}" -WorkingDirectory "${currentDir}" -WindowStyle Normal
-  Write-Log "Nouvelle version lancee."
-} catch {
-  Write-Log "Erreur lors du lancement : $_"
-}
+  const batchContent = `@echo off
+chcp 65001 >nul
+echo [%date% %time%] Mise a jour de SimRacing Agent... >> "${logPath}"
+ping -n 6 127.0.0.1 >nul
+:waitloop
+tasklist /FI "PID eq ${pid}" 2>nul | find "${pid}" >nul
+if %errorlevel%==0 (
+  taskkill /F /PID ${pid} >> "${logPath}" 2>&1
+  ping -n 3 127.0.0.1 >nul
+  goto waitloop
+)
+echo [%date% %time%] Processus arrete >> "${logPath}"
+ping -n 4 127.0.0.1 >nul
+if exist "${oldExePath}" del /F /Q "${oldExePath}" >> "${logPath}" 2>&1
+if exist "${currentExePath}" move /Y "${currentExePath}" "${oldExePath}" >> "${logPath}" 2>&1
+move /Y "${newExePath}" "${currentExePath}" >> "${logPath}" 2>&1
+if exist "${currentExePath}" (
+  echo [%date% %time%] Lancement de la nouvelle version... >> "${logPath}"
+  start "" "${currentExePath}"
+) else (
+  echo [%date% %time%] ERREUR: nouvel exe introuvable >> "${logPath}"
+)
+ping -n 3 127.0.0.1 >nul
+del /F /Q "%~f0"
 `;
-  await fs.writeFile(psPath, psContent, 'utf-8');
-  console.log(`[updater] Script de mise a jour créé: ${psPath}`);
+  await fs.writeFile(batchPath, batchContent, 'utf-8');
+  console.log(`[updater] Script de mise a jour créé: ${batchPath}`);
 
-  spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psPath], {
+  spawn('cmd.exe', ['/c', batchPath], {
     detached: true,
     stdio: 'ignore',
     windowsHide: false,

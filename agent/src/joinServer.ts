@@ -290,6 +290,8 @@ public class WinAPI {
   public static extern bool SetForegroundWindow(IntPtr hWnd);
   [DllImport("user32.dll")]
   public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+  [DllImport("user32.dll")]
+  public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
 function Write-Log($msg) {
@@ -313,11 +315,14 @@ Start-Sleep -Seconds 12
 [WinAPI]::ShowWindow($hwnd, 1) | Out-Null
 [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
 Start-Sleep -Milliseconds 500
-Add-Type -AssemblyName System.Windows.Forms
-Write-Log "Envoi de la touche Espace"
-[System.Windows.Forms.SendKeys]::SendWait(" ")
-Start-Sleep -Seconds 3
-[System.Windows.Forms.SendKeys]::SendWait(" ")
+$VK_SPACE = 0x20
+Write-Log "Envoi de la touche Espace (keybd_event)"
+for ($j = 0; $j -lt 3; $j++) {
+  [WinAPI]::keybd_event($VK_SPACE, 0, 0, 0)
+  Start-Sleep -Milliseconds 150
+  [WinAPI]::keybd_event($VK_SPACE, 0, 2, 0)
+  Start-Sleep -Seconds 2
+}
 Write-Log "Sequence envoyee"
 `;
   try {
