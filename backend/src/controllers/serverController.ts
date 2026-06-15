@@ -88,9 +88,13 @@ export async function joinServer(req: AuthRequest, res: Response) {
     if (!stationId || !carId) {
       return res.status(400).json({ error: 'stationId et carId sont requis' });
     }
-    const station = await queryOne<{ local_ip: string | null; name: string }>('SELECT local_ip, name FROM stations WHERE id = ?', [stationId]);
-    if (!station) {
-      return res.status(404).json({ error: 'Poste non trouvé' });
+    const podStation = await queryOne<{ local_ip: string | null; name: string }>('SELECT local_ip, name FROM stations WHERE id = ?', [stationId]);
+    if (!podStation) {
+      return res.status(404).json({ error: 'Poste cible non trouvé' });
+    }
+    const serverStation = await queryOne<{ local_ip: string | null; name: string }>('SELECT local_ip, name FROM stations WHERE id = ?', [server.station_id]);
+    if (!serverStation) {
+      return res.status(404).json({ error: 'Poste serveur non trouvé' });
     }
     let carAcId = '';
     const carById = await queryOne<{ ac_id: string }>('SELECT ac_id FROM cars WHERE id = ?', [carId]);
@@ -111,8 +115,11 @@ export async function joinServer(req: AuthRequest, res: Response) {
     if (roomSize === 0) {
       return res.status(503).json({ error: 'Agent du poste cible non connecté' });
     }
-    if (!station.local_ip) {
+    if (!podStation.local_ip) {
       return res.status(503).json({ error: 'IP locale du poste cible inconnue' });
+    }
+    if (!serverStation.local_ip) {
+      return res.status(503).json({ error: 'IP locale du poste serveur inconnue' });
     }
     let serverPort = 9600;
     let serverHttpPort = 8081;
@@ -122,14 +129,16 @@ export async function joinServer(req: AuthRequest, res: Response) {
       serverHttpPort = cfg.httpPort || serverHttpPort;
     } catch {}
     io.to(roomName).emit('pod:joinServer', {
-      serverIp: station.local_ip,
+      serverIp: serverStation.local_ip,
       serverPort,
       serverHttpPort,
       serverName: server.name,
       carAcId,
       password: server.password || '',
+      track: server.track || '',
+      trackLayout: server.track_layout || '',
     });
-    console.log(`[server:join] Envoi à ${roomName} pour rejoindre ${station.local_ip}:${serverPort} en ${carAcId}`);
+    console.log(`[server:join] Envoi à ${roomName} pour rejoindre ${serverStation.local_ip}:${serverPort} en ${carAcId} (depuis ${podStation.local_ip})`);
     return res.json({ message: 'Commande envoyée au poste' });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

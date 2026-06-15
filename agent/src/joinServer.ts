@@ -14,6 +14,8 @@ export interface JoinServerConfig {
   carAcId: string;
   password?: string;
   skin?: string;
+  track?: string;
+  trackLayout?: string;
 }
 
 function getSteamLibraries(): string[] {
@@ -135,21 +137,27 @@ function findContentManagerExe(): string | null {
 
 function buildRaceIni(cfg: JoinServerConfig): string {
   const password = cfg.password || '';
-  const skin = cfg.skin || 'random';
+  const skin = cfg.skin || '';
   const car = cfg.carAcId;
+  const track = cfg.track || 'ks_nordschleife';
+  const trackLayout = cfg.trackLayout || '';
   return `[HEADER]
-VERSION=1
+VERSION=2
 TYPE=RACE
 
 [RACE]
 CARS=1
+AI_LEVEL=100
 MODEL=${car}
 MODEL_CONFIG=
 SKIN=${skin}
-TRACK=rand
-CONFIG_TRACK=rand
+TRACK=${track}
+CONFIG_TRACK=${trackLayout}
 PENALTIES=0
 RACE_LAPS=0
+DRIFT_MODE=0
+FIXED_SETUP=0
+JUMP_START_PENALTY=0
 
 [CAR_0]
 MODEL=${car}
@@ -158,6 +166,10 @@ SKIN=${skin}
 DRIVERNAME=
 TEAM=
 GUID=
+SETUP=
+BALLAST=0
+RESTRICTOR=0
+SPECTATOR_MODE=0
 SPAWN_POINT=1
 
 [REMOTE]
@@ -181,6 +193,23 @@ NAME=Practice
 TYPE=1
 DURATION_MINUTES=0
 SPAWN_SET=PIT
+
+[TEMPERATURE]
+AMBIENT=20
+ROAD=20
+
+[WEATHER]
+NAME=3_clear
+
+[WIND]
+DIRECTION_DEG=0
+SPEED_KMH_MIN=0
+SPEED_KMH_MAX=0
+
+[LIGHTING]
+SUN_ANGLE=-48
+TIME_MULT=1
+CLOUD_SPEED=0.2
 `;
 }
 
