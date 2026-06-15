@@ -1,7 +1,10 @@
 import fs from 'fs-extra';
 import path from 'path';
-import { spawn } from 'child_process';
+import { spawn, exec } from 'child_process';
+import { promisify } from 'util';
 import { config } from './config';
+
+const execAsync = promisify(exec);
 
 export interface JoinServerConfig {
   serverIp: string;
@@ -50,6 +53,62 @@ function findExecutable(name: string): string | null {
   if (fs.existsSync(defaultPath)) return defaultPath;
 
   return null;
+}
+
+function findSteamExe(): string | null {
+  if (process.platform !== 'win32') {
+    return null;
+  }
+  const candidates = [
+    path.join('C:', 'Program Files (x86)', 'Steam', 'steam.exe'),
+    path.join('C:', 'Program Files', 'Steam', 'steam.exe'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return null;
+}
+
+async function isSteamRunning(): Promise<boolean> {
+  if (process.platform !== 'win32') {
+    try {
+      await execAsync('pgrep -x steam');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  try {
+    const { stdout } = await execAsync('powershell.exe -NoProfile -Command "Get-Process steam -ErrorAction SilentlyContinue | Select-Object -First 1"');
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function ensureSteamRunning(logPath: string): Promise<void> {
+  if (await isSteamRunning()) {
+    console.log('[joinServer] Steam est déjà en cours d\'exécution');
+    return;
+  }
+  const steamExe = findSteamExe();
+  if (!steamExe) {
+    console.warn('[joinServer] Steam.exe non trouvé, impossible de le démarrer automatiquement');
+    return;
+  }
+  console.log(`[joinServer] Démarrage de Steam : ${steamExe}`);
+  try {
+    fs.appendFileSync(logPath, `[${new Date().toISOString()}] Démarrage de Steam : ${steamExe}\n`);
+  } catch {}
+  const child = spawn(steamExe, [], {
+    cwd: path.dirname(steamExe),
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: false,
+  });
+  child.unref();
+  // Attendre que Steam s'initialise avant de lancer Content Manager.
+  await new Promise((resolve) => setTimeout(resolve, 8000));
 }
 
 function findContentManagerExe(): string | null {
@@ -154,6 +213,13 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
   const cmExe = findContentManagerExe();
 
   if (config.launchMode === 'cm' && cmExe) {
+    // Steam est requis pour le handshake AC. On s'assure qu'il est lancé
+    // avant de demander à Content Manager de rejoindre le serveur, sauf si
+    // l'admin a explicitement désactivé l'utilisation de Steam.
+    if (!config.cmAllowWithoutSteamId) {
+      await ensureSteamRunning(logPath);
+    }
+
     // Lancement via le protocole interne de Content Manager.
     const uri = buildCmUri(cfg);
     console.log(`[joinServer] Lancement via Content Manager : ${uri}`);
