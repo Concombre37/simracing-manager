@@ -194,12 +194,18 @@ function buildCmUri(cfg: JoinServerConfig): string {
     params.set('skin', cfg.skin);
   }
   if (cfg.password) params.set('plainPassword', cfg.password);
+
   // Par défaut, laisse Content Manager utiliser Steam. Si Steam n'est pas
   // disponible/intégré, activer CM_ALLOW_WITHOUT_STEAM_ID=1 dans le .env.
   if (config.cmAllowWithoutSteamId) {
     params.set('allowWithoutSteamId', '1');
   }
-  return `acmanager://race/online?${params.toString()}`;
+
+  // Les serveurs SimCenter tournent en LAN sans REGISTER_TO_LOBBY. Le protocole
+  // "race/online" (lobby) provoque un "handshake failed" car CM tente de
+  // contacter le serveur via le lobby. Le protocole "race/online/join" est
+  // prévu pour les serveurs LAN / invitation directe.
+  return `acmanager://race/online/join?${params.toString()}`;
 }
 
 export async function joinServer(cfg: JoinServerConfig): Promise<void> {
