@@ -1,6 +1,5 @@
 import fs from 'fs-extra';
 import path from 'path';
-import os from 'os';
 import { spawn } from 'child_process';
 import { config } from './config';
 
@@ -126,30 +125,60 @@ SPAWN_SET=PIT
 `;
 }
 
+function buildCmUri(cfg: JoinServerConfig): string {
+  const params = new URLSearchParams();
+  params.set('ip', cfg.serverIp);
+  params.set('port', String(cfg.serverPort));
+  params.set('httpPort', String(cfg.serverHttpPort || 8081));
+  params.set('car', cfg.carAcId);
+  params.set('skin', cfg.skin || 'random');
+  if (cfg.password) params.set('plainPassword', cfg.password);
+  // Permet de lancer sans Steam ID (si Steam n'est pas intégré)
+  params.set('allowWithoutSteamId', '1');
+  return `acmanager://race/online?${params.toString()}`;
+}
+
 export async function joinServer(cfg: JoinServerConfig): Promise<void> {
   const raceIniPath = path.join(config.documentsPath, 'Assetto Corsa', 'cfg', 'race.ini');
+  const logPath = path.join(config.documentsPath, 'Assetto Corsa', 'logs', 'spawn.log');
   await fs.ensureDir(path.dirname(raceIniPath));
+  await fs.ensureDir(path.dirname(logPath));
   await fs.writeFile(raceIniPath, buildRaceIni(cfg), 'utf-8');
 
-  let exe = findExecutable('AssettoCorsa.exe') || findExecutable('acs.exe');
+  const isWindows = process.platform === 'win32';
+  const cmExe = findContentManagerExe();
 
-  if (!exe) {
-    exe = findContentManagerExe();
-    if (!exe) {
-      throw new Error(`Impossible de trouver AssettoCorsa.exe, acs.exe ou Content Manager pour lancer AC`);
+  if (cmExe) {
+    // Lancement via le protocole interne de Content Manager.
+    const uri = buildCmUri(cfg);
+    console.log(`[joinServer] Lancement via Content Manager : ${uri}`);
+    try {
+      fs.appendFileSync(logPath, `[${new Date().toISOString()}] CM URI: ${uri}\n`);
+    } catch {}
+
+    if (isWindows) {
+      const child = spawn('cmd.exe', ['/c', 'start', '', uri], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: false,
+      });
+      child.unref();
+    } else {
+      const child = spawn('xdg-open', [uri], { detached: true, stdio: 'ignore' });
+      child.unref();
     }
+    return;
+  }
+
+  // Fallback : AssettoCorsa.exe ou acs.exe avec /spawn
+  let exe = findExecutable('AssettoCorsa.exe') || findExecutable('acs.exe');
+  if (!exe) {
+    throw new Error(`Impossible de trouver AssettoCorsa.exe, acs.exe ou Content Manager pour lancer AC`);
   }
 
   const workingDir = path.dirname(exe);
-  const logPath = path.join(config.documentsPath, 'Assetto Corsa', 'logs', 'spawn.log');
-  await fs.ensureDir(path.dirname(logPath));
-
-  // Utilise PowerShell Start-Process pour un lancement fiable et visible sous Windows.
-  const isWindows = process.platform === 'win32';
   if (isWindows) {
-    const psCmd = `
-      Start-Process -FilePath '${exe.replace(/'/g, "''")}' -ArgumentList '/spawn' -WorkingDirectory '${workingDir.replace(/'/g, "''")}' -WindowStyle Normal -PassThru | Select-Object -ExpandProperty Id
-    `.trim();
+    const psCmd = `Start-Process -FilePath '${exe.replace(/'/g, "''")}' -ArgumentList '/spawn' -WorkingDirectory '${workingDir.replace(/'/g, "''")}' -WindowStyle Normal`;
     const child = spawn('powershell.exe', ['-NoProfile', '-Command', psCmd], {
       detached: true,
       stdio: ['ignore', 'ignore', 'pipe'],
@@ -157,23 +186,15 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
     });
 
     let stderr = '';
-    child.stderr?.on('data', (data) => {
-      stderr += data.toString();
-    });
-
+    child.stderr?.on('data', (data) => { stderr += data.toString(); });
     child.on('exit', (code) => {
-      const line = `[${new Date().toISOString()}] PowerShell exit code: ${code}\nstderr: ${stderr}\n`;
       try {
-        fs.appendFileSync(logPath, line);
+        fs.appendFileSync(logPath, `[${new Date().toISOString()}] PowerShell exit code: ${code}\nstderr: ${stderr}\n`);
       } catch {}
     });
     child.unref();
   } else {
-    const child = spawn(exe, ['/spawn'], {
-      detached: true,
-      stdio: 'ignore',
-      cwd: workingDir,
-    });
+    const child = spawn(exe, ['/spawn'], { detached: true, stdio: 'ignore', cwd: workingDir });
     child.unref();
   }
 

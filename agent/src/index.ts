@@ -27,7 +27,7 @@ interface LaunchConfig {
   sessionType?: 'practice' | 'race' | 'hotlap';
 }
 
-const AGENT_VERSION = '1.2.7';
+const AGENT_VERSION = '1.2.8';
 
 process.on('uncaughtException', (err) => {
   const fs = require('fs');
