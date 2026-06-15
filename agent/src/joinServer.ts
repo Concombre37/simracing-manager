@@ -184,7 +184,7 @@ SPAWN_SET=PIT
 `;
 }
 
-function buildCmUri(cfg: JoinServerConfig): string {
+function buildCmOnlineUri(cfg: JoinServerConfig): string {
   const params = new URLSearchParams();
   params.set('ip', cfg.serverIp);
   params.set('port', String(cfg.serverPort));
@@ -206,6 +206,20 @@ function buildCmUri(cfg: JoinServerConfig): string {
   // contacter le serveur via le lobby. Le protocole "race/online/join" est
   // prévu pour les serveurs LAN / invitation directe.
   return `acmanager://race/online/join?${params.toString()}`;
+}
+
+function buildCmConfigUri(cfg: JoinServerConfig): string {
+  // Passe un race.ini complet a Content Manager via le protocole race/config.
+  // Cela permet de lancer directement AC avec la voiture choisie, sans passer
+  // par la page d'information serveur.
+  const raceIni = buildRaceIni(cfg);
+  const encoded = Buffer.from(raceIni, 'utf-8').toString('base64');
+  const params = new URLSearchParams({ config: encoded });
+  return `acmanager://race/config?${params.toString()}`;
+}
+
+function buildCmUri(cfg: JoinServerConfig): string {
+  return config.cmUseConfigUri ? buildCmConfigUri(cfg) : buildCmOnlineUri(cfg);
 }
 
 export async function joinServer(cfg: JoinServerConfig): Promise<void> {
