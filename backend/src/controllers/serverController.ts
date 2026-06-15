@@ -64,7 +64,7 @@ export async function createServer(req: AuthRequest, res: Response) {
       cars: JSON.parse(carsJson),
       maxClients: maxClients || 10,
       password,
-      registerToLobby: !!registerToLobby,
+      registerToLobby: registerToLobby !== false,
     });
 
     const created = await queryOne<DedicatedServer>('SELECT * FROM dedicated_servers WHERE id = ?', [id]);

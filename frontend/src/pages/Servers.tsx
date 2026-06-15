@@ -33,7 +33,7 @@ export default function Servers() {
     cars: [] as string[],
     maxClients: 10,
     password: '',
-    registerToLobby: false,
+    registerToLobby: true,
   });
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function Servers() {
         password: form.password,
         registerToLobby: form.registerToLobby,
       });
-      setForm({ stationId: '', name: '', track: '', trackLayout: '', cars: [], maxClients: 10, password: '', registerToLobby: false });
+      setForm({ stationId: '', name: '', track: '', trackLayout: '', cars: [], maxClients: 10, password: '', registerToLobby: true });
       loadData();
     } catch (err: any) {
       alert(err.response?.data?.error || err.message);
@@ -171,7 +171,7 @@ export default function Servers() {
               checked={form.registerToLobby}
               onChange={(e) => setForm({ ...form, registerToLobby: e.target.checked })}
             />
-            <span>Serveur public (lobby AC) — nécessite l'ouverture des ports</span>
+            <span>Serveur public (lobby AC) — recommandé pour lancer directement via Content Manager</span>
           </label>
 
           <div>
