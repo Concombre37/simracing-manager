@@ -92,9 +92,18 @@ export async function joinServer(req: AuthRequest, res: Response) {
     if (!station) {
       return res.status(404).json({ error: 'Poste non trouvé' });
     }
-    const car = await queryOne<{ ac_id: string; name: string }>('SELECT ac_id, name FROM cars WHERE id = ?', [carId]);
-    if (!car) {
-      return res.status(404).json({ error: 'Voiture non trouvée' });
+    let carAcId = '';
+    const carById = await queryOne<{ ac_id: string }>('SELECT ac_id FROM cars WHERE id = ?', [carId]);
+    if (carById) {
+      carAcId = carById.ac_id;
+    } else {
+      const carByAcId = await queryOne<{ ac_id: string }>('SELECT ac_id FROM cars WHERE ac_id = ?', [carId]);
+      if (carByAcId) {
+        carAcId = carByAcId.ac_id;
+      } else {
+        // Accepte l'ac_id directement même s'il n'est pas dans la BDD
+        carAcId = carId;
+      }
     }
     const io = getIO();
     const roomName = `station:${stationId}`;
@@ -117,10 +126,10 @@ export async function joinServer(req: AuthRequest, res: Response) {
       serverPort,
       serverHttpPort,
       serverName: server.name,
-      carAcId: car.ac_id,
+      carAcId,
       password: server.password || '',
     });
-    console.log(`[server:join] Envoi à ${roomName} pour rejoindre ${station.local_ip}:${serverPort} en ${car.ac_id}`);
+    console.log(`[server:join] Envoi à ${roomName} pour rejoindre ${station.local_ip}:${serverPort} en ${carAcId}`);
     return res.json({ message: 'Commande envoyée au poste' });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

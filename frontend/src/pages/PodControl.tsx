@@ -24,6 +24,12 @@ interface SendState {
   loading: boolean;
 }
 
+interface SelectableCar {
+  id: string;
+  ac_id: string;
+  name: string;
+}
+
 export default function PodControl() {
   const [servers, setServers] = useState<DedicatedServer[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
@@ -59,6 +65,30 @@ export default function PodControl() {
   const getCarName = (acId: string) => {
     const car = cars.find((c) => c.ac_id === acId);
     return car?.name || acId;
+  };
+
+  const getAvailableCars = (server: DedicatedServer, stationId: string): SelectableCar[] => {
+    const station = stations.find((s) => s.id === stationId);
+    const allowed = server.cars || [];
+
+    // Priorité au contenu scanné localement sur le POD
+    const scanned = station?.content_data?.cars || [];
+    let list: SelectableCar[] = scanned.map((c) => ({
+      id: c.acId,
+      ac_id: c.acId,
+      name: c.name,
+    }));
+
+    // Fallback sur la BDD si aucun contenu scanné
+    if (list.length === 0) {
+      list = cars.map((c) => ({ id: c.id, ac_id: c.ac_id, name: c.name }));
+    }
+
+    if (allowed.length > 0) {
+      list = list.filter((c) => allowed.includes(c.ac_id));
+    }
+
+    return list;
   };
 
   const handleSend = async (server: DedicatedServer) => {
@@ -113,9 +143,8 @@ export default function PodControl() {
           {onlineServers.map((server) => {
             const state = sending[server.id] || { stationId: '', carId: '', loading: false };
             const allowedCars = server.cars || [];
-            const availableCars = allowedCars.length > 0
-              ? cars.filter((c) => allowedCars.includes(c.ac_id))
-              : cars;
+            const availableCars = getAvailableCars(server, state.stationId);
+            const selectedStation = stations.find((s) => s.id === state.stationId);
 
             return (
               <div key={server.id} className="card space-y-4">
@@ -145,7 +174,7 @@ export default function PodControl() {
                   <select
                     className="input w-full"
                     value={state.stationId}
-                    onChange={(e) => setServerState(server.id, { stationId: e.target.value })}
+                    onChange={(e) => setServerState(server.id, { stationId: e.target.value, carId: '' })}
                   >
                     <option value="">Choisir un POD</option>
                     {podStations.map((s) => (
@@ -155,12 +184,25 @@ export default function PodControl() {
                     ))}
                   </select>
 
+                  {selectedStation && !selectedStation.content_data?.cars && (
+                    <p className="text-xs text-yellow-400">
+                      Contenu AC du POD non scanné : fallback sur la liste globale.
+                    </p>
+                  )}
+
                   <select
                     className="input w-full"
                     value={state.carId}
                     onChange={(e) => setServerState(server.id, { carId: e.target.value })}
+                    disabled={!state.stationId || availableCars.length === 0}
                   >
-                    <option value="">Choisir une voiture</option>
+                    <option value="">
+                      {availableCars.length === 0
+                        ? state.stationId
+                          ? 'Aucune voiture disponible'
+                          : 'Choisir une voiture'
+                        : 'Choisir une voiture'}
+                    </option>
                     {availableCars.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
