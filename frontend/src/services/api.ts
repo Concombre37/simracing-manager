@@ -88,6 +88,8 @@ export const serversApi = {
   create: (data: Partial<DedicatedServer> & { stationId: string; track: string; registerToLobby?: boolean }) =>
     api.post<DedicatedServer>('/servers', data).then((r) => r.data),
   stop: (id: string) => api.post(`/servers/${id}/stop`).then((r) => r.data),
+  join: (id: string, stationId: string, carId: string) =>
+    api.post(`/servers/${id}/join`, { stationId, carId }).then((r) => r.data),
   delete: (id: string) => api.delete(`/servers/${id}`),
 };
 

@@ -9,6 +9,8 @@ import { AcContent, scanAssettoContent } from './contentScanner';
 import { writeSessionState, clearSessionState } from './state';
 import { setupConsole, setStatus, log } from './console';
 import { triggerUpdate } from './updater';
+import { getLocalIp } from './network';
+import { joinServer } from './joinServer';
 
 interface LaunchConfig {
   sessionId: string;
@@ -25,7 +27,7 @@ interface LaunchConfig {
   sessionType?: 'practice' | 'race' | 'hotlap';
 }
 
-const AGENT_VERSION = '1.2.5';
+const AGENT_VERSION = '1.2.6';
 
 process.on('uncaughtException', (err) => {
   const fs = require('fs');
@@ -86,6 +88,18 @@ socket.on('agent:update', async () => {
     await triggerUpdate(process.execPath);
   } catch (err: any) {
     log('error', `Mise à jour : ${err.message}`);
+  }
+});
+
+socket.on('pod:joinServer', async (data: { serverIp: string; serverPort: number; serverHttpPort?: number; serverName?: string; carAcId: string; password?: string; skin?: string }) => {
+  log('info', `Demande de rejoindre le serveur ${data.serverIp}:${data.serverPort}`);
+  try {
+    await joinServer(data);
+    log('success', 'Assetto Corsa lancé pour rejoindre le serveur');
+    socket.emit('pod:joinedServer', { success: true });
+  } catch (err: any) {
+    log('error', `Erreur join server : ${err.message}`);
+    socket.emit('pod:joinedServer', { success: false, error: err.message });
   }
 });
 
@@ -257,6 +271,7 @@ setInterval(() => {
     currentSessionId,
     acRunning: lastKnownAcRunning,
     cmRunning: lastKnownCmRunning,
+    localIp: getLocalIp(),
   });
 }, config.heartbeatIntervalMs);
 
@@ -300,6 +315,7 @@ async function sendServerStatus() {
   socket.emit('server:status', {
     stationId: config.stationId,
     servers,
+    localIp: getLocalIp(),
   });
 }
 

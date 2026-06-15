@@ -78,6 +78,55 @@ export async function createServer(req: AuthRequest, res: Response) {
   }
 }
 
+export async function joinServer(req: AuthRequest, res: Response) {
+  try {
+    const server = await queryOne<DedicatedServer>('SELECT * FROM dedicated_servers WHERE id = ?', [req.params.id]);
+    if (!server) {
+      return res.status(404).json({ error: 'Serveur non trouvé' });
+    }
+    const { stationId, carId } = req.body;
+    if (!stationId || !carId) {
+      return res.status(400).json({ error: 'stationId et carId sont requis' });
+    }
+    const station = await queryOne<{ local_ip: string | null; name: string }>('SELECT local_ip, name FROM stations WHERE id = ?', [stationId]);
+    if (!station) {
+      return res.status(404).json({ error: 'Poste non trouvé' });
+    }
+    const car = await queryOne<{ ac_id: string; name: string }>('SELECT ac_id, name FROM cars WHERE id = ?', [carId]);
+    if (!car) {
+      return res.status(404).json({ error: 'Voiture non trouvée' });
+    }
+    const io = getIO();
+    const roomName = `station:${stationId}`;
+    const roomSize = io.sockets.adapter.rooms.get(roomName)?.size || 0;
+    if (roomSize === 0) {
+      return res.status(503).json({ error: 'Agent du poste cible non connecté' });
+    }
+    if (!station.local_ip) {
+      return res.status(503).json({ error: 'IP locale du poste cible inconnue' });
+    }
+    let serverPort = 9600;
+    let serverHttpPort = 8081;
+    try {
+      const cfg = JSON.parse(server.config_json as any || '{}');
+      serverPort = cfg.udpPort || serverPort;
+      serverHttpPort = cfg.httpPort || serverHttpPort;
+    } catch {}
+    io.to(roomName).emit('pod:joinServer', {
+      serverIp: station.local_ip,
+      serverPort,
+      serverHttpPort,
+      serverName: server.name,
+      carAcId: car.ac_id,
+      password: server.password || '',
+    });
+    console.log(`[server:join] Envoi à ${roomName} pour rejoindre ${station.local_ip}:${serverPort} en ${car.ac_id}`);
+    return res.json({ message: 'Commande envoyée au poste' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 export async function stopServer(req: AuthRequest, res: Response) {
   try {
     const server = await queryOne<DedicatedServer>('SELECT * FROM dedicated_servers WHERE id = ?', [req.params.id]);

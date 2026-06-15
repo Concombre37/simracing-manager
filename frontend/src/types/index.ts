@@ -39,6 +39,7 @@ export interface Station {
   current_session_id?: string;
   active_servers?: AcServerInfo[];
   content_data?: AcContent;
+  local_ip?: string;
   last_heartbeat?: string;
 }
 

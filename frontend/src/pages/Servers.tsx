@@ -23,6 +23,8 @@ export default function Servers() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(false);
+  const [joinModal, setJoinModal] = useState<{ open: boolean; serverId: string; serverName: string } | null>(null);
+  const [joinForm, setJoinForm] = useState({ stationId: '', carId: '' });
   const [form, setForm] = useState({
     stationId: '',
     name: '',
@@ -249,12 +251,20 @@ export default function Servers() {
                 </div>
                 <div className="flex gap-2">
                   {server.status === 'running' && (
-                    <button
-                      className="btn btn-secondary"
-                      onClick={() => serversApi.stop(server.id).then(loadData)}
-                    >
-                      Arrêter
-                    </button>
+                    <>
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => setJoinModal({ open: true, serverId: server.id, serverName: server.name })}
+                      >
+                        Envoyer un POD
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => serversApi.stop(server.id).then(loadData)}
+                      >
+                        Arrêter
+                      </button>
+                    </>
                   )}
                   <button
                     className="btn btn-danger"
@@ -268,6 +278,65 @@ export default function Servers() {
           </div>
         )}
       </div>
+
+      {joinModal?.open && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-dark-800 rounded-lg p-6 w-full max-w-md space-y-4">
+            <h2 className="text-xl font-bold">Envoyer un POD sur {joinModal.serverName}</h2>
+            <select
+              className="input w-full"
+              value={joinForm.stationId}
+              onChange={(e) => setJoinForm({ ...joinForm, stationId: e.target.value })}
+              required
+            >
+              <option value="">Choisir un poste POD</option>
+              {stations
+                .filter((s) => s.status !== 'offline')
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.status}) {s.local_ip ? `- ${s.local_ip}` : ''}
+                  </option>
+                ))}
+            </select>
+            <select
+              className="input w-full"
+              value={joinForm.carId}
+              onChange={(e) => setJoinForm({ ...joinForm, carId: e.target.value })}
+              required
+            >
+              <option value="">Choisir une voiture</option>
+              {cars.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex gap-2 justify-end">
+              <button className="btn btn-secondary" onClick={() => setJoinModal(null)}>
+                Annuler
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={!joinForm.stationId || !joinForm.carId || loading}
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await serversApi.join(joinModal.serverId, joinForm.stationId, joinForm.carId);
+                    setJoinModal(null);
+                    setJoinForm({ stationId: '', carId: '' });
+                  } catch (err: any) {
+                    alert(err.response?.data?.error || err.message);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                {loading ? 'Envoi...' : 'Envoyer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

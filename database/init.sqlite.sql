@@ -31,6 +31,7 @@ CREATE TABLE stations (
   current_session_id TEXT,
   active_servers TEXT,
   content_data TEXT,
+  local_ip TEXT,
   last_heartbeat DATETIME
 );
 

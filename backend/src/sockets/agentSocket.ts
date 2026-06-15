@@ -50,7 +50,7 @@ export function setupAgentSocket(io: SocketIOServer) {
       io.emit('station:updated', { id: stationId, status: 'online' });
     });
 
-    socket.on('station:heartbeat', async (data: { stationId: string; status: string; currentSessionId?: string; acRunning?: boolean; cmRunning?: boolean }) => {
+    socket.on('station:heartbeat', async (data: { stationId: string; status: string; currentSessionId?: string; acRunning?: boolean; cmRunning?: boolean; localIp?: string }) => {
       const stationId = await resolveOrCreateStationId(data.stationId);
       if (!stationId) {
         console.warn(`Heartbeat: aucun poste trouvé pour ${data.stationId}`);
@@ -59,8 +59,8 @@ export function setupAgentSocket(io: SocketIOServer) {
       console.log(`Heartbeat reçu: ${stationId} -> ${data.status}`);
       try {
         await run(
-          'UPDATE stations SET status = ?, current_session_id = ?, last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
-          [data.status, data.currentSessionId || null, stationId]
+          'UPDATE stations SET status = ?, current_session_id = ?, local_ip = ?, last_heartbeat = CURRENT_TIMESTAMP WHERE id = ?',
+          [data.status, data.currentSessionId || null, data.localIp || null, stationId]
         );
         io.emit('station:updated', {
           id: stationId,
@@ -68,13 +68,14 @@ export function setupAgentSocket(io: SocketIOServer) {
           currentSessionId: data.currentSessionId,
           acRunning: data.acRunning,
           cmRunning: data.cmRunning,
+          localIp: data.localIp,
         });
       } catch (err) {
         console.error('Erreur heartbeat:', err);
       }
     });
 
-    socket.on('server:status', async (data: { stationId: string; servers: any[] }) => {
+    socket.on('server:status', async (data: { stationId: string; servers: any[]; localIp?: string }) => {
       const stationId = await resolveOrCreateStationId(data.stationId);
       if (!stationId) {
         console.warn(`server:status: aucun poste trouvé pour ${data.stationId}`);
@@ -82,10 +83,10 @@ export function setupAgentSocket(io: SocketIOServer) {
       }
       try {
         await run(
-          'UPDATE stations SET active_servers = ? WHERE id = ?',
-          [JSON.stringify(data.servers || []), stationId]
+          'UPDATE stations SET active_servers = ?, local_ip = ? WHERE id = ?',
+          [JSON.stringify(data.servers || []), data.localIp || null, stationId]
         );
-        io.emit('station:updated', { id: stationId, active_servers: data.servers || [] });
+        io.emit('station:updated', { id: stationId, active_servers: data.servers || [], localIp: data.localIp });
       } catch (err) {
         console.error('Erreur server:status:', err);
       }
