@@ -24,7 +24,7 @@ DOCUMENTS_PATH=${path.join(os.homedir(), 'Documents').replace(/\\/g, '\\\\')}
 LAUNCH_MODE=cm
 CM_EXECUTABLE=Content Manager.exe
 CM_ALLOW_WITHOUT_STEAM_ID=0
-CM_USE_CONFIG_URI=1
+CM_URI_MODE=online
 AC_EXECUTABLE=acs.exe
 
 HEARTBEAT_INTERVAL_MS=5000
@@ -66,7 +66,7 @@ export const config = {
   launchMode: getEnv('LAUNCH_MODE', 'cm') as 'cm' | 'ac',
   cmExecutable: getEnv('CM_EXECUTABLE', 'Content Manager.exe'),
   cmAllowWithoutSteamId: getEnv('CM_ALLOW_WITHOUT_STEAM_ID', '0') === '1',
-  cmUseConfigUri: getEnv('CM_USE_CONFIG_URI', '1') === '1',
+  cmUriMode: getEnv('CM_URI_MODE', 'online') as 'online' | 'join' | 'config',
   acExecutable: getEnv('AC_EXECUTABLE', 'acs.exe'),
 
   // Intervalles

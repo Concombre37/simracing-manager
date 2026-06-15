@@ -120,31 +120,44 @@ export async function triggerUpdate(currentExePath: string): Promise<void> {
 
   const psPath = path.join(currentDir, 'update_agent.ps1');
   const logPath = path.join(currentDir, 'update_agent.log');
-  const psContent = `Start-Transcript -Path "${logPath}" -Force
-Write-Host "Mise a jour de SimRacing Agent..."
+  const psContent = `$log = "${logPath}"
+function Write-Log($msg) {
+  $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg"
+  Add-Content -Path $log -Value $line -ErrorAction SilentlyContinue
+  Write-Host $line
+}
+Write-Log "Mise a jour de SimRacing Agent..."
 $pidToKill = ${pid}
-$maxWait = 10
-Write-Host "Attente de l arret du processus $pidToKill..."
+$maxWait = 15
+Write-Log "Attente de l arret du processus $pidToKill..."
 for ($i = 0; $i -lt $maxWait; $i++) {
   try {
     Stop-Process -Id $pidToKill -Force -ErrorAction Stop
   } catch {
     break
   }
-  Start-Sleep -Seconds 1
+  Start-Sleep -Milliseconds 500
 }
 Start-Sleep -Seconds 2
 if (Test-Path "${oldExePath}") {
-  Remove-Item -Path "${oldExePath}" -Force -ErrorAction SilentlyContinue
+  try { Remove-Item -Path "${oldExePath}" -Force -ErrorAction Stop } catch { Write-Log "Impossible de supprimer l ancien exe : $_" }
 }
 if (Test-Path "${currentExePath}") {
-  Move-Item -Path "${currentExePath}" -Destination "${oldExePath}" -Force -ErrorAction SilentlyContinue
+  try { Move-Item -Path "${currentExePath}" -Destination "${oldExePath}" -Force -ErrorAction Stop } catch { Write-Log "Impossible de renommer l exe actuel : $_" }
 }
-Move-Item -Path "${newExePath}" -Destination "${currentExePath}" -Force -ErrorAction SilentlyContinue
-Write-Host "Lancement de la nouvelle version : ${currentExePath}"
-Start-Process -FilePath "${currentExePath}" -WorkingDirectory "${currentDir}" -WindowStyle Normal
-Stop-Transcript
-Remove-Item -Path "$PSCommandPath" -Force -ErrorAction SilentlyContinue
+try {
+  Move-Item -Path "${newExePath}" -Destination "${currentExePath}" -Force -ErrorAction Stop
+} catch {
+  Write-Log "Impossible de deplacer le nouvel exe : $_"
+  return
+}
+Write-Log "Lancement de la nouvelle version : ${currentExePath}"
+try {
+  Start-Process -FilePath "${currentExePath}" -WorkingDirectory "${currentDir}" -WindowStyle Normal
+  Write-Log "Nouvelle version lancee."
+} catch {
+  Write-Log "Erreur lors du lancement : $_"
+}
 `;
   await fs.writeFile(psPath, psContent, 'utf-8');
   console.log(`[updater] Script de mise a jour créé: ${psPath}`);

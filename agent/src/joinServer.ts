@@ -213,6 +213,27 @@ CLOUD_SPEED=0.2
 `;
 }
 
+function buildCmOnlineJoinUri(cfg: JoinServerConfig): string {
+  const params = new URLSearchParams();
+  params.set('ip', cfg.serverIp);
+  params.set('port', String(cfg.serverPort));
+  params.set('httpPort', String(cfg.serverHttpPort || 8081));
+  params.set('car', cfg.carAcId);
+  if (cfg.skin && cfg.skin !== 'random') {
+    params.set('skin', cfg.skin);
+  }
+  if (cfg.password) params.set('plainPassword', cfg.password);
+
+  // Par défaut, laisse Content Manager utiliser Steam. Si Steam n'est pas
+  // disponible/intégré, activer CM_ALLOW_WITHOUT_STEAM_ID=1 dans le .env.
+  if (config.cmAllowWithoutSteamId) {
+    params.set('allowWithoutSteamId', '1');
+  }
+
+  // Protocole LAN : ouvre la page d'information du serveur local.
+  return `acmanager://race/online/join?${params.toString()}`;
+}
+
 function buildCmOnlineUri(cfg: JoinServerConfig): string {
   const params = new URLSearchParams();
   params.set('ip', cfg.serverIp);
@@ -230,11 +251,9 @@ function buildCmOnlineUri(cfg: JoinServerConfig): string {
     params.set('allowWithoutSteamId', '1');
   }
 
-  // Les serveurs SimCenter tournent en LAN sans REGISTER_TO_LOBBY. Le protocole
-  // "race/online" (lobby) provoque un "handshake failed" car CM tente de
-  // contacter le serveur via le lobby. Le protocole "race/online/join" est
-  // prévu pour les serveurs LAN / invitation directe.
-  return `acmanager://race/online/join?${params.toString()}`;
+  // Protocole en ligne / lobby : tente de rejoindre directement le serveur.
+  // Fonctionne si le serveur est joignable a cette IP ou enregistre au lobby.
+  return `acmanager://race/online?${params.toString()}`;
 }
 
 function buildCmConfigUri(cfg: JoinServerConfig): string {
@@ -248,7 +267,15 @@ function buildCmConfigUri(cfg: JoinServerConfig): string {
 }
 
 function buildCmUri(cfg: JoinServerConfig): string {
-  return config.cmUseConfigUri ? buildCmConfigUri(cfg) : buildCmOnlineUri(cfg);
+  switch (config.cmUriMode) {
+    case 'config':
+      return buildCmConfigUri(cfg);
+    case 'join':
+      return buildCmOnlineJoinUri(cfg);
+    case 'online':
+    default:
+      return buildCmOnlineUri(cfg);
+  }
 }
 
 export async function joinServer(cfg: JoinServerConfig): Promise<void> {
