@@ -280,7 +280,44 @@ function buildCmUri(cfg: JoinServerConfig): string {
 
 function scheduleDriveKeyPress(logPath: string): void {
   const psPath = path.join(config.documentsPath, 'Assetto Corsa', 'logs', 'press_drive_key.ps1');
-  const psContent = `Add-Type -TypeDefinition @"
+  const psContent = `function Write-Log($msg) {
+  $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg"
+  Add-Content -Path "${logPath}" -Value $line -ErrorAction SilentlyContinue
+}
+
+# Methode 1 : UI Automation pour cliquer sur le bouton Drive/Join de CM
+function Click-DriveButton {
+  try {
+    Add-Type -AssemblyName UIAutomationClient -ErrorAction Stop
+    $ui = [System.Windows.Automation.AutomationElement]
+    $desktop = $ui::RootElement
+    $cond = [System.Windows.Automation.ControlTypeCondition]::FromControlType([System.Windows.Automation.ControlType]::Button)
+    $timeout = 120
+    for ($i = 0; $i -lt $timeout; $i++) {
+      $buttons = $desktop.FindAll([System.Windows.Automation.TreeScope]::Descendants, $cond)
+      for ($j = 0; $j -lt $buttons.Count; $j++) {
+        $b = $buttons[$j]
+        $name = $b.Current.Name
+        if ($name -eq "Drive" -or $name -eq "JOIN" -or $name -eq "Join") {
+          Write-Log "Bouton trouve : '$name', attente 5 secondes avant clic"
+          Start-Sleep -Seconds 5
+          $pattern = $b.GetCurrentPattern([System.Windows.Automation.PatternIdentifiers]::InvokePattern)
+          $pattern.Invoke()
+          Write-Log "Bouton '$name' clique"
+          return $true
+        }
+      }
+      Start-Sleep -Seconds 1
+    }
+  } catch {
+    Write-Log "UI Automation indisponible ou erreur : $_"
+  }
+  return $false
+}
+
+# Methode 2 : appui clavier bas niveau sur la fenetre AC
+function Press-SpaceOnAc {
+  Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
 public class WinAPI {
@@ -294,36 +331,38 @@ public class WinAPI {
   public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
 }
 "@
-function Write-Log($msg) {
-  $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg"
-  Add-Content -Path "${logPath}" -Value $line -ErrorAction SilentlyContinue
+  Write-Log "Attente de la fenetre Assetto Corsa..."
+  $hwnd = 0
+  $timeout = 90
+  for ($i = 0; $i -lt $timeout; $i++) {
+    $hwnd = [WinAPI]::FindWindow($null, "Assetto Corsa")
+    if ($hwnd -ne 0) { break }
+    Start-Sleep -Seconds 1
+  }
+  if ($hwnd -eq 0) {
+    Write-Log "Fenetre Assetto Corsa non trouvee"
+    return
+  }
+  Write-Log "Fenetre AC trouvee, attente 25 secondes de chargement..."
+  Start-Sleep -Seconds 25
+  [WinAPI]::ShowWindow($hwnd, 1) | Out-Null
+  [WinAPI]::SetForegroundWindow($hwnd) | Out-Null
+  Start-Sleep -Milliseconds 500
+  $VK_SPACE = 0x20
+  Write-Log "Envoi Espace (keybd_event)"
+  for ($j = 0; $j -lt 5; $j++) {
+    [WinAPI]::keybd_event($VK_SPACE, 0, 0, 0)
+    Start-Sleep -Milliseconds 150
+    [WinAPI]::keybd_event($VK_SPACE, 0, 2, 0)
+    Start-Sleep -Seconds 2
+  }
+  Write-Log "Sequence clavier envoyee"
 }
-Write-Log "Attente de la fenetre Assetto Corsa..."
-$hwnd = 0
-$timeout = 90
-for ($i = 0; $i -lt $timeout; $i++) {
-  $hwnd = [WinAPI]::FindWindow($null, "Assetto Corsa")
-  if ($hwnd -ne 0) { break }
-  Start-Sleep -Seconds 1
+
+Write-Log "Demarrage de l'automatisation Drive..."
+if (-not (Click-DriveButton)) {
+  Press-SpaceOnAc
 }
-if ($hwnd -eq 0) {
-  Write-Log "Fenetre Assetto Corsa non trouvee apres $timeout secondes"
-  return
-}
-Write-Log "Fenetre trouvee, attente du chargement..."
-Start-Sleep -Seconds 12
-[WinAPI]::ShowWindow($hwnd, 1) | Out-Null
-[WinAPI]::SetForegroundWindow($hwnd) | Out-Null
-Start-Sleep -Milliseconds 500
-$VK_SPACE = 0x20
-Write-Log "Envoi de la touche Espace (keybd_event)"
-for ($j = 0; $j -lt 3; $j++) {
-  [WinAPI]::keybd_event($VK_SPACE, 0, 0, 0)
-  Start-Sleep -Milliseconds 150
-  [WinAPI]::keybd_event($VK_SPACE, 0, 2, 0)
-  Start-Sleep -Seconds 2
-}
-Write-Log "Sequence envoyee"
 `;
   try {
     fs.writeFileSync(psPath, psContent, 'utf-8');
