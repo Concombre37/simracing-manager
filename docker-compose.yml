@@ -1,18 +1,44 @@
 services:
-  simracing:
-    build: .
-    container_name: simracing
+  postgres:
+    image: postgres:16
+    container_name: simracing-postgres
+    privileged: true
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: simracing
+      POSTGRES_PASSWORD: simracing
+      POSTGRES_DB: simracing
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    tmpfs:
+      - /var/run/postgresql:rw,nosuid,size=100m
+      - /tmp:rw,nosuid,size=100m
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U simracing -d simracing']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: simracing-backend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3002:3002"
-    volumes:
-      - simracing-data:/data
+      - '127.0.0.1:3000:3000'
     environment:
-      - NODE_ENV=production
-      - PORT=3002
-      - DB_NAME=/data/sim_center.sqlite
-      - JWT_SECRET=simracing_hytlabs_secret_key_change_me
-      - JWT_EXPIRES_IN=7d
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://simracing:simracing@postgres:5432/simracing?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_EXPIRES_IN: 7d
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://simracing.hytlabs.com}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  simracing-data:
+  postgres-data:

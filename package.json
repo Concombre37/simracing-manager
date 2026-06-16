@@ -1,14 +1,44 @@
 {
-  "name": "sim-center-manager",
-  "version": "1.0.0",
-  "description": "Plateforme de gestion pour centre de simulation automobile",
+  "name": "simracing-manager",
+  "version": "2.0.0",
   "private": true,
+  "description": "Professional sim racing station management system",
+  "license": "MIT",
+  "author": "Concombre37",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../agent && npm install",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "dev:agent": "cd agent && npm run dev",
-    "seed": "cd backend && npm run seed",
-    "build": "cd backend && npm run build && cd ../frontend && npm run build && cd ../agent && npm run build"
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml}\"",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspaces --if-present",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.12.0",
+    "@typescript-eslint/parser": "^7.12.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,md,yml}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx}": [
+      "eslint --fix"
+    ]
   }
 }

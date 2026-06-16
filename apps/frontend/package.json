@@ -1,0 +1,36 @@
+{
+  "name": "@simracing/frontend",
+  "private": true,
+  "version": "2.0.0",
+  "description": "SimRacing Manager frontend dashboard",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@simracing/shared": "*",
+    "@tanstack/react-query": "^5.45.0",
+    "axios": "^1.7.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.23.1",
+    "socket.io-client": "^4.7.5",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@typescript-eslint/eslint-plugin": "^7.12.0",
+    "@typescript-eslint/parser": "^7.12.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-refresh": "^0.4.14",
+    "typescript": "^5.4.5",
+    "vite": "^5.4.10"
+  }
+}

@@ -1,10 +1,64 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
 dist/
 build/
+out/
+*.tsbuildinfo
+
+# Environment variables
 .env
-backend/data/
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# Testing
+coverage/
+.nyc_output/
+
+# Database
 *.sqlite
 *.sqlite3
-.DS_Store
-agent/src/embeddedAssets.ts
+*.db
+
+# Agent binaries and build artifacts
+agent/exe/
+agent/dist/
+agent/tools/PressDriveKey/bin/
+agent/tools/PressDriveKey/obj/
+*.pdb
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Docker
+.docker/
+
+# Misc
+.cache/
 .dotnet/
