@@ -313,6 +313,21 @@ function findDriveKeyHelperPath(): string | null {
   return null;
 }
 
+function getAutoStartFlagPath(): string {
+  return path.join(
+    config.documentsPath,
+    "Assetto Corsa",
+    "cfg",
+    "simcenter_autostart.flag",
+  );
+}
+
+async function writeAutoStartFlag(): Promise<void> {
+  const flagPath = getAutoStartFlagPath();
+  await fs.ensureDir(path.dirname(flagPath));
+  await fs.writeFile(flagPath, "1", "utf-8");
+}
+
 function scheduleDriveKeyPress(logPath: string): void {
   if (!config.autoDriveHelper) {
     schedulePowerShellDriveKeyPress(logPath);
@@ -585,8 +600,17 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
 
     const cmDir = path.dirname(cmExe);
     if (isWindows) {
-      // Lancer le helper avant Content Manager pour que la manette virtuelle soit
-      // deja connectee quand Assetto Corsa demarre (meilleure detection DirectInput).
+      // Creer le flag pour l'app Lua CSP qui appellera ac.tryToStart(true)
+      // quand AC affichera l'ecran "volant rouge".
+      if (config.autoDriveLua) {
+        try {
+          await writeAutoStartFlag();
+        } catch (err: any) {
+          console.warn(`[joinServer] Impossible d'ecrire le flag autostart : ${err.message}`);
+        }
+      }
+
+      // Lancer le helper ViGEmBus en fallback (si CSP n'est pas present).
       scheduleDriveKeyPress(driveKeyLogPath);
 
       // Petite pause pour laisser ViGEmBus connecter la manette virtuelle.
@@ -622,6 +646,15 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
   }
 
   const workingDir = path.dirname(exe);
+
+  if (isWindows && config.autoDriveLua) {
+    try {
+      await writeAutoStartFlag();
+    } catch (err: any) {
+      console.warn(`[joinServer] Impossible d'ecrire le flag autostart : ${err.message}`);
+    }
+  }
+
   if (isWindows) {
     const psCmd = `Start-Process -FilePath '${exe.replace(/'/g, "''")}' -ArgumentList '/spawn' -WorkingDirectory '${workingDir.replace(/'/g, "''")}' -WindowStyle Normal`;
     const child = spawn("powershell.exe", ["-NoProfile", "-Command", psCmd], {

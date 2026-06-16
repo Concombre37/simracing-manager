@@ -1,6 +1,6 @@
 {
   "name": "sim-center-agent",
-  "version": "1.3.22",
+  "version": "1.3.23",
   "description": "Agent local pour Sim Center Manager",
   "main": "dist/index.js",
   "bin": "dist/index.js",
@@ -12,6 +12,8 @@
     "outputPath": "./exe",
     "assets": [
       ".env.example",
+      "lua_app/manifest.ini",
+      "lua_app/SimCenterAutoStart.lua",
       "tools/PressDriveKey.exe",
       "tools/ViGEmBus/ViGEmBus_1.22.0_x64_x86_arm64.exe"
     ]

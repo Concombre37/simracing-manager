@@ -39,6 +39,9 @@ AUTO_DRIVE_INTERVAL_MS=2000
 # Mapper automatiquement l'action Start/Restart d'AC sur le bouton A de la manette virtuelle
 AUTO_MAP_AC_CONTROLS=1
 
+# App Lua CSP pour demarrer automatiquement la session (1 = actif)
+AUTO_DRIVE_LUA=1
+
 HEARTBEAT_INTERVAL_MS=5000
 RESULT_CHECK_INTERVAL_MS=10000
 SERVER_SCAN_INTERVAL_MS=15000
@@ -96,6 +99,9 @@ export const config = {
 
   // Mapping automatique de Start/Restart sur le bouton A de la manette virtuelle
   autoMapAcControls: getEnv("AUTO_MAP_AC_CONTROLS", "1") === "1",
+
+  // App Lua CSP pour demarrer automatiquement la session
+  autoDriveLua: getEnv("AUTO_DRIVE_LUA", "1") === "1",
 
   // Intervalles
   heartbeatIntervalMs: parseInt(getEnv("HEARTBEAT_INTERVAL_MS", "5000")),

@@ -18,6 +18,10 @@ const VIGEM_DOWNLOAD_URL = `https://github.com/nefarius/ViGEmBus/releases/downlo
 const HELPER_NAME = "PressDriveKey.exe";
 const HELPER_PUBLIC_URL = `https://github.com/${OWNER}/${REPO}/releases/latest/download/${HELPER_NAME}`;
 
+const LUA_APP_DIR = "lua_app";
+const LUA_APP_TARGET_NAME = "SimCenterAutoStart";
+const LUA_APP_FILES = ["manifest.ini", "SimCenterAutoStart.lua"];
+
 function getToolsDir(): string {
   return path.join(config.baseDir, "tools");
 }
@@ -186,6 +190,46 @@ async function ensureViGEmBus(): Promise<void> {
   }
 }
 
+function getLuaAppTargetDir(): string {
+  return path.join(config.acPath, "apps", "lua", LUA_APP_TARGET_NAME);
+}
+
+async function ensureLuaApp(): Promise<void> {
+  if (process.platform !== "win32") {
+    log("info", "[setup] App Lua ignoree sur plateforme non-Windows");
+    return;
+  }
+
+  const targetDir = getLuaAppTargetDir();
+  let installed = 0;
+
+  for (const file of LUA_APP_FILES) {
+    const srcSnapshot = path.join(__dirname, "..", LUA_APP_DIR, file);
+    const dest = path.join(targetDir, file);
+
+    try {
+      const data = fs.readFileSync(srcSnapshot);
+      if (!data || data.length === 0) {
+        log("warn", `[setup] Fichier Lua source vide : ${srcSnapshot}`);
+        continue;
+      }
+      await fs.ensureDir(targetDir);
+      await fs.writeFile(dest, data);
+      installed++;
+    } catch (err: any) {
+      log("warn", `[setup] Impossible de copier ${file} : ${err.message}`);
+    }
+  }
+
+  if (installed === LUA_APP_FILES.length) {
+    log("success", `[setup] App Lua installee : ${targetDir}`);
+  } else if (installed > 0) {
+    log("warn", `[setup] App Lua partiellement installee (${installed}/${LUA_APP_FILES.length})`);
+  } else {
+    throw new Error("Aucun fichier Lua n'a pu etre installe");
+  }
+}
+
 async function ensureDriveKeyHelper(): Promise<void> {
   const helperPath = getHelperPath();
   if (fs.existsSync(helperPath)) {
@@ -228,6 +272,14 @@ export async function runSetupChecks(): Promise<void> {
     }
   } catch (err: any) {
     log("warn", `[setup] Mapping AC controls indisponible : ${err.message}`);
+  }
+
+  try {
+    if (config.autoDriveLua) {
+      await ensureLuaApp();
+    }
+  } catch (err: any) {
+    log("warn", `[setup] App Lua indisponible : ${err.message}`);
   }
 
   try {
