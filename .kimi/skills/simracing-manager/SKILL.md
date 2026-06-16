@@ -52,6 +52,8 @@ sim-center-manager/
 - `join-server.dto.ts` validates `stationIds` as `z.array(z.string().min(1)).min(1)` (not UUIDs).
 - `AgentGateway.emitJoinServer` now enumerates sockets in the target room and logs the count. If it logs `0 socket(s) found`, the POD agent is not connected or not authenticated to the `/agent` namespace.
 - `AgentGateway` tracks connected station IDs and exposes `getConnectedStationIds()`. `GET /stations/connected` returns the currently connected agent station IDs for quick diagnostics.
+- Agent content previews are extracted by `StationsService.updateContent()` and stored in the `content_previews` table. The stored `Station.content` JSON contains preview URLs (`/api/content/previews/<id>`), not inline base64.
+- `GET /api/content/previews/<id>` is a public endpoint that returns the image binary with a 24h cache header.
 - `AGENT_API_KEY_SALT` env var is validated but **not used** in code (plain SHA-256).
 - The existing migration `20260616022757_init` defines an older `dedicated_servers` table that does **not** match the current Prisma schema. After any schema change, generate a new migration or use `prisma db push` in dev.
 - Dashboard `station:command` accepts `launch`/`stop` but they are **not forwarded** to agents; use REST endpoints instead.
@@ -149,12 +151,12 @@ npm run package:win      # outputs exe/agent.exe, rename to sim-center-agent-win
 
 ## 9. Agent Version Gotcha
 
-Dedicated-server and POD commands (`server:launch`, `server:join`, `server:stop`) were added in agent **v2.0.5** and improved in **v2.0.6**. If an agent logs `"version":"2.0.4"` (or older), it will stay silent when receiving these commands even though it is online and other commands (e.g. `ac:autoShifter`) may work.
+Dedicated-server and POD commands (`server:launch`, `server:join`, `server:stop`) were added in agent **v2.0.5** and improved in **v2.0.6**. Content previews are stored in the `content_previews` table since **v2.0.7**. If an agent logs `"version":"2.0.4"` (or older), it will stay silent when receiving these commands even though it is online and other commands (e.g. `ac:autoShifter`) may work.
 
-Release asset expected SHA-256 for v2.0.6 (GitHub Actions build):
+Release asset expected SHA-256 for v2.0.7 (GitHub Actions build):
 
 ```
-60b071ef2599a6647f30514361c63d569b7f689abd2b20345c25f1493339f240
+9239ee4ea6a5fd58023875cc974d2039904b2aff8262fd5a1251348f6cf9848f
 ```
 
 To fix a stuck station, replace its local `sim-center-agent-win.exe` with the v2.0.6 asset (or re-run the updater) and restart the agent.
