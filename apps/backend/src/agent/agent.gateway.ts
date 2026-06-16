@@ -168,14 +168,25 @@ export class AgentGateway
   @SubscribeMessage('server:started')
   async handleServerStarted(
     _client: AuthenticatedSocket,
-    payload: { serverId: string; serverDir?: string },
+    payload: {
+      serverId: string;
+      serverDir?: string;
+      udpPort: number;
+      tcpPort: number;
+      httpPort: number;
+    },
   ): Promise<void> {
-    this.logger.log(`Dedicated server started: ${payload.serverId}`);
+    this.logger.log(
+      `Dedicated server started: ${payload.serverId} (ports udp=${payload.udpPort}, tcp=${payload.tcpPort}, http=${payload.httpPort})`,
+    );
     await this.dedicatedServersService.updateStatus(
       payload.serverId,
       'running',
       {
         serverDir: payload.serverDir,
+        udpPort: payload.udpPort,
+        tcpPort: payload.tcpPort,
+        httpPort: payload.httpPort,
       },
     );
   }
@@ -230,7 +241,16 @@ export class AgentGateway
 
   async emitJoinServer(
     stationId: string,
-    payload: { host: string; port: number; password?: string },
+    payload: {
+      host: string;
+      port: number;
+      httpPort: number;
+      password?: string;
+      carAcId: string;
+      track: string;
+      trackLayout?: string;
+      serverName?: string;
+    },
   ): Promise<void> {
     this.server.to(`station:${stationId}`).emit('server:join', payload);
   }

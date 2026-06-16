@@ -8,7 +8,13 @@ export interface AgentToServerEvents {
   'agent:results': (payload: ResultsPayload) => void;
   'agent:status': (payload: StatusPayload) => void;
   'agent:content': (payload: { stationId: string; content: Record<string, unknown> }) => void;
-  'server:started': (payload: { serverId: string; serverDir?: string }) => void;
+  'server:started': (payload: {
+    serverId: string;
+    serverDir?: string;
+    udpPort: number;
+    tcpPort: number;
+    httpPort: number;
+  }) => void;
   'server:stopped': (payload: { serverId: string; error?: string }) => void;
 }
 
@@ -24,7 +30,16 @@ export interface ServerToAgentEvents {
   'system:restart': () => void;
   'system:update': () => void;
   'content:sync': () => void;
-  'server:join': (payload: { host: string; port: number; password?: string }) => void;
+  'server:join': (payload: {
+    host: string;
+    port: number;
+    httpPort: number;
+    password?: string;
+    carAcId: string;
+    track: string;
+    trackLayout?: string;
+    serverName?: string;
+  }) => void;
   'server:launch': (payload: LaunchDedicatedServerPayload) => void;
   'server:stop': (payload: { serverId: string }) => void;
 }

@@ -1,80 +1,241 @@
 import { spawn, ChildProcess } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
+import net from 'net';
+import dgram from 'dgram';
 import { Logger } from 'pino';
 import { config } from './config';
 import { LaunchDedicatedServerPayload } from '@simracing/shared';
 
+export interface LaunchedServerInfo {
+  serverDir: string;
+  udpPort: number;
+  tcpPort: number;
+  httpPort: number;
+}
+
+interface RunningServer {
+  serverId: string;
+  process: ChildProcess;
+  serverDir: string;
+  logPath: string;
+}
+
 export class ServerLauncher {
-  private currentProcess: ChildProcess | null = null;
-  private currentServerId: string | null = null;
+  private servers = new Map<string, RunningServer>();
 
   constructor(private readonly logger: Logger) {}
 
-  async launch(payload: LaunchDedicatedServerPayload): Promise<string> {
+  async launch(payload: LaunchDedicatedServerPayload): Promise<LaunchedServerInfo> {
     this.logger.info({ serverId: payload.serverId }, 'Launching dedicated server');
 
-    const acPath =
-      config.AC_PATH ??
-      path.join(process.env.ProgramFiles ?? '', 'Steam', 'steamapps', 'common', 'assettocorsa');
+    const acPath = await this.resolveAcPath();
     const serverExe = path.join(acPath, 'server', 'acServer.exe');
 
-    const serverDir = path.join(
-      process.env.USERPROFILE ?? '',
-      'Documents',
-      'Assetto Corsa',
-      'servers',
-      payload.serverId,
-    );
+    try {
+      await fs.access(serverExe);
+    } catch {
+      throw new Error(`Serveur dédié AC non trouvé: ${serverExe}. Vérifie AC_PATH dans le .env.`);
+    }
+
+    // Ports libres pour éviter les conflits avec d'autres serveurs AC/CM
+    const mainPort = await this.findAvailablePort(9600, 9700);
+    const httpPort = await this.findAvailablePort(8081, 8181);
+
+    const serverDir = path.join(acPath, 'server', `simcenter_${payload.serverId}`);
     await fs.mkdir(serverDir, { recursive: true });
 
-    const cfgDir = path.join(serverDir, 'cfg');
-    await fs.mkdir(cfgDir, { recursive: true });
-
-    const cfgPath = path.join(cfgDir, 'server_cfg.ini');
-    const entryListPath = path.join(cfgDir, 'entry_list.ini');
+    const cfgPath = path.join(serverDir, 'server_cfg.ini');
+    const entryListPath = path.join(serverDir, 'entry_list.ini');
     const logPath = path.join(serverDir, 'server.log');
 
-    await this.writeServerConfig(cfgDir, payload);
+    await this.writeServerConfig(serverDir, payload, mainPort, httpPort);
 
-    this.currentProcess = spawn(serverExe, ['-c', cfgPath, '-e', entryListPath], {
-      cwd: serverDir,
+    const child = spawn(serverExe, ['-c', cfgPath, '-e', entryListPath], {
+      cwd: path.dirname(serverExe),
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: false,
     });
 
-    this.currentServerId = payload.serverId;
+    this.pipeToLog(child, logPath);
 
-    this.pipeToLog(this.currentProcess, logPath);
+    const running: RunningServer = {
+      serverId: payload.serverId,
+      process: child,
+      serverDir,
+      logPath,
+    };
+    this.servers.set(payload.serverId, running);
 
-    this.currentProcess.on('error', (err) => {
+    child.on('error', (err) => {
       this.logger.error({ err, serverId: payload.serverId }, 'Server process error');
     });
 
-    this.currentProcess.on('exit', (code) => {
+    child.on('exit', (code) => {
       this.logger.info({ code, serverId: payload.serverId }, 'Server process exited');
-      this.currentProcess = null;
-      this.currentServerId = null;
+      this.servers.delete(payload.serverId);
     });
 
-    return serverDir;
+    // Vérifier que le processus ne meurt pas immédiatement (erreur de config, port...)
+    await this.verifyProcessAlive(child, payload.serverId, logPath);
+
+    this.logger.info(
+      { serverId: payload.serverId, serverDir, udpPort: mainPort, tcpPort: mainPort, httpPort },
+      'Dedicated server launched',
+    );
+
+    return {
+      serverDir,
+      udpPort: mainPort,
+      tcpPort: mainPort,
+      httpPort,
+    };
   }
 
   async stop(serverId: string): Promise<void> {
-    if (this.currentServerId !== serverId) {
+    const running = this.servers.get(serverId);
+    if (!running) {
       this.logger.warn({ serverId }, 'No matching server process to stop');
       return;
     }
 
     this.logger.info({ serverId }, 'Stopping dedicated server');
-    if (this.currentProcess && !this.currentProcess.killed) {
-      this.currentProcess.kill('SIGTERM');
+    if (!running.process.killed) {
+      running.process.kill('SIGTERM');
     }
+    if (process.platform === 'win32' && running.process.pid) {
+      spawn('taskkill', ['/F', '/PID', String(running.process.pid)], { stdio: 'ignore' });
+    }
+    this.servers.delete(serverId);
+  }
+
+  private async resolveAcPath(): Promise<string> {
+    if (config.AC_PATH) {
+      return config.AC_PATH;
+    }
+
+    const candidates: string[] = [];
     if (process.platform === 'win32') {
-      spawn('taskkill', ['/F', '/IM', 'acServer.exe'], { stdio: 'ignore' });
+      const prefixes = [
+        process.env.ProgramFiles,
+        process.env['ProgramFiles(x86)'],
+        'C:\\Program Files',
+        'C:\\Program Files (x86)',
+        'C:\\Steam',
+      ].filter((p): p is string => !!p);
+      const seen = new Set<string>();
+      for (const prefix of prefixes) {
+        const candidate = path.join(prefix, 'Steam', 'steamapps', 'common', 'assettocorsa');
+        if (!seen.has(candidate)) {
+          seen.add(candidate);
+          candidates.push(candidate);
+        }
+      }
     }
-    this.currentProcess = null;
-    this.currentServerId = null;
+
+    for (const candidate of candidates) {
+      try {
+        await fs.access(path.join(candidate, 'server', 'acServer.exe'));
+        return candidate;
+      } catch {
+        // try next
+      }
+    }
+
+    throw new Error(
+      `Assetto Corsa non trouvé. Définis AC_PATH dans le .env à côté de l'exécutable.`,
+    );
+  }
+
+  private isTcpPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const server = net.createServer();
+      server.once('error', () => resolve(false));
+      server.once('listening', () => {
+        server.close(() => resolve(true));
+      });
+      server.listen(port, '0.0.0.0');
+    });
+  }
+
+  private isUdpPortAvailable(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const socket = dgram.createSocket('udp4');
+      socket.once('error', () => resolve(false));
+      socket.once('listening', () => {
+        socket.close(() => resolve(true));
+      });
+      socket.bind(port, '0.0.0.0');
+    });
+  }
+
+  private async isPortAvailable(port: number): Promise<boolean> {
+    const [tcp, udp] = await Promise.all([
+      this.isTcpPortAvailable(port),
+      this.isUdpPortAvailable(port),
+    ]);
+    return tcp && udp;
+  }
+
+  private async findAvailablePort(start: number, end: number): Promise<number> {
+    for (let port = start; port <= end; port++) {
+      if (await this.isPortAvailable(port)) return port;
+    }
+    throw new Error(`Aucun port libre trouvé entre ${start} et ${end}`);
+  }
+
+  private async verifyProcessAlive(
+    child: ChildProcess,
+    serverId: string,
+    logPath: string,
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+
+      const cleanup = () => {
+        settled = true;
+      };
+
+      child.once('error', (err) => {
+        if (!settled) {
+          settled = true;
+          reject(new Error(`Impossible de lancer acServer.exe: ${err.message}`));
+        }
+      });
+
+      child.once('exit', (code) => {
+        if (!settled) {
+          settled = true;
+          reject(
+            new Error(
+              `acServer.exe s'est arrêté immédiatement (code ${code}). Consulte ${logPath}.`,
+            ),
+          );
+        }
+      });
+
+      setTimeout(() => {
+        if (settled) return;
+        if (!child.pid) {
+          settled = true;
+          reject(new Error('acServer.exe a démarré sans PID'));
+          return;
+        }
+        try {
+          process.kill(child.pid, 0);
+          cleanup();
+          resolve();
+        } catch {
+          settled = true;
+          reject(
+            new Error(
+              `acServer.exe s'est arrêté immédiatement après le lancement. Consulte ${logPath}.`,
+            ),
+          );
+        }
+      }, 2500);
+    });
   }
 
   private pipeToLog(child: ChildProcess, logPath: string): void {
@@ -93,67 +254,77 @@ export class ServerLauncher {
   }
 
   private async writeServerConfig(
-    cfgDir: string,
+    serverDir: string,
     payload: LaunchDedicatedServerPayload,
+    mainPort: number,
+    httpPort: number,
   ): Promise<void> {
-    const serverCfgPath = path.join(cfgDir, 'server_cfg.ini');
-    const entryListPath = path.join(cfgDir, 'entry_list.ini');
+    const serverCfgPath = path.join(serverDir, 'server_cfg.ini');
+    const entryListPath = path.join(serverDir, 'entry_list.ini');
 
     const carIds = payload.cars.length > 0 ? payload.cars : ['ks_mazda_mx5_cup'];
 
     const serverCfg = [
       '[SERVER]',
       `NAME=${payload.name}`,
-      `CARS=${carIds.join(';')}`,
-      `CONFIG_TRACK=${payload.trackLayout ?? ''}`,
       `TRACK=${payload.track}`,
-      `SUN_ANGLE=-48`,
-      `PASSWORD=${payload.password ?? ''}`,
-      `ADMIN_PASSWORD=${payload.rconPassword ?? 'admin'}`,
-      `UDP_PORT=9600`,
-      `TCP_PORT=9600`,
-      `HTTP_PORT=8081`,
+      `CONFIG_TRACK=${payload.trackLayout ?? ''}`,
+      `CARS=${carIds.join(';')}`,
       `MAX_CLIENTS=${payload.maxClients}`,
+      `PASSWORD=${payload.password ?? ''}`,
+      `WELCOME_MESSAGE=Bienvenue sur ${payload.name}`,
+      `ADMIN_PASSWORD=${payload.rconPassword ?? 'admin'}`,
+      `UDP_PORT=${mainPort}`,
+      `TCP_PORT=${mainPort}`,
+      `HTTP_PORT=${httpPort}`,
+      `SERVER_IP=0.0.0.0`,
       'PICKUP_MODE_ENABLED=1',
       'LOOP_MODE=1',
       'SLEEP_TIME=1',
+      'ABS_ALLOWED=1',
+      'TC_ALLOWED=1',
+      'STABILITY_ALLOWED=1',
+      'AUTOCLUTCH_ALLOWED=1',
+      'DAMAGE_MULTIPLIER=0',
+      'FUEL_RATE=1',
+      'TYRE_WEAR_RATE=1',
       'ALLOWED_TYRES_OUT=2',
-      'QUALIFY_MAX_WAIT_PERC=120',
+      'MAX_BALLAST_KG=150',
       'RACE_OVER_TIME=60',
       'RESULT_SCREEN_TIME=20',
-      'START_RULE=2',
-      'NUM_THREADS=2',
-      'REGISTER_TO_LOBBY=1',
+      'RACE_GAS_PENALTY_DISABLED=1',
+      'MAX_CONTACTS_PER_KM=3',
       'MINIMUM_SECURITY_LEVEL=1',
+      'REGISTER_TO_LOBBY=1',
       '',
       '[PRACTICE]',
       'NAME=Practice',
-      'TIME=60',
+      'TIME=30',
       'IS_OPEN=1',
       '',
       '[QUALIFY]',
-      'NAME=Qualify',
-      'TIME=30',
+      'NAME=Qualifying',
+      'TIME=15',
       'IS_OPEN=1',
       '',
       '[RACE]',
       'NAME=Race',
       'LAPS=5',
-      'WAIT_FOR_OTHERS=1',
+      'WAIT_TIME=60',
       'IS_OPEN=1',
       '',
       '[DYNAMIC_TRACK]',
       'SESSION_START=89',
       'RANDOMNESS=2',
-      'SESSION_TRANSFER=89',
-      'LAP_GAIN=50',
+      'LAP_GAIN=22',
+      'SESSION_TRANSFER=90',
       '',
       '[WEATHER_0]',
       'GRAPHICS=3_clear',
-      'BASE_TEMPERATURE_AMBIENT=20',
-      'BASE_TEMPERATURE_ROAD=7',
-      'VARIATION_AMBIENT=1',
-      'VARIATION_ROAD=1',
+      'BASE_TEMPERATURE_AMBIENT=26',
+      'BASE_TEMPERATURE_TRACK=34',
+      'VARIATION_AMBIENT=2',
+      'VARIATION_TRACK=2',
       '',
     ].join('\n');
 
@@ -165,6 +336,6 @@ export class ServerLauncher {
     await fs.writeFile(serverCfgPath, serverCfg, 'utf-8');
     await fs.writeFile(entryListPath, entryList, 'utf-8');
 
-    this.logger.info({ cfgDir }, 'Server config written');
+    this.logger.info({ serverDir, mainPort, httpPort }, 'Server config written');
   }
 }

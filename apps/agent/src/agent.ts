@@ -330,19 +330,27 @@ export class SimRacingAgent {
   private async handleJoinServer(payload: {
     host: string;
     port: number;
+    httpPort: number;
     password?: string;
+    carAcId: string;
+    track: string;
+    trackLayout?: string;
+    serverName?: string;
   }): Promise<void> {
     this.logger.info({ host: payload.host, port: payload.port }, 'Received join server command');
-    await this.luaBridge.joinServer(payload.host, payload.port, payload.password);
+    await this.acLauncher.joinServer(payload);
   }
 
   private async handleLaunchDedicatedServer(payload: LaunchDedicatedServerPayload): Promise<void> {
     this.logger.info({ serverId: payload.serverId }, 'Received dedicated server launch command');
     try {
-      const serverDir = await this.serverLauncher.launch(payload);
+      const info = await this.serverLauncher.launch(payload);
       this.socket?.emit('server:started', {
         serverId: payload.serverId,
-        serverDir,
+        serverDir: info.serverDir,
+        udpPort: info.udpPort,
+        tcpPort: info.tcpPort,
+        httpPort: info.httpPort,
       });
     } catch (err) {
       this.logger.error({ err }, 'Failed to launch dedicated server');

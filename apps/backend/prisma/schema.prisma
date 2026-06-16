@@ -99,6 +99,9 @@ model DedicatedServer {
   config         Json?
   status         String    @default("stopped")
   serverDir      String?   @map("server_dir")
+  udpPort        Int?      @map("udp_port")
+  tcpPort        Int?      @map("tcp_port")
+  httpPort       Int?      @map("http_port")
   startedAt      DateTime? @map("started_at")
   endedAt        DateTime? @map("ended_at")
   createdAt      DateTime  @default(now()) @map("created_at")

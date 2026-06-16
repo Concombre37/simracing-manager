@@ -107,11 +107,19 @@ export class DedicatedServersController {
   ) {
     const server = await this.dedicatedServersService.findOne(id);
     const host = server.station.localIp ?? '127.0.0.1';
+    const port = server.tcpPort ?? 9600;
+    const httpPort = server.httpPort ?? 8081;
+
     for (const stationId of dto.stationIds) {
       await this.agentGateway.emitJoinServer(stationId, {
         host,
-        port: 9600,
+        port,
+        httpPort,
         password: server.password ?? undefined,
+        carAcId: dto.carAcId,
+        track: server.track,
+        trackLayout: server.trackLayout ?? undefined,
+        serverName: server.name,
       });
     }
     return { success: true };

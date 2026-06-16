@@ -14,6 +14,9 @@ export interface DedicatedServer {
   rconPassword: string | null;
   status: 'stopped' | 'starting' | 'running' | 'error';
   serverDir: string | null;
+  udpPort: number | null;
+  tcpPort: number | null;
+  httpPort: number | null;
   startedAt: string | null;
   endedAt: string | null;
   createdAt: string;
@@ -65,6 +68,6 @@ export const dedicatedServersApi = {
   remove: (id: string) =>
     api.delete<DedicatedServer>(`/dedicated-servers/${id}`).then((res) => res.data),
   stop: (id: string) => api.post(`/dedicated-servers/${id}/stop`).then((res) => res.data),
-  join: (id: string, stationIds: string[]) =>
-    api.post(`/dedicated-servers/${id}/join`, { stationIds }).then((res) => res.data),
+  join: (id: string, stationIds: string[], carAcId: string) =>
+    api.post(`/dedicated-servers/${id}/join`, { stationIds, carAcId }).then((res) => res.data),
 };

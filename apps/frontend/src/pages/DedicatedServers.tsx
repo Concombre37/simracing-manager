@@ -28,8 +28,6 @@ import {
   MapPin,
 } from 'lucide-react';
 
-const DEFAULT_SERVER_PORT = 9600;
-
 export function DedicatedServers() {
   const queryClient = useQueryClient();
   const { data: servers, isLoading } = useQuery({
@@ -106,7 +104,10 @@ export function DedicatedServers() {
                   <div>
                     <h3 className="font-semibold text-white">{server.name}</h3>
                     <p className="text-xs text-gray-500 font-mono">
-                      {server.station.localIp ?? '127.0.0.1'}:{DEFAULT_SERVER_PORT}
+                      {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
+                      {server.httpPort && server.httpPort !== 8081
+                        ? ` (http ${server.httpPort})`
+                        : ''}
                     </p>
                   </div>
                 </div>
@@ -220,8 +221,8 @@ export function DedicatedServers() {
           server={joiningServer}
           stations={stations}
           onClose={() => setJoiningServer(null)}
-          onJoin={async (stationIds) => {
-            await dedicatedServersApi.join(joiningServer.id, stationIds);
+          onJoin={async (stationIds, carAcId) => {
+            await dedicatedServersApi.join(joiningServer.id, stationIds, carAcId);
             setJoiningServer(null);
           }}
         />
@@ -542,11 +543,12 @@ interface JoinServerModalProps {
   server: DedicatedServer;
   stations: Station[];
   onClose: () => void;
-  onJoin: (stationIds: string[]) => void;
+  onJoin: (stationIds: string[], carAcId: string) => void;
 }
 
 function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [carAcId, setCarAcId] = useState<string>(server.cars[0] ?? '');
   const [joined, setJoined] = useState(false);
 
   const onlineStations = stations.filter(
@@ -558,7 +560,8 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
   };
 
   async function handleJoin() {
-    await onJoin(selectedIds);
+    if (!carAcId) return;
+    await onJoin(selectedIds, carAcId);
     setJoined(true);
   }
 
@@ -572,7 +575,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
           <h3 className="text-xl font-semibold text-white mb-2">Commande envoyée</h3>
           <p className="text-gray-400 mb-6">
             {selectedIds.length} POD ont reçu l'ordre de rejoindre{' '}
-            {server.station.localIp ?? '127.0.0.1'}:{DEFAULT_SERVER_PORT}
+            {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
           </p>
           <Button variant="primary" onClick={onClose} className="w-full">
             Fermer
@@ -583,9 +586,24 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
           <p className="text-sm text-gray-400">
             Sélectionne les stations à envoyer sur{' '}
             <span className="text-accent-orange font-mono">
-              {server.station.localIp ?? '127.0.0.1'}:{DEFAULT_SERVER_PORT}
+              {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
             </span>
           </p>
+          <div>
+            <Label htmlFor="join-car">Voiture à attribuer aux POD</Label>
+            <select
+              id="join-car"
+              value={carAcId}
+              onChange={(e) => setCarAcId(e.target.value)}
+              className="w-full bg-dark-900 border border-dark-600 rounded-lg px-3 py-2 text-white focus:border-accent-orange focus:ring-1 focus:ring-accent-orange"
+            >
+              {server.cars.map((car) => (
+                <option key={car} value={car}>
+                  {car}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="max-h-64 overflow-y-auto space-y-2">
             {onlineStations.length === 0 && (
               <p className="text-gray-500 text-center py-4">Aucun POD en ligne</p>

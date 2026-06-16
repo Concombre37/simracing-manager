@@ -99,12 +99,21 @@ export class DedicatedServersService {
   async updateStatus(
     id: string,
     status: string,
-    extra?: { serverDir?: string; error?: string },
+    extra?: {
+      serverDir?: string;
+      error?: string;
+      udpPort?: number;
+      tcpPort?: number;
+      httpPort?: number;
+    },
   ): Promise<DedicatedServerWithStation> {
     const data: Prisma.DedicatedServerUpdateInput = { status };
     if (status === 'running') {
       data.startedAt = new Date();
       if (extra?.serverDir) data.serverDir = extra.serverDir;
+      if (extra?.udpPort) data.udpPort = extra.udpPort;
+      if (extra?.tcpPort) data.tcpPort = extra.tcpPort;
+      if (extra?.httpPort) data.httpPort = extra.httpPort;
     } else if (status === 'stopped' || status === 'error') {
       data.endedAt = new Date();
     }
