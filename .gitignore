@@ -64,3 +64,6 @@ temp/
 # Misc
 .cache/
 .dotnet/
+
+# Kimi skill secrets
+.kimi/skills/simracing-manager/.github-token

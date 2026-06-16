@@ -159,6 +159,10 @@ Release asset expected SHA-256 for v2.0.6:
 
 To fix a stuck station, replace its local `sim-center-agent-win.exe` with the v2.0.6 asset (or re-run the updater) and restart the agent.
 
+### Release token
+
+A GitHub personal access token for pushing releases is stored in `.kimi/skills/simracing-manager/.github-token` (gitignored). Use it with `git remote set-url origin https://<token>@github.com/Concombre37/simracing-manager.git` before pushing tags, or reset the URL afterward.
+
 ## 10. Testing Checklist
 
 After agent/backend changes, verify:
