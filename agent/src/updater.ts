@@ -120,27 +120,72 @@ function buildExeUpdateBatch(opts: {
 }): string {
   return `@echo off
 chcp 65001 >nul
-echo [%date% %time%] Mise a jour de SimRacing Agent... >> "${opts.logPath}"
-ping -n 6 127.0.0.1 >nul
+setlocal EnableDelayedExpansion
+set "LOG=${opts.logPath}"
+set "PID=${opts.pid}"
+set "CURRENT=${opts.currentExePath}"
+set "NEW=${opts.newExePath}"
+set "OLD=${opts.oldExePath}"
+
+echo ============================================
+echo  Mise a jour de SimRacing Agent
+echo ============================================
+echo.
+echo [1/5] Arret de l'agent (PID: %PID%)...
+echo [%date% %time%] Demarrage de la mise a jour >> "%LOG%"
+
+:: Laisse le temps a l'agent d'avoir lance ce script
+timeout /t 2 /nobreak >nul
+
+:: Demande gentiment au processus de se fermer, puis force
+taskkill /PID %PID% >nul 2>&1
+timeout /t 1 /nobreak >nul
+taskkill /F /PID %PID% >nul 2>&1
+
+:: Attend que le processus soit reellement termine (max 30s)
+set /a RETRIES=30
 :waitloop
-tasklist /FI "PID eq ${opts.pid}" 2>nul | find "${opts.pid}" >nul
-if %errorlevel%==0 (
-  taskkill /F /PID ${opts.pid} >> "${opts.logPath}" 2>&1
-  ping -n 3 127.0.0.1 >nul
-  goto waitloop
+timeout /t 1 /nobreak >nul
+tasklist /FI "PID eq %PID%" 2>nul | find /I "%PID%" >nul
+if %errorlevel%==1 goto processStopped
+set /a RETRIES-=1
+if %RETRIES%==0 goto processNotStopped
+goto waitloop
+
+:processNotStopped
+echo [ERREUR] Impossible d'arreter l'agent (PID: %PID%)
+echo [%date% %time%] ERREUR: impossible d'arreter l'agent PID %PID% >> "%LOG%"
+echo.
+pause
+exit /b 1
+
+:processStopped
+echo [OK] Agent arrete.
+echo [%date% %time%] Agent arrete >> "%LOG%"
+timeout /t 1 /nobreak >nul
+
+echo [2/5] Suppression de l'ancienne sauvegarde...
+if exist "%OLD%" del /F /Q "%OLD%" >> "%LOG%" 2>&1
+
+echo [3/5] Sauvegarde de la version actuelle...
+if exist "%CURRENT%" move /Y "%CURRENT%" "%OLD%" >> "%LOG%" 2>&1
+
+echo [4/5] Installation de la nouvelle version...
+move /Y "%NEW%" "%CURRENT%" >> "%LOG%" 2>&1
+
+if not exist "%CURRENT%" (
+  echo [ERREUR] Le nouvel executable est introuvable.
+  echo [%date% %time%] ERREUR: nouvel exe introuvable >> "%LOG%"
+  echo.
+  pause
+  exit /b 1
 )
-echo [%date% %time%] Processus arrete >> "${opts.logPath}"
-ping -n 4 127.0.0.1 >nul
-if exist "${opts.oldExePath}" del /F /Q "${opts.oldExePath}" >> "${opts.logPath}" 2>&1
-if exist "${opts.currentExePath}" move /Y "${opts.currentExePath}" "${opts.oldExePath}" >> "${opts.logPath}" 2>&1
-move /Y "${opts.newExePath}" "${opts.currentExePath}" >> "${opts.logPath}" 2>&1
-if exist "${opts.currentExePath}" (
-  echo [%date% %time%] Lancement de la nouvelle version... >> "${opts.logPath}"
-  start "" "${opts.currentExePath}"
-) else (
-  echo [%date% %time%] ERREUR: nouvel exe introuvable >> "${opts.logPath}"
-)
-ping -n 3 127.0.0.1 >nul
+
+echo [5/5] Lancement de la nouvelle version...
+echo [%date% %time%] Lancement de la nouvelle version >> "%LOG%"
+start "" "%CURRENT%"
+
+timeout /t 2 /nobreak >nul
 del /F /Q "%~f0"
 `;
 }
@@ -153,36 +198,81 @@ function buildZipUpdateBatch(opts: {
 }): string {
   return `@echo off
 chcp 65001 >nul
-echo [%date% %time%] Mise a jour de SimRacing Agent (package zip)... >> "${opts.logPath}"
-ping -n 6 127.0.0.1 >nul
+setlocal EnableDelayedExpansion
+set "LOG=${opts.logPath}"
+set "PID=${opts.pid}"
+set "CURRENT=${opts.currentExePath}"
+set "ZIP=${opts.zipPath}"
+set "DEST=${path.dirname(opts.currentExePath)}"
+
+echo ============================================
+echo  Mise a jour de SimRacing Agent (zip)
+echo ============================================
+echo.
+echo [1/5] Arret de l'agent (PID: %PID%)...
+echo [%date% %time%] Demarrage de la mise a jour (zip) >> "%LOG%"
+
+timeout /t 2 /nobreak >nul
+
+taskkill /PID %PID% >nul 2>&1
+timeout /t 1 /nobreak >nul
+taskkill /F /PID %PID% >nul 2>&1
+
+set /a RETRIES=30
 :waitloop
-tasklist /FI "PID eq ${opts.pid}" 2>nul | find "${opts.pid}" >nul
-if %errorlevel%==0 (
-  taskkill /F /PID ${opts.pid} >> "${opts.logPath}" 2>&1
-  ping -n 3 127.0.0.1 >nul
-  goto waitloop
-)
-echo [%date% %time%] Processus arrete >> "${opts.logPath}"
-ping -n 4 127.0.0.1 >nul
+timeout /t 1 /nobreak >nul
+tasklist /FI "PID eq %PID%" 2>nul | find /I "%PID%" >nul
+if %errorlevel%==1 goto processStopped
+set /a RETRIES-=1
+if %RETRIES%==0 goto processNotStopped
+goto waitloop
+
+:processNotStopped
+echo [ERREUR] Impossible d'arreter l'agent (PID: %PID%)
+echo [%date% %time%] ERREUR: impossible d'arreter l'agent PID %PID% >> "%LOG%"
+echo.
+pause
+exit /b 1
+
+:processStopped
+echo [OK] Agent arrete.
+echo [%date% %time%] Agent arrete >> "%LOG%"
+timeout /t 1 /nobreak >nul
+
+echo [2/5] Sauvegarde du dossier tools...
 if exist "tools" (
-  if exist "tools.old" rmdir /S /Q "tools.old" >> "${opts.logPath}" 2>&1
-  move /Y "tools" "tools.old" >> "${opts.logPath}" 2>&1
+  if exist "tools.old" rmdir /S /Q "tools.old" >> "%LOG%" 2>&1
+  move /Y "tools" "tools.old" >> "%LOG%" 2>&1
 )
-powershell -NoProfile -Command "Expand-Archive -Path '${opts.zipPath}' -DestinationPath '${path.dirname(opts.currentExePath)}' -Force" >> "${opts.logPath}" 2>&1
+
+echo [3/5] Extraction du package...
+powershell -NoProfile -Command "Expand-Archive -Path '%ZIP%' -DestinationPath '%DEST%' -Force" >> "%LOG%" 2>&1
 if errorlevel 1 (
-  echo [%date% %time%] ERREUR lors de l extraction du zip >> "${opts.logPath}"
-  if exist "tools.old" move /Y "tools.old" "tools" >> "${opts.logPath}" 2>&1
-) else (
-  if exist "tools.old" rmdir /S /Q "tools.old" >> "${opts.logPath}" 2>&1
+  echo [ERREUR] Extraction du zip echouee, restauration...
+  echo [%date% %time%] ERREUR extraction du zip >> "%LOG%"
+  if exist "tools.old" move /Y "tools.old" "tools" >> "%LOG%" 2>&1
+  echo.
+  pause
+  exit /b 1
 )
-if exist "${opts.zipPath}" del /F /Q "${opts.zipPath}" >> "${opts.logPath}" 2>&1
-if exist "${opts.currentExePath}" (
-  echo [%date% %time%] Lancement de la nouvelle version... >> "${opts.logPath}"
-  start "" "${opts.currentExePath}"
+if exist "tools.old" rmdir /S /Q "tools.old" >> "%LOG%" 2>&1
+
+echo [4/5] Nettoyage...
+if exist "%ZIP%" del /F /Q "%ZIP%" >> "%LOG%" 2>&1
+
+echo [5/5] Lancement de la nouvelle version...
+if exist "%CURRENT%" (
+  echo [%date% %time%] Lancement de la nouvelle version >> "%LOG%"
+  start "" "%CURRENT%"
 ) else (
-  echo [%date% %time%] ERREUR: exe introuvable apres extraction >> "${opts.logPath}"
+  echo [ERREUR] Executable introuvable apres extraction.
+  echo [%date% %time%] ERREUR: exe introuvable apres extraction >> "%LOG%"
+  echo.
+  pause
+  exit /b 1
 )
-ping -n 3 127.0.0.1 >nul
+
+timeout /t 2 /nobreak >nul
 del /F /Q "%~f0"
 `;
 }
