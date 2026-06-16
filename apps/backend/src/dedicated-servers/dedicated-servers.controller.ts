@@ -54,6 +54,9 @@ export class DedicatedServersController {
         maxClients: server.maxClients,
         password: server.password,
         rconPassword: server.rconPassword,
+        udpPort: server.udpPort ?? undefined,
+        tcpPort: server.tcpPort ?? undefined,
+        httpPort: server.httpPort ?? undefined,
       },
     );
     return this.dedicatedServersService.updateStatus(server.id, 'starting');

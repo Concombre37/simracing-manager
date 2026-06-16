@@ -116,7 +116,7 @@ export class ContentScanner {
         const updatedAt = await maxMtime(uiPath, ...previewPaths);
         const cached = this.cache.getCar(entry);
 
-        if (cached && cached.updatedAt === updatedAt) {
+        if (cached && cached.updatedAt === updatedAt && cached.preview !== undefined) {
           content.cars.push({
             acId: cached.acId,
             name: cached.name,
@@ -161,7 +161,7 @@ export class ContentScanner {
         const updatedAt = await maxMtime(uiPath, ...previewPaths);
         const cached = this.cache.getTrack(entry);
 
-        if (cached && cached.updatedAt === updatedAt) {
+        if (cached && cached.updatedAt === updatedAt && cached.preview !== undefined) {
           content.tracks.push({
             acId: cached.acId,
             name: cached.name,

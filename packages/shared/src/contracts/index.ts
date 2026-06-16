@@ -94,4 +94,7 @@ export interface LaunchDedicatedServerPayload {
   maxClients: number;
   password?: string;
   rconPassword?: string;
+  udpPort?: number;
+  tcpPort?: number;
+  httpPort?: number;
 }

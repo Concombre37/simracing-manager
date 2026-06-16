@@ -297,6 +297,9 @@ export class AgentGateway
       maxClients: number;
       password: string | null;
       rconPassword: string | null;
+      udpPort?: number;
+      tcpPort?: number;
+      httpPort?: number;
     },
   ): Promise<void> {
     this.server.to(`station:${stationId}`).emit('server:launch', {
@@ -308,6 +311,9 @@ export class AgentGateway
       maxClients: payload.maxClients,
       password: payload.password ?? undefined,
       rconPassword: payload.rconPassword ?? undefined,
+      udpPort: payload.udpPort,
+      tcpPort: payload.tcpPort,
+      httpPort: payload.httpPort,
     });
   }
 

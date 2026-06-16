@@ -39,8 +39,17 @@ export class ServerLauncher {
     }
 
     // Ports libres pour éviter les conflits avec d'autres serveurs AC/CM
-    const mainPort = await this.findAvailablePort(9600, 9700);
-    const httpPort = await this.findAvailablePort(8081, 8181);
+    const requestedMainPort = payload.udpPort ?? payload.tcpPort;
+    const requestedHttpPort = payload.httpPort;
+
+    const mainPort =
+      requestedMainPort && (await this.isPortAvailable(requestedMainPort))
+        ? requestedMainPort
+        : await this.findAvailablePort(9600, 9700);
+    const httpPort =
+      requestedHttpPort && (await this.isPortAvailable(requestedHttpPort))
+        ? requestedHttpPort
+        : await this.findAvailablePort(8081, 8181);
 
     const serverDir = path.join(acPath, 'server', `simcenter_${payload.serverId}`);
     await fs.mkdir(serverDir, { recursive: true });

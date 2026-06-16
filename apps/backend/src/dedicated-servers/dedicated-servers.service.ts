@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import net from 'net';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { CreateDedicatedServerDto } from './dto/create-dedicated-server.dto';
@@ -28,6 +29,10 @@ export class DedicatedServersService {
       throw new BadRequestException('Station not found');
     }
 
+    const usedPorts = await this.getUsedPorts();
+    const mainPort = await findAvailablePort(9600, 9700, usedPorts);
+    const httpPort = await findAvailablePort(8081, 8181, usedPorts);
+
     return this.prisma.dedicatedServer.create({
       data: {
         name: dto.name,
@@ -38,6 +43,9 @@ export class DedicatedServersService {
         maxClients: dto.maxClients,
         password: dto.password,
         rconPassword: dto.rconPassword,
+        udpPort: mainPort,
+        tcpPort: mainPort,
+        httpPort,
         config: {
           track: dto.track,
           trackLayout: dto.trackLayout,
@@ -123,4 +131,46 @@ export class DedicatedServersService {
       include: serverInclude,
     });
   }
+
+  private async getUsedPorts(): Promise<Set<number>> {
+    const servers = await this.prisma.dedicatedServer.findMany({
+      where: {
+        OR: [
+          { udpPort: { not: null } },
+          { tcpPort: { not: null } },
+          { httpPort: { not: null } },
+        ],
+      },
+    });
+    const ports = new Set<number>();
+    for (const server of servers) {
+      if (server.udpPort) ports.add(server.udpPort);
+      if (server.tcpPort) ports.add(server.tcpPort);
+      if (server.httpPort) ports.add(server.httpPort);
+    }
+    return ports;
+  }
+}
+
+function isTcpPortAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, '0.0.0.0');
+  });
+}
+
+async function findAvailablePort(
+  start: number,
+  end: number,
+  usedPorts: Set<number>,
+): Promise<number> {
+  for (let port = start; port <= end; port++) {
+    if (usedPorts.has(port)) continue;
+    if (await isTcpPortAvailable(port)) return port;
+  }
+  throw new Error(`Aucun port libre trouvé entre ${start} et ${end}`);
 }
