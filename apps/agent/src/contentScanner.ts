@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
 import { config } from './config';
+import { ContentCache, maxMtime } from './contentCache';
 
 export interface Car {
   acId: string;
@@ -33,7 +34,7 @@ async function readJsonSafe<T>(filePath: string): Promise<T | undefined> {
   }
 }
 
-const MAX_PREVIEW_BYTES = 100 * 1024;
+const MAX_PREVIEW_BYTES = 60 * 1024;
 
 async function readImageAsBase64(filePath: string): Promise<string | undefined> {
   try {
@@ -76,10 +77,19 @@ async function findTrackPreview(trackDir: string): Promise<string | undefined> {
 }
 
 export class ContentScanner {
-  constructor(private readonly logger: Logger) {}
+  private readonly cache: ContentCache;
+
+  constructor(
+    private readonly logger: Logger,
+    cachePath?: string,
+  ) {
+    const baseDir = path.dirname(process.execPath);
+    this.cache = new ContentCache(cachePath ?? path.join(baseDir, 'content-cache.json'), logger);
+  }
 
   async scan(): Promise<AcContent> {
     const content: AcContent = { cars: [], tracks: [] };
+    await this.cache.load();
 
     const acPath = await this.resolveAcPath();
     if (!acPath) {
@@ -90,6 +100,7 @@ export class ContentScanner {
       return content;
     }
 
+    this.cache.setAcPath(acPath);
     this.logger.info({ acPath }, 'Scanning Assetto Corsa content');
 
     const carsDir = path.join(acPath, 'content', 'cars');
@@ -100,19 +111,36 @@ export class ContentScanner {
         const stat = await fs.stat(carDir).catch(() => null);
         if (!stat?.isDirectory()) continue;
 
+        const uiPath = path.join(carDir, 'ui_car.json');
+        const previewPaths = await this.getCarPreviewPaths(carDir);
+        const updatedAt = await maxMtime(uiPath, ...previewPaths);
+        const cached = this.cache.getCar(entry);
+
+        if (cached && cached.updatedAt === updatedAt) {
+          content.cars.push({
+            acId: cached.acId,
+            name: cached.name,
+            brand: cached.brand,
+            category: cached.category,
+            preview: cached.preview,
+          });
+          continue;
+        }
+
         const uiJson = await readJsonSafe<{
           name?: string;
           brand?: string;
           class?: string;
-        }>(path.join(carDir, 'ui_car.json'));
-
-        content.cars.push({
+        }>(uiPath);
+        const car: Car = {
           acId: entry,
           name: uiJson?.name || entry,
           brand: uiJson?.brand,
           category: uiJson?.class,
           preview: await findCarPreview(carDir),
-        });
+        };
+        this.cache.setCar({ ...car, updatedAt });
+        content.cars.push(car);
       }
     } else {
       this.logger.warn({ carsDir }, 'Cars directory not found');
@@ -126,7 +154,24 @@ export class ContentScanner {
         const stat = await fs.stat(trackDir).catch(() => null);
         if (!stat?.isDirectory()) continue;
 
-        const uiJson = await readJsonSafe<{ name?: string }>(path.join(trackDir, 'ui_track.json'));
+        const uiPath = path.join(trackDir, 'ui_track.json');
+        const previewPaths = ['preview.png', 'preview.jpg', 'preview.jpeg'].map((n) =>
+          path.join(trackDir, n),
+        );
+        const updatedAt = await maxMtime(uiPath, ...previewPaths);
+        const cached = this.cache.getTrack(entry);
+
+        if (cached && cached.updatedAt === updatedAt) {
+          content.tracks.push({
+            acId: cached.acId,
+            name: cached.name,
+            layouts: cached.layouts,
+            preview: cached.preview,
+          });
+          continue;
+        }
+
+        const uiJson = await readJsonSafe<{ name?: string }>(uiPath);
 
         const layouts: string[] = [];
         const subEntries = await fs.readdir(trackDir).catch(() => []);
@@ -139,22 +184,39 @@ export class ContentScanner {
           }
         }
 
-        content.tracks.push({
+        const track: Track = {
           acId: entry,
           name: uiJson?.name || entry,
           layouts,
           preview: await findTrackPreview(trackDir),
-        });
+        };
+        this.cache.setTrack({ ...track, updatedAt });
+        content.tracks.push(track);
       }
     } else {
       this.logger.warn({ tracksDir }, 'Tracks directory not found');
     }
 
+    await this.cache.save();
     this.logger.info(
       { cars: content.cars.length, tracks: content.tracks.length, acPath },
       'Assetto Corsa content scanned',
     );
     return content;
+  }
+
+  private async getCarPreviewPaths(carDir: string): Promise<string[]> {
+    const paths: string[] = [path.join(carDir, 'preview.png')];
+    const skinsDir = path.join(carDir, 'skins');
+    try {
+      const skins = await fs.readdir(skinsDir);
+      for (const skin of skins) {
+        paths.push(path.join(skinsDir, skin, 'preview.png'));
+      }
+    } catch {
+      // ignore
+    }
+    return paths;
   }
 
   private getCandidatePaths(): string[] {

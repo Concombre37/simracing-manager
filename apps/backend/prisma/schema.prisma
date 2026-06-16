@@ -35,6 +35,7 @@ model Station {
 
   sessions        Session[]
   dedicatedServers DedicatedServer[]
+  contentPreviews ContentPreview[]
 
   @@map("stations")
 }
@@ -108,4 +109,19 @@ model DedicatedServer {
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
   @@map("dedicated_servers")
+}
+
+model ContentPreview {
+  id        String   @id @default(uuid()) @db.Uuid
+  stationId String   @map("station_id") @db.Uuid
+  station   Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  type      String
+  acId      String   @map("ac_id")
+  name      String
+  data      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([stationId, type, acId])
+  @@map("content_previews")
 }

@@ -34,7 +34,7 @@ interface AuthenticatedSocket extends Socket {
 @WebSocketGateway({
   namespace: 'agent',
   cors: { origin: '*' },
-  maxHttpBufferSize: 10 * 1024 * 1024,
+  maxHttpBufferSize: 50 * 1024 * 1024,
 })
 @UseGuards(AgentAuthGuard)
 export class AgentGateway

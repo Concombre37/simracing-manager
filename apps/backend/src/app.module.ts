@@ -12,6 +12,7 @@ import { SessionsModule } from './sessions/sessions.module';
 import { AgentModule } from './agent/agent.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ContentModule } from './content/content.module';
+import { ContentPreviewsModule } from './content-previews/content-previews.module';
 import { DedicatedServersModule } from './dedicated-servers/dedicated-servers.module';
 import { envSchema } from './config/env.validation';
 
@@ -35,6 +36,7 @@ import { envSchema } from './config/env.validation';
     AgentModule,
     DashboardModule,
     ContentModule,
+    ContentPreviewsModule,
     DedicatedServersModule,
   ],
 })

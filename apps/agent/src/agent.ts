@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { Logger } from 'pino';
+import crypto from 'crypto';
 import {
   AgentToServerEvents,
   ServerToAgentEvents,
@@ -28,6 +29,7 @@ export class SimRacingAgent {
   private vrConnected = false;
   private apiKey: string | undefined = config.API_KEY;
   private isProvisioning = false;
+  private lastContentHash = '';
   private acLauncher: AcLauncher;
   private luaBridge: LuaBridge;
   private contentSync: ContentSync;
@@ -257,10 +259,17 @@ export class SimRacingAgent {
   private async sendContent(): Promise<void> {
     try {
       const content = await this.contentScanner.scan();
+      const hash = crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex');
+      if (hash === this.lastContentHash) {
+        this.logger.debug('Content unchanged, skipping upload');
+        return;
+      }
+      this.lastContentHash = hash;
       this.socket?.emit('agent:content', {
         stationId: config.STATION_ID,
         content: content as unknown as Record<string, unknown>,
       });
+      this.logger.info('Content sent to backend');
     } catch (err) {
       this.logger.error({ err }, 'Failed to send content');
     }
