@@ -40,5 +40,8 @@
     "*.{ts,tsx}": [
       "eslint --fix"
     ]
+  },
+  "dependencies": {
+    "@nestjs/event-emitter": "^3.1.0"
   }
 }

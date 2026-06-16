@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { PrismaModule } from './prisma/prisma.module';
 import { LoggerModule } from './logger/logger.module';
 import { AuthModule } from './auth/auth.module';
@@ -16,6 +17,7 @@ import { envSchema } from './config/env.validation';
       isGlobal: true,
       validate: (config) => envSchema.parse(config),
     }),
+    EventEmitterModule.forRoot(),
     LoggerModule,
     PrismaModule,
     AuthModule,

@@ -6,7 +6,8 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger, UseGuards, OnModuleInit } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { StationsService } from '../stations/stations.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { AgentAuthGuard } from './guards/agent-auth.guard';
@@ -27,7 +28,9 @@ interface AuthenticatedSocket extends Socket {
 
 @WebSocketGateway({ namespace: 'agent', cors: { origin: '*' } })
 @UseGuards(AgentAuthGuard)
-export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class AgentGateway
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit
+{
   private readonly logger = new Logger(AgentGateway.name);
 
   @WebSocketServer()
@@ -37,7 +40,33 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private readonly stationsService: StationsService,
     private readonly sessionsService: SessionsService,
     private readonly dashboardGateway: DashboardGateway,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  onModuleInit(): void {
+    this.eventEmitter.on(
+      'agent.command',
+      async (payload: { stationId: string; command: string }) => {
+        switch (payload.command) {
+          case 'idealLine':
+            await this.emitIdealLine(payload.stationId);
+            break;
+          case 'autoShifter':
+            await this.emitAutoShifter(payload.stationId);
+            break;
+          case 'teleportToPits':
+            await this.emitTeleportToPits(payload.stationId);
+            break;
+          case 'recenterVR':
+            await this.emitRecenterVR(payload.stationId);
+            break;
+          case 'contentSync':
+            await this.emitContentSync(payload.stationId);
+            break;
+        }
+      },
+    );
+  }
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
     this.logger.log(`Agent connected: ${client.stationId ?? 'unknown'}`);
@@ -92,5 +121,25 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async emitStop(stationId: string): Promise<void> {
     this.server.to(`station:${stationId}`).emit('session:stop');
+  }
+
+  async emitIdealLine(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('ac:idealLine');
+  }
+
+  async emitAutoShifter(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('ac:autoShifter');
+  }
+
+  async emitTeleportToPits(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('ac:teleportToPits');
+  }
+
+  async emitRecenterVR(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('vr:recenter');
+  }
+
+  async emitContentSync(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('content:sync');
   }
 }

@@ -11,9 +11,12 @@ export interface AgentToServerEvents {
 export interface ServerToAgentEvents {
   'session:launch': (payload: LaunchSessionPayload) => void;
   'session:stop': () => void;
+  'ac:idealLine': () => void;
+  'ac:autoShifter': () => void;
+  'ac:teleportToPits': () => void;
+  'vr:recenter': () => void;
   'system:restart': () => void;
   'system:update': () => void;
-  'vr:recenter': () => void;
   'content:sync': () => void;
 }
 

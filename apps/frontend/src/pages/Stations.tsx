@@ -45,6 +45,10 @@ export function Stations() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
   });
 
+  function sendCommand(stationId: string, command: string) {
+    socket?.emit('station:command', { stationId, command });
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="mx-auto max-w-6xl">
@@ -89,20 +93,50 @@ export function Stations() {
                   </dd>
                 </div>
               </dl>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => launchMutation.mutate(station.id)}
                   disabled={launchMutation.isPending}
-                  className="flex-1 rounded-lg bg-green-600 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+                  className="rounded-lg bg-green-600 py-2 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
                 >
                   Launch
                 </button>
                 <button
                   onClick={() => stopMutation.mutate(station.id)}
                   disabled={stopMutation.isPending}
-                  className="flex-1 rounded-lg bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                  className="rounded-lg bg-red-600 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
                 >
                   Stop
+                </button>
+                <button
+                  onClick={() => sendCommand(station.stationId, 'idealLine')}
+                  className="rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200"
+                >
+                  Ideal Line
+                </button>
+                <button
+                  onClick={() => sendCommand(station.stationId, 'autoShifter')}
+                  className="rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200"
+                >
+                  Auto Shifter
+                </button>
+                <button
+                  onClick={() => sendCommand(station.stationId, 'teleportToPits')}
+                  className="rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200"
+                >
+                  Pits
+                </button>
+                <button
+                  onClick={() => sendCommand(station.stationId, 'recenterVR')}
+                  className="rounded-lg bg-gray-100 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200"
+                >
+                  Recenter VR
+                </button>
+                <button
+                  onClick={() => sendCommand(station.stationId, 'contentSync')}
+                  className="col-span-2 rounded-lg bg-blue-50 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                >
+                  Sync Content
                 </button>
               </div>
             </div>

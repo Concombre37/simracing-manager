@@ -49,8 +49,11 @@ export class SimRacingAgent {
 
     this.socket.on('session:launch', (payload) => this.handleLaunch(payload));
     this.socket.on('session:stop', () => this.handleStop());
-    this.socket.on('system:update', () => this.handleUpdate());
+    this.socket.on('ac:idealLine', () => this.handleIdealLine());
+    this.socket.on('ac:autoShifter', () => this.handleAutoShifter());
+    this.socket.on('ac:teleportToPits', () => this.handleTeleportToPits());
     this.socket.on('vr:recenter', () => this.handleRecenter());
+    this.socket.on('system:update', () => this.handleUpdate());
     this.socket.on('content:sync', () => this.handleContentSync());
   }
 
@@ -109,12 +112,28 @@ export class SimRacingAgent {
     });
   }
 
+  private async handleIdealLine(): Promise<void> {
+    this.logger.info('Received ideal line command');
+    await this.luaBridge.toggleIdealLine();
+  }
+
+  private async handleAutoShifter(): Promise<void> {
+    this.logger.info('Received auto shifter command');
+    await this.luaBridge.toggleAutoShifter();
+  }
+
+  private async handleTeleportToPits(): Promise<void> {
+    this.logger.info('Received teleport to pits command');
+    await this.luaBridge.teleportToPits();
+  }
+
   private handleUpdate(): void {
     this.logger.info('Received update command');
   }
 
-  private handleRecenter(): void {
+  private async handleRecenter(): Promise<void> {
     this.logger.info('Received VR recenter command');
+    await this.luaBridge.recenterVR();
   }
 
   private async handleContentSync(): Promise<void> {

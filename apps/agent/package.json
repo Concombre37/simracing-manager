@@ -12,7 +12,9 @@
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/**/*.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package": "pkg . --out-path exe",
+    "package:win": "pkg . --targets node18-win-x64 --out-path exe"
   },
   "dependencies": {
     "@simracing/shared": "*",
@@ -25,8 +27,21 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.0",
+    "pkg": "^5.8.1",
     "tsx": "^4.15.0",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
+  },
+  "pkg": {
+    "scripts": [
+      "dist/**/*.js"
+    ],
+    "assets": [
+      "lua_app/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "exe"
   }
 }
