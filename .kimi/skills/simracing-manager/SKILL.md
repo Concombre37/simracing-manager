@@ -151,10 +151,10 @@ npm run package:win      # outputs exe/agent.exe, rename to sim-center-agent-win
 
 Dedicated-server and POD commands (`server:launch`, `server:join`, `server:stop`) were added in agent **v2.0.5** and improved in **v2.0.6**. If an agent logs `"version":"2.0.4"` (or older), it will stay silent when receiving these commands even though it is online and other commands (e.g. `ac:autoShifter`) may work.
 
-Release asset expected SHA-256 for v2.0.6:
+Release asset expected SHA-256 for v2.0.6 (GitHub Actions build):
 
 ```
-2e39ac296b60da16143c951f2f7f9c905a2f08f3906b7c7af257f150628ecbce
+60b071ef2599a6647f30514361c63d569b7f689abd2b20345c25f1493339f240
 ```
 
 To fix a stuck station, replace its local `sim-center-agent-win.exe` with the v2.0.6 asset (or re-run the updater) and restart the agent.
