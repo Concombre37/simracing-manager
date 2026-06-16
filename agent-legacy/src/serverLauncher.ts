@@ -77,14 +77,16 @@ function pipeToLog(child: ChildProcess, logPath: string) {
   if (child.stdout) child.stdout.on('data', write);
   if (child.stderr) child.stderr.on('data', write);
   child.on('exit', (code, signal) => {
-    logStream.write(`[serverLauncher] Processus acServer.exe termine avec code ${code}, signal ${signal}\n`);
+    logStream.write(
+      `[serverLauncher] Processus acServer.exe termine avec code ${code}, signal ${signal}\n`,
+    );
     logStream.end();
   });
 }
 
 export async function launchDedicatedServer(
   cfg: ServerLaunchConfig,
-  onExit?: (code: number | null, signal: string | null) => void
+  onExit?: (code: number | null, signal: string | null) => void,
 ): Promise<LaunchedServer> {
   const acServerExe = path.join(config.acServerPath, 'acServer.exe');
   if (!(await fs.pathExists(acServerExe))) {
@@ -168,7 +170,10 @@ VARIATION_TRACK=2
 
   await fs.writeFile(cfgPath, serverCfg, 'utf-8');
 
-  let entryList = '[CAR_0]\nMODEL=' + carIds[0] + '\nSKIN=random\nSPECTATOR_MODE=0\nDRIVERNAME=\nTEAM=\nGUID=\nBALLAST=0\n';
+  let entryList =
+    '[CAR_0]\nMODEL=' +
+    carIds[0] +
+    '\nSKIN=random\nSPECTATOR_MODE=0\nDRIVERNAME=\nTEAM=\nGUID=\nBALLAST=0\n';
   for (let i = 1; i < (cfg.maxClients || 10); i++) {
     entryList += `[CAR_${i}]\nMODEL=${carIds[i % carIds.length]}\nSKIN=random\nSPECTATOR_MODE=0\nDRIVERNAME=\nTEAM=\nGUID=\nBALLAST=0\n`;
   }
@@ -221,7 +226,11 @@ VARIATION_TRACK=2
         resolve(launchedServer);
       } catch (err) {
         settled = true;
-        reject(new Error('acServer.exe s\'est arrêté immédiatement après le lancement. Consultez server.log.'));
+        reject(
+          new Error(
+            "acServer.exe s'est arrêté immédiatement après le lancement. Consultez server.log.",
+          ),
+        );
       }
     }, 2500);
   });

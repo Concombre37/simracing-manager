@@ -27,7 +27,7 @@ sim-center-manager/
 │   └── agent/            # NEW Windows agent (Node 20, pkg)
 ├── packages/
 │   └── shared/           # Shared types, enums, Socket.IO contracts
-├── agent/                # LEGACY agent (do not modify unless migrating)
+├── agent-legacy/         # LEGACY agent (archived, do not use)
 ├── docker-compose.yml
 ├── nginx-simracing.hytlabs.com.conf
 └── .kimi/skills/simracing-manager/SKILL.md  (this file)
@@ -82,8 +82,8 @@ sim-center-manager/
 ### Agent gotchas
 
 - `envWriter.ts` must use `path.dirname(process.execPath)` (not `process.cwd()`), otherwise packaged agent writes `.env` in the wrong place.
-- `serverLauncher.ts` currently hardcodes ports `9600`/`8081`. The legacy agent used dynamic ports `9600-9700` / `8081-8181`. Multiple servers on one station will collide until dynamic allocation is restored.
-- `server:join` payload only sends `host`, `port`, `password`. For full POD support it must also send `carAcId`, `track`, `trackLayout`, `serverHttpPort`.
+- `serverLauncher.ts` uses dynamic ports `9600-9700` / `8081-8181` since v2.0.5. Allocated ports are stored in `DedicatedServer.udpPort/tcpPort/httpPort`.
+- `server:join` payload (v2.0.5+) sends `host`, `port`, `httpPort`, `password`, `carAcId`, `track`, `trackLayout`, `serverName`.
 - The agent does **not** scan running `acServer.exe` processes; server status relies on `server:started` / `server:stopped`.
 - `pkg` config only bundles `lua_app/**/*`; native helpers (`PressDriveKey.exe`, `ViGEmBus`) are not included in the new agent.
 
@@ -144,9 +144,9 @@ After agent/backend changes, verify:
 - [ ] Agent provisions and appears `online` on the Stations page.
 - [ ] Heartbeat keeps station online.
 - [ ] Content scan shows cars/tracks for the station.
-- [ ] Creating a dedicated server launches `acServer.exe` on the agent.
-- [ ] Server ports are unique per server on the same host.
-- [ ] Join/POD command reaches the agent and launches CM/AC with the right car/track.
+- [x] Creating a dedicated server launches `acServer.exe` on the agent.
+- [x] Server ports are unique per server on the same host.
+- [x] Join/POD command reaches the agent and launches CM/AC with the right car/track.
 - [ ] Stop server terminates only the correct process.
 - [ ] Agent update (`system:update`) downloads and restarts from latest release.
 

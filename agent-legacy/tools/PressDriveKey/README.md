@@ -41,12 +41,12 @@ PressDriveKey.exe --window "Assetto Corsa" --delay 25000 --press 300 --repeat 3 
 
 ## Arguments
 
-| Argument | Description | Defaut |
-|----------|-------------|--------|
-| `--window` | Titre de la fenetre a attendre | `Assetto Corsa` |
-| `--window-timeout` | Timeout d'attente de la fenetre (s) | `120` |
-| `--delay` | Delai apres detection de la fenetre (ms) | `25000` |
-| `--press` | Duree de l'appui sur le bouton (ms) | `300` |
-| `--repeat` | Nombre d'appuis | `3` |
-| `--interval` | Intervalle entre deux appuis (ms) | `2000` |
-| `--log` | Fichier de log | - |
+| Argument           | Description                              | Defaut          |
+| ------------------ | ---------------------------------------- | --------------- |
+| `--window`         | Titre de la fenetre a attendre           | `Assetto Corsa` |
+| `--window-timeout` | Timeout d'attente de la fenetre (s)      | `120`           |
+| `--delay`          | Delai apres detection de la fenetre (ms) | `25000`         |
+| `--press`          | Duree de l'appui sur le bouton (ms)      | `300`           |
+| `--repeat`         | Nombre d'appuis                          | `3`             |
+| `--interval`       | Intervalle entre deux appuis (ms)        | `2000`          |
+| `--log`            | Fichier de log                           | -               |

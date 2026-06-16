@@ -43,8 +43,8 @@ function fallbackStatusLine(): string {
     status.status === 'online' || status.status === 'running'
       ? chalk.green
       : status.status === 'in_use'
-      ? chalk.yellow
-      : chalk.gray;
+        ? chalk.yellow
+        : chalk.gray;
   return `[${formatTime()}] Agent ${statusColor(status.status.toUpperCase())} | AC ${status.acRunning ? chalk.green('●') : chalk.gray('●')} | CM ${status.cmRunning ? chalk.green('●') : chalk.gray('●')} | ${status.serversRunning} serveur(s)`;
 }
 
@@ -168,14 +168,30 @@ export function setStatus(update: Partial<AgentStatus>) {
 
 export function log(level: 'info' | 'success' | 'warn' | 'error', text: string) {
   if (useBlessed && logBox) {
-    const color = level === 'success' ? 'green' : level === 'warn' ? 'yellow' : level === 'error' ? 'red' : 'cyan';
-    const prefix = level === 'info' ? 'ℹ' : level === 'success' ? '✔' : level === 'warn' ? '⚠' : '✖';
+    const color =
+      level === 'success'
+        ? 'green'
+        : level === 'warn'
+          ? 'yellow'
+          : level === 'error'
+            ? 'red'
+            : 'cyan';
+    const prefix =
+      level === 'info' ? 'ℹ' : level === 'success' ? '✔' : level === 'warn' ? '⚠' : '✖';
     logBox.log(`{gray-fg}${formatTime()}{/gray-fg} {${color}-fg}${prefix}{/${color}-fg} ${text}`);
     return;
   }
 
-  const color = level === 'success' ? chalk.green : level === 'warn' ? chalk.yellow : level === 'error' ? chalk.red : chalk.cyan;
-  const label = level === 'info' ? 'INFO' : level === 'success' ? 'OK  ' : level === 'warn' ? 'WARN' : 'ERR ';
+  const color =
+    level === 'success'
+      ? chalk.green
+      : level === 'warn'
+        ? chalk.yellow
+        : level === 'error'
+          ? chalk.red
+          : chalk.cyan;
+  const label =
+    level === 'info' ? 'INFO' : level === 'success' ? 'OK  ' : level === 'warn' ? 'WARN' : 'ERR ';
   nativeLog(`[${chalk.gray(formatTime())}] ${color(label)} ${text}`);
 }
 

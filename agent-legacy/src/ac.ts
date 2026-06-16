@@ -3,12 +3,7 @@ import util from 'util';
 
 const execAsync = util.promisify(exec);
 
-const processNames = [
-  'acs.exe',
-  'Content Manager.exe',
-  'ContentManager.exe',
-  'ACLauncher.exe',
-];
+const processNames = ['acs.exe', 'Content Manager.exe', 'ContentManager.exe', 'ACLauncher.exe'];
 
 export async function isAcRunning(): Promise<boolean> {
   try {
@@ -24,7 +19,9 @@ export async function isCmRunning(): Promise<boolean> {
   try {
     const { stdout } = await execAsync('tasklist /FI "STATUS eq RUNNING" /FO CSV /NH');
     const lowerStdout = stdout.toLowerCase();
-    return lowerStdout.includes('content manager.exe') || lowerStdout.includes('contentmanager.exe');
+    return (
+      lowerStdout.includes('content manager.exe') || lowerStdout.includes('contentmanager.exe')
+    );
   } catch (err) {
     return false;
   }

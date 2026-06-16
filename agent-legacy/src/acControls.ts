@@ -1,22 +1,22 @@
-import fs from "fs-extra";
-import path from "path";
-import { config } from "./config";
-import { log } from "./console";
+import fs from 'fs-extra';
+import path from 'path';
+import { config } from './config';
+import { log } from './console';
 
 const STARTER_KEYS: Record<string, string> = {
-  JOY: "-1",
-  BUTTON: "-1",
-  KEY: "-1",
-  XBOXBUTTON: "A",
+  JOY: '-1',
+  BUTTON: '-1',
+  KEY: '-1',
+  XBOXBUTTON: 'A',
 };
 
 function getControlsIniPath(): string {
-  return path.join(config.documentsPath, "Assetto Corsa", "cfg", "controls.ini");
+  return path.join(config.documentsPath, 'Assetto Corsa', 'cfg', 'controls.ini');
 }
 
 function detectEol(content: string): string {
-  if (content.includes("\r\n")) return "\r\n";
-  return "\n";
+  if (content.includes('\r\n')) return '\r\n';
+  return '\n';
 }
 
 /**
@@ -29,25 +29,25 @@ function detectEol(content: string): string {
  * manette physique pour faire ce mapping.
  */
 export async function ensureStarterBoundToA(): Promise<boolean> {
-  if (process.platform !== "win32") {
-    log("info", "[acControls] Mapping AC ignoré sur plateforme non-Windows");
+  if (process.platform !== 'win32') {
+    log('info', '[acControls] Mapping AC ignoré sur plateforme non-Windows');
     return false;
   }
 
   const controlsPath = getControlsIniPath();
   if (!fs.existsSync(controlsPath)) {
-    log("warn", `[acControls] controls.ini introuvable : ${controlsPath}`);
+    log('warn', `[acControls] controls.ini introuvable : ${controlsPath}`);
     return false;
   }
 
-  const content = fs.readFileSync(controlsPath, "utf-8");
+  const content = fs.readFileSync(controlsPath, 'utf-8');
   const eol = detectEol(content);
   const lines = content.split(eol);
 
   // Rechercher la dernière occurrence de la section [STARTER]
   let sectionStart = -1;
   for (let i = lines.length - 1; i >= 0; i--) {
-    if (lines[i].trim().toUpperCase() === "[STARTER]") {
+    if (lines[i].trim().toUpperCase() === '[STARTER]') {
       sectionStart = i;
       break;
     }
@@ -66,7 +66,7 @@ export async function ensureStarterBoundToA(): Promise<boolean> {
     const seen = new Set<string>();
     for (let j = sectionStart + 1; j < sectionEnd; j++) {
       const trimmed = lines[j].trim();
-      const eq = trimmed.indexOf("=");
+      const eq = trimmed.indexOf('=');
       if (eq === -1) continue;
       const key = trimmed.slice(0, eq).trim().toUpperCase();
       if (key in STARTER_KEYS) {
@@ -84,7 +84,7 @@ export async function ensureStarterBoundToA(): Promise<boolean> {
     }
   } else {
     // Aucune section STARTER, l'ajouter à la fin
-    lines.push("", "[STARTER]");
+    lines.push('', '[STARTER]');
     for (const [key, value] of Object.entries(STARTER_KEYS)) {
       lines.push(`${key}=${value}`);
     }
@@ -92,7 +92,7 @@ export async function ensureStarterBoundToA(): Promise<boolean> {
 
   const newContent = lines.join(eol);
   if (newContent === content) {
-    log("info", "[acControls] Mapping STARTER déjà configuré sur bouton A");
+    log('info', '[acControls] Mapping STARTER déjà configuré sur bouton A');
     return true;
   }
 
@@ -100,15 +100,13 @@ export async function ensureStarterBoundToA(): Promise<boolean> {
   try {
     fs.copyFileSync(controlsPath, backupPath);
   } catch (err: any) {
-    log("warn", `[acControls] Impossible de créer le backup : ${err.message}`);
+    log('warn', `[acControls] Impossible de créer le backup : ${err.message}`);
   }
 
-  fs.writeFileSync(controlsPath, newContent, "utf-8");
+  fs.writeFileSync(controlsPath, newContent, 'utf-8');
   log(
-    "success",
-    `[acControls] Action STARTER mappée sur le bouton A (backup : ${path.basename(
-      backupPath,
-    )})`,
+    'success',
+    `[acControls] Action STARTER mappée sur le bouton A (backup : ${path.basename(backupPath)})`,
   );
   return true;
 }

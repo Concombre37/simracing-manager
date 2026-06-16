@@ -43,7 +43,7 @@ export async function findAcServerProcesses(): Promise<ProcessInfo[]> {
   const candidates = allProcesses.filter(
     (p) =>
       (p.executablePath && /acserver|ac_server|assettocorsa[\\/]server/i.test(p.executablePath)) ||
-      (p.commandLine && /acserver|ac_server|server_cfg\.ini|entry_list\.ini/i.test(p.commandLine))
+      (p.commandLine && /acserver|ac_server|server_cfg\.ini|entry_list\.ini/i.test(p.commandLine)),
   );
 
   if (candidates.length > 0) {
@@ -68,8 +68,7 @@ async function findAllProcesses(): Promise<ProcessInfo[]> {
 }
 
 async function findProcessesByName(exeName: string): Promise<ProcessInfo[]> {
-  const psCmd =
-    `powershell -Command "Get-CimInstance Win32_Process -Filter \\\"Name='${exeName}'\\\" | Select-Object ProcessId,CommandLine,ExecutablePath | ConvertTo-Csv -NoTypeInformation"`;
+  const psCmd = `powershell -Command "Get-CimInstance Win32_Process -Filter \\\"Name='${exeName}'\\\" | Select-Object ProcessId,CommandLine,ExecutablePath | ConvertTo-Csv -NoTypeInformation"`;
   try {
     console.log(`[acServer] Recherche PowerShell: ${exeName}`);
     const { stdout } = await execAsync(psCmd, { timeout: 10000 });
@@ -80,7 +79,7 @@ async function findProcessesByName(exeName: string): Promise<ProcessInfo[]> {
     try {
       const { stdout } = await execAsync(
         `wmic process where "name='${exeName}'" get ProcessId,CommandLine,ExecutablePath /FORMAT:CSV`,
-        { timeout: 10000 }
+        { timeout: 10000 },
       );
       console.log(`[acServer] Sortie WMIC brute:\n${stdout}`);
       return parseProcessCsv(stdout);
@@ -252,7 +251,9 @@ function countPlayersInLog(serverDir: string): number {
       if (lower.includes('disconnected') || lower.includes('connection lost')) disconnections++;
     }
     const count = Math.max(0, newConnections - disconnections);
-    console.log(`[acServer] Joueurs dans log.txt: ${count} (connexions=${newConnections}, déco=${disconnections})`);
+    console.log(
+      `[acServer] Joueurs dans log.txt: ${count} (connexions=${newConnections}, déco=${disconnections})`,
+    );
     return count;
   } catch (err) {
     console.error('[acServer] Erreur lecture log serveur:', err);
@@ -277,10 +278,16 @@ export async function getLocalAcServers(): Promise<AcServerInfo[]> {
     const track = serverSection.TRACK || serverSection.track;
     const trackLayout = serverSection.CONFIG_TRACK || serverSection.config_track;
     const carsRaw = serverSection.CARS || serverSection.cars;
-    const maxClients = parseInt(serverSection.MAX_CLIENTS || serverSection.max_clients || '0', 10) || undefined;
+    const maxClients =
+      parseInt(serverSection.MAX_CLIENTS || serverSection.max_clients || '0', 10) || undefined;
     const hasPassword = !!(serverSection.PASSWORD || serverSection.password);
 
-    const cars = carsRaw ? carsRaw.split(';').map((c) => c.trim()).filter(Boolean) : parseEntryListCars(serverDir);
+    const cars = carsRaw
+      ? carsRaw
+          .split(';')
+          .map((c) => c.trim())
+          .filter(Boolean)
+      : parseEntryListCars(serverDir);
     const playerCount = countPlayersInLog(serverDir);
 
     const info: AcServerInfo = {

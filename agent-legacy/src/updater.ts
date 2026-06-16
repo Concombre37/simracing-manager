@@ -1,13 +1,13 @@
-import fs from "fs-extra";
-import path from "path";
-import https from "https";
-import { spawn } from "child_process";
-import { config } from "./config";
+import fs from 'fs-extra';
+import path from 'path';
+import https from 'https';
+import { spawn } from 'child_process';
+import { config } from './config';
 
-const OWNER = "Concombre37";
-const REPO = "simracing-manager";
-const ASSET_EXE = "sim-center-agent-win.exe";
-const ASSET_ZIP = "sim-center-agent-win.zip";
+const OWNER = 'Concombre37';
+const REPO = 'simracing-manager';
+const ASSET_EXE = 'sim-center-agent-win.exe';
+const ASSET_ZIP = 'sim-center-agent-win.zip';
 
 function publicDownloadUrl(assetName: string): string {
   return `https://github.com/${OWNER}/${REPO}/releases/latest/download/${assetName}`;
@@ -22,19 +22,19 @@ interface GithubAsset {
 function githubApiRequest<T>(url: string): Promise<T> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {
-      "User-Agent": "sim-center-agent",
-      Accept: "application/vnd.github+json",
+      'User-Agent': 'sim-center-agent',
+      Accept: 'application/vnd.github+json',
     };
     if (config.githubToken) {
-      headers["Authorization"] = `token ${config.githubToken}`;
+      headers['Authorization'] = `token ${config.githubToken}`;
     }
-    let data = "";
+    let data = '';
     https
       .get(url, { headers }, (response) => {
         if (response.statusCode === 302 || response.statusCode === 301) {
           const redirectUrl = response.headers.location;
           if (!redirectUrl) {
-            reject(new Error("Redirection sans URL"));
+            reject(new Error('Redirection sans URL'));
             return;
           }
           githubApiRequest<T>(redirectUrl).then(resolve).catch(reject);
@@ -44,8 +44,8 @@ function githubApiRequest<T>(url: string): Promise<T> {
           reject(new Error(`GitHub API HTTP ${response.statusCode}`));
           return;
         }
-        response.on("data", (chunk) => (data += chunk));
-        response.on("end", () => {
+        response.on('data', (chunk) => (data += chunk));
+        response.on('end', () => {
           try {
             resolve(JSON.parse(data));
           } catch (err: any) {
@@ -53,7 +53,7 @@ function githubApiRequest<T>(url: string): Promise<T> {
           }
         });
       })
-      .on("error", reject);
+      .on('error', reject);
   });
 }
 
@@ -76,17 +76,17 @@ function downloadFile(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
     const headers: Record<string, string> = {
-      Accept: "application/octet-stream",
+      Accept: 'application/octet-stream',
     };
-    if (config.githubToken && url.includes("api.github.com")) {
-      headers["Authorization"] = `token ${config.githubToken}`;
+    if (config.githubToken && url.includes('api.github.com')) {
+      headers['Authorization'] = `token ${config.githubToken}`;
     }
     https
       .get(url, { headers }, (response) => {
         if (response.statusCode === 302 || response.statusCode === 301) {
           const redirectUrl = response.headers.location;
           if (!redirectUrl) {
-            reject(new Error("Redirection sans URL"));
+            reject(new Error('Redirection sans URL'));
             return;
           }
           downloadFile(redirectUrl, dest).then(resolve).catch(reject);
@@ -97,12 +97,12 @@ function downloadFile(url: string, dest: string): Promise<void> {
           return;
         }
         response.pipe(file);
-        file.on("finish", () => {
+        file.on('finish', () => {
           file.close();
           resolve();
         });
       })
-      .on("error", (err) => {
+      .on('error', (err) => {
         try {
           fs.unlinkSync(dest);
         } catch {}
@@ -277,22 +277,19 @@ del /F /Q "%~f0"
 `;
 }
 
-async function launchUpdateBatch(
-  batchContent: string,
-  currentDir: string,
-): Promise<void> {
-  const batchPath = path.join(currentDir, "update_agent.bat");
-  const logPath = path.join(currentDir, "update_agent.log");
-  await fs.writeFile(batchPath, batchContent, "utf-8");
+async function launchUpdateBatch(batchContent: string, currentDir: string): Promise<void> {
+  const batchPath = path.join(currentDir, 'update_agent.bat');
+  const logPath = path.join(currentDir, 'update_agent.log');
+  await fs.writeFile(batchPath, batchContent, 'utf-8');
   console.log(`[updater] Script de mise a jour créé: ${batchPath}`);
 
-  spawn("cmd.exe", ["/c", batchPath], {
+  spawn('cmd.exe', ['/c', batchPath], {
     detached: true,
-    stdio: "ignore",
+    stdio: 'ignore',
     windowsHide: false,
   }).unref();
 
-  console.log("[updater] Mise a jour lancée, fermeture de l agent...");
+  console.log('[updater] Mise a jour lancée, fermeture de l agent...');
   setTimeout(() => process.exit(0), 1000);
 }
 
@@ -307,13 +304,11 @@ export async function triggerUpdate(currentExePath: string): Promise<void> {
 
   try {
     const downloadUrl = await resolveAssetUrl(ASSET_EXE);
-    console.log(
-      `[updater] Téléchargement de l'exe depuis ${downloadUrl.split("?")[0]}...`,
-    );
+    console.log(`[updater] Téléchargement de l'exe depuis ${downloadUrl.split('?')[0]}...`);
     await downloadFile(downloadUrl, newExePath);
     console.log(`[updater] Téléchargement terminé: ${newExePath}`);
 
-    const logPath = path.join(currentDir, "update_agent.log");
+    const logPath = path.join(currentDir, 'update_agent.log');
     const batchContent = buildExeUpdateBatch({
       currentExePath,
       newExePath,
@@ -333,9 +328,7 @@ export async function triggerUpdate(currentExePath: string): Promise<void> {
   try {
     const zipUrl = await resolveAssetUrl(ASSET_ZIP);
     const zipPath = path.join(currentDir, `${ASSET_ZIP}.new`);
-    console.log(
-      `[updater] Téléchargement du zip depuis ${zipUrl.split("?")[0]}...`,
-    );
+    console.log(`[updater] Téléchargement du zip depuis ${zipUrl.split('?')[0]}...`);
     await downloadFile(zipUrl, zipPath);
     console.log(`[updater] Zip téléchargé: ${zipPath}`);
 
@@ -343,13 +336,11 @@ export async function triggerUpdate(currentExePath: string): Promise<void> {
       currentExePath,
       zipPath,
       pid,
-      logPath: path.join(currentDir, "update_agent.log"),
+      logPath: path.join(currentDir, 'update_agent.log'),
     });
     await launchUpdateBatch(batchContent, currentDir);
     return;
   } catch (zipErr: any) {
-    throw new Error(
-      `Aucun asset de mise a jour disponible : ${zipErr.message}`,
-    );
+    throw new Error(`Aucun asset de mise a jour disponible : ${zipErr.message}`);
   }
 }

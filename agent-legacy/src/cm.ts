@@ -34,7 +34,7 @@ NAME=SimCenter Session
 TYPE={{mode}}
 DURATION_MINUTES=60
 SPAWN_SET=PIT
-`; 
+`;
 
 export async function createCmPreset(session: SessionConfig): Promise<string> {
   const presetName = `simcenter_${session.sessionId}`;
@@ -86,10 +86,7 @@ export async function launchAssettoCorsa(session: SessionConfig): Promise<number
     throw new Error(`Assetto Corsa non trouvé: ${acExe}`);
   }
 
-  const args = [
-    '-c', session.carAcId || 'ks_mazda_mx5_cup',
-    '-t', session.trackAcId || 'spa',
-  ];
+  const args = ['-c', session.carAcId || 'ks_mazda_mx5_cup', '-t', session.trackAcId || 'spa'];
   if (session.layoutName) {
     args.push('-l', session.layoutName);
   }

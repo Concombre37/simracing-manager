@@ -9,7 +9,7 @@ const stateFilePath = path.join(
   'apps',
   'lua',
   'simcenter_overlay',
-  'session_state.json'
+  'session_state.json',
 );
 
 export interface SessionState {

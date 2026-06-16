@@ -32,6 +32,7 @@ npm run build:exe
 ```
 
 Cette commande effectue automatiquement :
+
 1. Compilation de `PressDriveKey.exe` (`npm run build:tools`).
 2. Téléchargement du MSI ViGEmBus (`npm run download:vigem-msi`).
 3. Embarquement des binaires dans le code source (`npm run embed:assets`).

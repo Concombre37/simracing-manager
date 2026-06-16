@@ -28,7 +28,7 @@ export async function scanAssettoContent(): Promise<AcContent> {
       if (!stat || !stat.isDirectory()) continue;
 
       const uiJson = readJsonSafe<{ name?: string; brand?: string; class?: string }>(
-        path.join(carDir, 'ui_car.json')
+        path.join(carDir, 'ui_car.json'),
       );
 
       content.cars.push({
@@ -56,7 +56,11 @@ export async function scanAssettoContent(): Promise<AcContent> {
       for (const sub of subEntries) {
         const subDir = path.join(trackDir, sub);
         const subStat = await fs.stat(subDir).catch(() => null);
-        if (subStat && subStat.isDirectory() && (await fs.pathExists(path.join(subDir, 'ui_track.json')))) {
+        if (
+          subStat &&
+          subStat.isDirectory() &&
+          (await fs.pathExists(path.join(subDir, 'ui_track.json')))
+        ) {
           layouts.push(sub);
         }
       }
@@ -69,6 +73,8 @@ export async function scanAssettoContent(): Promise<AcContent> {
     }
   }
 
-  console.log(`[contentScanner] Voitures trouvées: ${content.cars.length}, Circuits: ${content.tracks.length}`);
+  console.log(
+    `[contentScanner] Voitures trouvées: ${content.cars.length}, Circuits: ${content.tracks.length}`,
+  );
   return content;
 }
