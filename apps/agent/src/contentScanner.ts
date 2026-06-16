@@ -37,9 +37,16 @@ export class ContentScanner {
   async scan(): Promise<AcContent> {
     const content: AcContent = { cars: [], tracks: [] };
 
-    const acPath =
-      config.AC_PATH ??
-      path.join(process.env.ProgramFiles ?? '', 'Steam', 'steamapps', 'common', 'assettocorsa');
+    const acPath = await this.resolveAcPath();
+    if (!acPath) {
+      this.logger.warn(
+        { tried: this.getCandidatePaths() },
+        'Assetto Corsa directory not found. Set AC_PATH in .env if the game is installed elsewhere.',
+      );
+      return content;
+    }
+
+    this.logger.info({ acPath }, 'Scanning Assetto Corsa content');
 
     const carsDir = path.join(acPath, 'content', 'cars');
     if (await this.pathExists(carsDir)) {
@@ -62,6 +69,8 @@ export class ContentScanner {
           category: uiJson?.class,
         });
       }
+    } else {
+      this.logger.warn({ carsDir }, 'Cars directory not found');
     }
 
     const tracksDir = path.join(acPath, 'content', 'tracks');
@@ -91,13 +100,62 @@ export class ContentScanner {
           layouts,
         });
       }
+    } else {
+      this.logger.warn({ tracksDir }, 'Tracks directory not found');
     }
 
     this.logger.info(
-      { cars: content.cars.length, tracks: content.tracks.length },
+      { cars: content.cars.length, tracks: content.tracks.length, acPath },
       'Assetto Corsa content scanned',
     );
     return content;
+  }
+
+  private getCandidatePaths(): string[] {
+    const candidates: string[] = [];
+    if (config.AC_PATH) {
+      candidates.push(config.AC_PATH);
+    }
+    if (process.platform === 'win32') {
+      const programFiles = process.env.ProgramFiles;
+      const programFilesX86 = process.env['ProgramFiles(x86)'];
+      const prefixes = [
+        programFiles,
+        programFilesX86,
+        'C:\\Program Files',
+        'C:\\Program Files (x86)',
+        'C:\\Steam',
+      ].filter((p): p is string => !!p);
+      const seen = new Set<string>();
+      for (const prefix of prefixes) {
+        const candidate = path.join(prefix, 'Steam', 'steamapps', 'common', 'assettocorsa');
+        if (!seen.has(candidate)) {
+          seen.add(candidate);
+          candidates.push(candidate);
+        }
+      }
+    }
+    return candidates;
+  }
+
+  private async resolveAcPath(): Promise<string | undefined> {
+    if (config.AC_PATH) {
+      if (await this.pathExists(path.join(config.AC_PATH, 'content', 'cars'))) {
+        return config.AC_PATH;
+      }
+      this.logger.warn(
+        { acPath: config.AC_PATH },
+        'Configured AC_PATH does not contain content/cars',
+      );
+    }
+
+    for (const candidate of this.getCandidatePaths()) {
+      if (await this.pathExists(path.join(candidate, 'content', 'cars'))) {
+        return candidate;
+      }
+    }
+
+    return undefined;
   }
 
   private async pathExists(filePath: string): Promise<boolean> {
