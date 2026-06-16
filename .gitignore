@@ -46,7 +46,9 @@ coverage/
 
 # Agent binaries and build artifacts
 agent/exe/
+apps/agent/exe/
 agent/dist/
+apps/agent/dist/
 agent/tools/PressDriveKey/bin/
 agent/tools/PressDriveKey/obj/
 *.pdb

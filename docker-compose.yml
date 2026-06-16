@@ -28,10 +28,10 @@ services:
     container_name: simracing-backend
     restart: unless-stopped
     ports:
-      - '127.0.0.1:3000:3000'
+      - '127.0.0.1:3002:3002'
     environment:
       NODE_ENV: production
-      PORT: 3000
+      PORT: 3002
       DATABASE_URL: postgresql://simracing:simracing@postgres:5432/simracing?schema=public
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRES_IN: 7d
