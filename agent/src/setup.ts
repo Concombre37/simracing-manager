@@ -77,23 +77,51 @@ function downloadFile(url: string, dest: string): Promise<void> {
 
 async function isViGEmBusInstalled(): Promise<boolean> {
   try {
-    const { stdout } = await execAsync(
-      'powershell.exe -NoProfile -Command "Get-Service -Name ViGEmBus -ErrorAction SilentlyContinue | Select-Object -First 1"',
-    );
+    const { stdout } = await execAsync('sc query ViGEmBus');
     return stdout.toLowerCase().includes("vigembus");
   } catch {
     return false;
   }
 }
 
+async function unblockFile(filePath: string): Promise<void> {
+  try {
+    await execAsync(
+      `powershell.exe -NoProfile -Command "Unblock-File -Path '${filePath.replace(/'/g, "''")}'"`,
+    );
+  } catch {
+    // Ignorer si PowerShell n'est pas disponible ou si le fichier n'est pas bloque
+  }
+}
+
 function runDriverInstaller(driverPath: string): Promise<number> {
   return new Promise((resolve) => {
-    const child = spawn(driverPath, ["/S"], {
+    log("info", `[setup] Execution de ${driverPath} /S`);
+
+    // Utilise cmd /c pour eviter les problemes de parsing de certains installateurs NSIS
+    const child = spawn("cmd.exe", ["/c", `"${driverPath}"`, "/S"], {
       detached: false,
       windowsHide: true,
     });
-    child.on("exit", (code) => resolve(code ?? 1));
-    child.on("error", () => resolve(1));
+
+    let output = "";
+    child.stdout?.on("data", (data) => {
+      output += data.toString();
+    });
+    child.stderr?.on("data", (data) => {
+      output += data.toString();
+    });
+
+    child.on("exit", (code) => {
+      if (code !== 0 && output) {
+        log("warn", `[setup] Sortie installateur: ${output.trim()}`);
+      }
+      resolve(code ?? 1);
+    });
+    child.on("error", (err) => {
+      log("error", `[setup] Erreur execution installateur: ${err.message}`);
+      resolve(1);
+    });
   });
 }
 
@@ -134,6 +162,16 @@ async function ensureViGEmBus(): Promise<void> {
       log("info", "[setup] Installateur ViGEmBus extrait de l'agent");
     }
   }
+
+  if (!fs.existsSync(driverPath)) {
+    throw new Error(`Installateur introuvable: ${driverPath}`);
+  }
+
+  const stats = fs.statSync(driverPath);
+  log("info", `[setup] Installateur pret: ${driverPath} (${stats.size} octets)`);
+
+  // Debloque le fichier si Windows l'a marque comme telecharge depuis Internet
+  await unblockFile(driverPath);
 
   log("info", "[setup] Installation silencieuse de ViGEmBus (admin requis)...");
   const code = await runDriverInstaller(driverPath);

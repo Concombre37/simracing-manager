@@ -14,7 +14,7 @@ class Program
     {
         var options = Options.Parse(args);
         var defaultLogPath = Path.Combine(AppContext.BaseDirectory, "PressDriveKey.log");
-        var logPath = string.IsNullOrWhiteSpace(options.LogPath) ? defaultLogPath : options.LogPath;
+        var logPath = string.IsNullOrWhiteSpace(options.LogPath) ? defaultLogPath : options.LogPath!;
 
         try
         {
@@ -30,17 +30,17 @@ class Program
             using var client = new ViGEmClient();
             var controller = client.CreateXbox360Controller();
             controller.Connect();
-            Log(options.LogPath, "Manette Xbox 360 virtuelle connectee (ViGEmBus).");
+            Log(logPath, "Manette Xbox 360 virtuelle connectee (ViGEmBus).");
 
             // Attente de la fenetre Assetto Corsa
             IntPtr hwnd = IntPtr.Zero;
-            Log(options.LogPath, $"Attente de la fenetre '{options.WindowTitle}'...");
+            Log(logPath, $"Attente de la fenetre '{options.WindowTitle}'...");
             for (int i = 0; i < options.WindowTimeoutSec; i++)
             {
                 hwnd = FindWindow(null, options.WindowTitle);
                 if (hwnd != IntPtr.Zero)
                 {
-                    Log(options.LogPath, $"Fenetre trouvee apres {i}s.");
+                    Log(logPath, $"Fenetre trouvee apres {i}s.");
                     break;
                 }
                 Thread.Sleep(1000);
@@ -48,21 +48,21 @@ class Program
 
             if (hwnd == IntPtr.Zero)
             {
-                Log(options.LogPath, $"ERREUR: fenetre '{options.WindowTitle}' non trouvee apres {options.WindowTimeoutSec}s.");
+                Log(logPath, $"ERREUR: fenetre '{options.WindowTitle}' non trouvee apres {options.WindowTimeoutSec}s.");
                 return 1;
             }
 
             // Delai supplementaire pour le chargement du circuit
             if (options.DelayMs > 0)
             {
-                Log(options.LogPath, $"Attente {options.DelayMs}ms avant d'appuyer...");
+                Log(logPath, $"Attente {options.DelayMs}ms avant d'appuyer...");
                 Thread.Sleep(options.DelayMs);
             }
 
             // Appuis repetes sur le bouton A
             for (int i = 0; i < options.Repeat; i++)
             {
-                Log(options.LogPath, $"Appui sur A ({i + 1}/{options.Repeat}).");
+                Log(logPath, $"Appui sur A ({i + 1}/{options.Repeat}).");
                 controller.SetButtonState(Xbox360Button.A, true);
                 Thread.Sleep(options.PressMs);
                 controller.SetButtonState(Xbox360Button.A, false);
@@ -73,12 +73,12 @@ class Program
                 }
             }
 
-            Log(options.LogPath, "Sequence terminee avec succes.");
+            Log(logPath, "Sequence terminee avec succes.");
             return 0;
         }
         catch (Exception ex)
         {
-            Log(options.LogPath, $"ERREUR: {ex}");
+            Log(logPath, $"ERREUR: {ex}");
             return 1;
         }
     }
