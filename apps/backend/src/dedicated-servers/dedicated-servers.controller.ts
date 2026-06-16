@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { DedicatedServersService } from './dedicated-servers.service';
 import {
@@ -28,6 +29,8 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 @Controller('dedicated-servers')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class DedicatedServersController {
+  private readonly logger = new Logger(DedicatedServersController.name);
+
   constructor(
     private readonly dedicatedServersService: DedicatedServersService,
     private readonly agentGateway: AgentGateway,
@@ -111,6 +114,7 @@ export class DedicatedServersController {
     const httpPort = server.httpPort ?? 8081;
 
     for (const stationId of dto.stationIds) {
+      this.logger.log(`Emitting server:join to station:${stationId}`);
       await this.agentGateway.emitJoinServer(stationId, {
         host,
         port,

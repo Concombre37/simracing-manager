@@ -46,7 +46,12 @@ sim-center-manager/
 
 ### Important backend gotchas
 
-- `AgentAuthGuard` joins authenticated sockets to room `station:<stationId>`. All agent-targeted commands use `this.server.to('station:<id>').emit(...)`.
+- `AgentAuthGuard` joins authenticated sockets to room `station:<stationId>`. All agent-targeted commands use `this.server.to('station:<id>').emit(...)`. **The `<id>` is the station’s `stationId` string, not the DB UUID.**
+- `AgentGateway` sets `maxHttpBufferSize: 10 MB` so the agent can upload scanned content with embedded preview images.
+- `DedicatedServersController.join` emits `server:join` to `station:<stationId>` using the station’s textual `stationId`. The frontend must send `station.stationId`, not `station.id`.
+- `join-server.dto.ts` validates `stationIds` as `z.array(z.string().min(1)).min(1)` (not UUIDs).
+- `AgentGateway.emitJoinServer` now enumerates sockets in the target room and logs the count. If it logs `0 socket(s) found`, the POD agent is not connected or not authenticated to the `/agent` namespace.
+- `AgentGateway` tracks connected station IDs and exposes `getConnectedStationIds()`. `GET /stations/connected` returns the currently connected agent station IDs for quick diagnostics.
 - `AGENT_API_KEY_SALT` env var is validated but **not used** in code (plain SHA-256).
 - The existing migration `20260616022757_init` defines an older `dedicated_servers` table that does **not** match the current Prisma schema. After any schema change, generate a new migration or use `prisma db push` in dev.
 - Dashboard `station:command` accepts `launch`/`stop` but they are **not forwarded** to agents; use REST endpoints instead.
@@ -61,6 +66,8 @@ sim-center-manager/
 
 ### Frontend gotchas
 
+- `DedicatedServers.tsx` uses image grids for track and car selection. Pass `station.stationId` (not `station.id`) when targeting agents for POD commands.
+- Selecting a track auto-fills the server name as `Serveur <track name>` if the name field is empty.
 - `Stations.tsx` registers `socket.on('station:updated', ...)` directly in render, causing duplicate listeners. Wrap in `useEffect` when modifying.
 - `Leaderboard` is a placeholder.
 - `/settings` nav item exists but has no route.
@@ -82,8 +89,11 @@ sim-center-manager/
 ### Agent gotchas
 
 - `envWriter.ts` must use `path.dirname(process.execPath)` (not `process.cwd()`), otherwise packaged agent writes `.env` in the wrong place.
+- `contentScanner.ts` embeds car/track previews as base64 data URLs (max 100 KB per preview) by reading `preview.png` / `preview.jpg` from the AC content folders.
 - `serverLauncher.ts` uses dynamic ports `9600-9700` / `8081-8181` since v2.0.5. Allocated ports are stored in `DedicatedServer.udpPort/tcpPort/httpPort`.
+- `serverLauncher.ts` writes `CONFIG_TRACK=${payload.trackLayout || 'random'}` so tracks without a layout use `random` instead of an empty value (which causes AC “UI missing”).
 - `server:join` payload (v2.0.5+) sends `host`, `port`, `httpPort`, `password`, `carAcId`, `track`, `trackLayout`, `serverName`.
+- `acLauncher.ts` verifies that `Content Manager.exe` exists before spawning and logs spawn errors.
 - The agent does **not** scan running `acServer.exe` processes; server status relies on `server:started` / `server:stopped`.
 - `pkg` config only bundles `lua_app/**/*`; native helpers (`PressDriveKey.exe`, `ViGEmBus`) are not included in the new agent.
 
@@ -137,20 +147,33 @@ npm run package:win      # outputs exe/agent.exe, rename to sim-center-agent-win
 - Verify the uploaded asset hash/size against the local file. CDN caching can serve an old asset; use `?nocache=<ts>` to test.
 - Do **not** release the legacy `agent/exe/sim-center-agent-win.exe`.
 
-## 9. Testing Checklist
+## 9. Agent Version Gotcha
+
+Dedicated-server and POD commands (`server:launch`, `server:join`, `server:stop`) were added in agent **v2.0.5** and improved in **v2.0.6**. If an agent logs `"version":"2.0.4"` (or older), it will stay silent when receiving these commands even though it is online and other commands (e.g. `ac:autoShifter`) may work.
+
+Release asset expected SHA-256 for v2.0.6:
+
+```
+2e39ac296b60da16143c951f2f7f9c905a2f08f3906b7c7af257f150628ecbce
+```
+
+To fix a stuck station, replace its local `sim-center-agent-win.exe` with the v2.0.6 asset (or re-run the updater) and restart the agent.
+
+## 10. Testing Checklist
 
 After agent/backend changes, verify:
 
 - [ ] Agent provisions and appears `online` on the Stations page.
 - [ ] Heartbeat keeps station online.
-- [ ] Content scan shows cars/tracks for the station.
+- [ ] Content scan shows cars/tracks for the station, including preview images.
 - [x] Creating a dedicated server launches `acServer.exe` on the agent.
 - [x] Server ports are unique per server on the same host.
 - [x] Join/POD command reaches the agent and launches CM/AC with the right car/track.
+- [x] Tracks without a layout default to `random` instead of an empty layout.
 - [ ] Stop server terminates only the correct process.
 - [ ] Agent update (`system:update`) downloads and restarts from latest release.
 
-## 10. Common Commands
+## 11. Common Commands
 
 ```bash
 # Logs
@@ -169,7 +192,7 @@ npm run dev --workspace=@simracing/agent
 npm run dev --workspace=@simracing/frontend
 ```
 
-## 11. When Modifying This Project
+## 12. When Modifying This Project
 
 - Keep changes minimal and aligned with existing NestJS/React patterns.
 - Update `@simracing/shared` contracts before backend/agent when adding WebSocket events.

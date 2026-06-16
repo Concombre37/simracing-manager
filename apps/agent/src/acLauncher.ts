@@ -190,6 +190,16 @@ export class AcLauncher {
       config.CM_PATH ?? path.join(process.env.LOCALAPPDATA ?? '', 'AcTools Content Manager');
     const cmExe = path.join(cmPath, 'Content Manager.exe');
 
+    try {
+      await fs.access(cmExe);
+    } catch {
+      this.logger.error(
+        { cmExe },
+        'Content Manager executable not found. Set CM_PATH in the agent .env.',
+      );
+      throw new Error(`Content Manager non trouvé: ${cmExe}`);
+    }
+
     const params = new URLSearchParams({
       acs_exe: 'acs.exe',
       b1: '1',
@@ -204,6 +214,9 @@ export class AcLauncher {
     const uri = `acmanager://race/online?${params.toString()}`;
 
     this.currentProcess = spawn(cmExe, [uri], { detached: true, stdio: 'ignore' });
+    this.currentProcess.on('error', (err) => {
+      this.logger.error({ err }, 'Failed to spawn Content Manager');
+    });
     this.logger.info({ uri }, 'Launched via Content Manager');
   }
 

@@ -124,7 +124,10 @@ export class SimRacingAgent {
     });
 
     this.socket.on('connect', () => {
-      this.logger.info('Connected to backend');
+      this.logger.info(
+        { stationId: config.STATION_ID, socketId: this.socket?.id },
+        'Connected to backend',
+      );
       this.startHeartbeat();
       void this.sendContent();
       this.startContentSync();
@@ -337,8 +340,13 @@ export class SimRacingAgent {
     trackLayout?: string;
     serverName?: string;
   }): Promise<void> {
-    this.logger.info({ host: payload.host, port: payload.port }, 'Received join server command');
-    await this.acLauncher.joinServer(payload);
+    this.logger.info(payload, 'Received join server command');
+    try {
+      await this.acLauncher.joinServer(payload);
+      this.logger.info('Join server command completed');
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to execute join server command');
+    }
   }
 
   private async handleLaunchDedicatedServer(payload: LaunchDedicatedServerPayload): Promise<void> {

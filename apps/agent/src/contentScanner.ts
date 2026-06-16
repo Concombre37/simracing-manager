@@ -8,12 +8,14 @@ export interface Car {
   name: string;
   brand?: string;
   category?: string;
+  preview?: string;
 }
 
 export interface Track {
   acId: string;
   name: string;
   layouts: string[];
+  preview?: string;
 }
 
 export interface AcContent {
@@ -29,6 +31,48 @@ async function readJsonSafe<T>(filePath: string): Promise<T | undefined> {
   } catch {
     return undefined;
   }
+}
+
+const MAX_PREVIEW_BYTES = 100 * 1024;
+
+async function readImageAsBase64(filePath: string): Promise<string | undefined> {
+  try {
+    await fs.access(filePath);
+    const stat = await fs.stat(filePath);
+    if (!stat.isFile() || stat.size > MAX_PREVIEW_BYTES) return undefined;
+    const buffer = await fs.readFile(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const mime =
+      ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
+    return `data:${mime};base64,${buffer.toString('base64')}`;
+  } catch {
+    return undefined;
+  }
+}
+
+async function findCarPreview(carDir: string): Promise<string | undefined> {
+  const rootPreview = await readImageAsBase64(path.join(carDir, 'preview.png'));
+  if (rootPreview) return rootPreview;
+
+  const skinsDir = path.join(carDir, 'skins');
+  try {
+    const skins = await fs.readdir(skinsDir);
+    for (const skin of skins) {
+      const skinPreview = await readImageAsBase64(path.join(skinsDir, skin, 'preview.png'));
+      if (skinPreview) return skinPreview;
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
+async function findTrackPreview(trackDir: string): Promise<string | undefined> {
+  for (const name of ['preview.png', 'preview.jpg', 'preview.jpeg']) {
+    const preview = await readImageAsBase64(path.join(trackDir, name));
+    if (preview) return preview;
+  }
+  return undefined;
 }
 
 export class ContentScanner {
@@ -67,6 +111,7 @@ export class ContentScanner {
           name: uiJson?.name || entry,
           brand: uiJson?.brand,
           category: uiJson?.class,
+          preview: await findCarPreview(carDir),
         });
       }
     } else {
@@ -98,6 +143,7 @@ export class ContentScanner {
           acId: entry,
           name: uiJson?.name || entry,
           layouts,
+          preview: await findTrackPreview(trackDir),
         });
       }
     } else {

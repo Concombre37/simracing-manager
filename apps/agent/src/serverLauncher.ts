@@ -268,7 +268,7 @@ export class ServerLauncher {
       '[SERVER]',
       `NAME=${payload.name}`,
       `TRACK=${payload.track}`,
-      `CONFIG_TRACK=${payload.trackLayout ?? ''}`,
+      `CONFIG_TRACK=${payload.trackLayout || 'random'}`,
       `CARS=${carIds.join(';')}`,
       `MAX_CLIENTS=${payload.maxClients}`,
       `PASSWORD=${payload.password ?? ''}`,

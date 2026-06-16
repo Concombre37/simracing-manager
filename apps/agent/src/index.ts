@@ -58,11 +58,13 @@ async function main(): Promise<void> {
   const { config } = await import('./config');
   const { SimRacingAgent } = await import('./agent');
 
-  logger.info(
-    { version: config.VERSION, stationId: config.STATION_ID },
-    'SimRacing Manager Agent starting',
-  );
-  const agent = new SimRacingAgent(logger);
+  const scopedLogger = logger.child({
+    version: config.VERSION,
+    stationId: config.STATION_ID,
+  });
+
+  scopedLogger.info(`SimRacing Manager Agent v${config.VERSION} starting`);
+  const agent = new SimRacingAgent(scopedLogger);
   await agent.start();
 }
 

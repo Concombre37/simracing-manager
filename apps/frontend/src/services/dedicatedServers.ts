@@ -28,12 +28,14 @@ export interface Car {
   name: string;
   brand?: string;
   category?: string;
+  preview?: string;
 }
 
 export interface Track {
   acId: string;
   name: string;
   layouts: string[];
+  preview?: string;
 }
 
 export interface AcContent {

@@ -31,12 +31,17 @@ interface AuthenticatedSocket extends Socket {
   provisioning?: boolean;
 }
 
-@WebSocketGateway({ namespace: 'agent', cors: { origin: '*' } })
+@WebSocketGateway({
+  namespace: 'agent',
+  cors: { origin: '*' },
+  maxHttpBufferSize: 10 * 1024 * 1024,
+})
 @UseGuards(AgentAuthGuard)
 export class AgentGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit
 {
   private readonly logger = new Logger(AgentGateway.name);
+  private readonly connectedStationIds = new Set<string>();
 
   @WebSocketServer()
   server!: Server<AgentToServerEvents, ServerToAgentEvents>;
@@ -82,12 +87,18 @@ export class AgentGateway
     }
     if (client.stationId) {
       await client.join(`station:${client.stationId}`);
+      this.connectedStationIds.add(client.stationId);
+      this.logger.log(
+        `Agent connected and joined room station:${client.stationId} (socket ${client.id})`,
+      );
+    } else {
+      this.logger.log(`Agent connected: unknown station (socket ${client.id})`);
     }
-    this.logger.log(`Agent connected: ${client.stationId ?? 'unknown'}`);
   }
 
   async handleDisconnect(client: AuthenticatedSocket): Promise<void> {
     if (client.stationId && !client.provisioning) {
+      this.connectedStationIds.delete(client.stationId);
       const station = await this.stationsService.updateStatus(
         client.stationId,
         StationStatus.OFFLINE,
@@ -98,6 +109,10 @@ export class AgentGateway
       );
     }
     this.logger.log(`Agent disconnected: ${client.stationId ?? 'unknown'}`);
+  }
+
+  getConnectedStationIds(): string[] {
+    return Array.from(this.connectedStationIds);
   }
 
   @SubscribeMessage('agent:register')
@@ -132,6 +147,8 @@ export class AgentGateway
     payload: HeartbeatPayload,
   ): Promise<void> {
     client.stationId = payload.stationId;
+    await client.join(`station:${payload.stationId}`);
+    this.connectedStationIds.add(payload.stationId);
     const station = await this.stationsService.updateHeartbeat(payload);
     this.dashboardGateway.emitStationUpdated(station.stationId, station.status);
   }
@@ -252,7 +269,21 @@ export class AgentGateway
       serverName?: string;
     },
   ): Promise<void> {
-    this.server.to(`station:${stationId}`).emit('server:join', payload);
+    const room = `station:${stationId}`;
+    const sockets = await this.server.in(room).fetchSockets();
+    this.logger.log(
+      `Emitting server:join to ${room} — ${sockets.length} socket(s) found`,
+    );
+    if (sockets.length === 0) {
+      this.logger.warn(
+        `No agent socket in ${room}; command will not be received. Connected stations: [${this.getConnectedStationIds().join(', ')}]`,
+      );
+      return;
+    }
+    for (const socket of sockets) {
+      socket.emit('server:join', payload);
+      this.logger.log(`Sent server:join to socket ${socket.id} in ${room}`);
+    }
   }
 
   async emitLaunchDedicatedServer(

@@ -26,6 +26,7 @@ import {
   Square,
   Car,
   MapPin,
+  ImageOff,
 } from 'lucide-react';
 
 export function DedicatedServers() {
@@ -348,68 +349,143 @@ function CreateServerModal({ stations, onClose, onSubmit, isSubmitting }: Create
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="track">Circuit</Label>
-            <select
-              id="track"
-              value={trackId}
-              onChange={(e) => {
-                setTrackId(e.target.value);
-                setTrackLayout('');
-              }}
-              required
-              disabled={!stationId}
-              className="w-full bg-dark-900 border border-dark-600 rounded-lg px-3 py-2 text-white focus:border-accent-orange focus:ring-1 focus:ring-accent-orange disabled:opacity-50"
-            >
-              <option value="">Choisir un circuit</option>
-              {content.tracks.map((track) => (
-                <option key={track.acId} value={track.acId}>
-                  {track.name}
-                </option>
-              ))}
-            </select>
+        <div>
+          <Label>Circuit</Label>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-56 overflow-y-auto p-1">
+            {content.tracks.length === 0 && (
+              <p className="text-gray-500 text-sm col-span-full">Aucun circuit détecté</p>
+            )}
+            {content.tracks.map((track) => (
+              <button
+                key={track.acId}
+                type="button"
+                onClick={() => {
+                  setTrackId(track.acId);
+                  setTrackLayout(track.layouts.length > 0 ? track.layouts[0] : 'random');
+                  if (!name) {
+                    setName(`Serveur ${track.name}`);
+                  }
+                }}
+                className={`relative text-left rounded-lg border overflow-hidden transition hover:ring-1 hover:ring-accent-orange/50 ${
+                  trackId === track.acId
+                    ? 'border-accent-orange ring-1 ring-accent-orange'
+                    : 'border-dark-600 bg-dark-900'
+                }`}
+              >
+                <div className="aspect-video bg-dark-800 flex items-center justify-center">
+                  {track.preview ? (
+                    <img
+                      src={track.preview}
+                      alt={track.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <ImageOff className="w-8 h-8 text-gray-600" />
+                  )}
+                </div>
+                <div className="p-2">
+                  <p className="text-sm font-medium text-white truncate">{track.name}</p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {track.layouts.length > 0
+                      ? `${track.layouts.length} layout(s)`
+                      : 'Aucun layout'}
+                  </p>
+                </div>
+                {trackId === track.acId && (
+                  <div className="absolute top-2 right-2 bg-accent-orange text-dark-900 rounded-full p-0.5">
+                    <Check className="w-3 h-3" />
+                  </div>
+                )}
+              </button>
+            ))}
           </div>
-          <div>
-            <Label htmlFor="layout">Layout</Label>
-            <select
-              id="layout"
-              value={trackLayout}
-              onChange={(e) => setTrackLayout(e.target.value)}
-              disabled={!selectedTrack || selectedTrack.layouts.length === 0}
-              className="w-full bg-dark-900 border border-dark-600 rounded-lg px-3 py-2 text-white focus:border-accent-orange focus:ring-1 focus:ring-accent-orange disabled:opacity-50"
-            >
-              <option value="">Défaut</option>
-              {selectedTrack?.layouts.map((layout) => (
-                <option key={layout} value={layout}>
-                  {layout}
-                </option>
-              ))}
-            </select>
-          </div>
+
+          {selectedTrack && (
+            <div className="mt-3">
+              <Label htmlFor="layout">Layout</Label>
+              <select
+                id="layout"
+                value={trackLayout}
+                onChange={(e) => setTrackLayout(e.target.value)}
+                disabled={selectedTrack.layouts.length === 0}
+                className="w-full bg-dark-900 border border-dark-600 rounded-lg px-3 py-2 text-white focus:border-accent-orange focus:ring-1 focus:ring-accent-orange disabled:opacity-50"
+              >
+                {selectedTrack.layouts.length === 0 ? (
+                  <option value="random">Aléatoire</option>
+                ) : (
+                  selectedTrack.layouts.map((layout) => (
+                    <option key={layout} value={layout}>
+                      {layout}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
         </div>
 
         <div>
-          <Label>Voitures ({selectedCars.length})</Label>
-          <div className="max-h-40 overflow-y-auto space-y-1 border border-dark-600 rounded-lg p-2 bg-dark-900">
-            {content.cars.length === 0 && (
-              <p className="text-gray-500 text-sm">Aucune voiture détectée</p>
-            )}
-            {content.cars.map((car) => (
-              <label
-                key={car.acId}
-                className="flex items-center gap-2 text-sm text-gray-300 hover:bg-dark-800 p-1 rounded cursor-pointer"
+          <div className="flex items-center justify-between">
+            <Label>Voitures ({selectedCars.length})</Label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedCars(content.cars.map((c) => c.acId))}
+                className="text-xs text-accent-orange hover:underline"
               >
-                <input
-                  type="checkbox"
-                  checked={selectedCars.includes(car.acId)}
-                  onChange={() => toggleCar(car.acId)}
-                  className="rounded border-dark-600 text-accent-orange focus:ring-accent-orange bg-dark-900"
-                />
-                <span className="flex-1">{car.name}</span>
-                {car.brand && <span className="text-xs text-gray-500">{car.brand}</span>}
-              </label>
-            ))}
+                Tout
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCars([])}
+                className="text-xs text-gray-500 hover:underline"
+              >
+                Aucune
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-1">
+            {content.cars.length === 0 && (
+              <p className="text-gray-500 text-sm col-span-full">Aucune voiture détectée</p>
+            )}
+            {content.cars.map((car) => {
+              const selected = selectedCars.includes(car.acId);
+              return (
+                <button
+                  key={car.acId}
+                  type="button"
+                  onClick={() => toggleCar(car.acId)}
+                  className={`relative text-left rounded-lg border overflow-hidden transition hover:ring-1 hover:ring-accent-orange/50 ${
+                    selected
+                      ? 'border-accent-orange ring-1 ring-accent-orange'
+                      : 'border-dark-600 bg-dark-900'
+                  }`}
+                >
+                  <div className="aspect-video bg-dark-800 flex items-center justify-center">
+                    {car.preview ? (
+                      <img
+                        src={car.preview}
+                        alt={car.name}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <Car className="w-8 h-8 text-gray-600" />
+                    )}
+                  </div>
+                  <div className="p-2">
+                    <p className="text-sm font-medium text-white truncate">{car.name}</p>
+                    {car.brand && <p className="text-xs text-gray-500 truncate">{car.brand}</p>}
+                  </div>
+                  {selected && (
+                    <div className="absolute top-2 right-2 bg-accent-orange text-dark-900 rounded-full p-0.5">
+                      <Check className="w-3 h-3" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -550,19 +626,34 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [carAcId, setCarAcId] = useState<string>(server.cars[0] ?? '');
   const [joined, setJoined] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const onlineStations = stations.filter(
     (s) => s.id !== server.stationId && (s.status === 'online' || s.status === 'in_game'),
   );
+
+  const carMap = useMemo(() => {
+    const cars = (server.station.content as { cars?: AcCar[] } | undefined)?.cars ?? [];
+    return new Map(cars.map((c) => [c.acId, c]));
+  }, [server.station.content]);
 
   const toggleStation = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
   };
 
   async function handleJoin() {
-    if (!carAcId) return;
-    await onJoin(selectedIds, carAcId);
-    setJoined(true);
+    if (!carAcId || selectedIds.length === 0) return;
+    setIsJoining(true);
+    setError(null);
+    try {
+      await onJoin(selectedIds, carAcId);
+      setJoined(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Échec de l’envoi des POD');
+    } finally {
+      setIsJoining(false);
+    }
   }
 
   return (
@@ -590,19 +681,47 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
             </span>
           </p>
           <div>
-            <Label htmlFor="join-car">Voiture à attribuer aux POD</Label>
-            <select
-              id="join-car"
-              value={carAcId}
-              onChange={(e) => setCarAcId(e.target.value)}
-              className="w-full bg-dark-900 border border-dark-600 rounded-lg px-3 py-2 text-white focus:border-accent-orange focus:ring-1 focus:ring-accent-orange"
-            >
-              {server.cars.map((car) => (
-                <option key={car} value={car}>
-                  {car}
-                </option>
-              ))}
-            </select>
+            <Label>Voiture à attribuer aux POD</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-56 overflow-y-auto p-1">
+              {server.cars.map((id) => {
+                const car = carMap.get(id);
+                const selected = carAcId === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setCarAcId(id)}
+                    className={`relative text-left rounded-lg border overflow-hidden transition hover:ring-1 hover:ring-accent-orange/50 ${
+                      selected
+                        ? 'border-accent-orange ring-1 ring-accent-orange'
+                        : 'border-dark-600 bg-dark-900'
+                    }`}
+                  >
+                    <div className="aspect-video bg-dark-800 flex items-center justify-center">
+                      {car?.preview ? (
+                        <img
+                          src={car.preview}
+                          alt={car?.name ?? id}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <Car className="w-8 h-8 text-gray-600" />
+                      )}
+                    </div>
+                    <div className="p-2">
+                      <p className="text-sm font-medium text-white truncate">{car?.name ?? id}</p>
+                      {car?.brand && <p className="text-xs text-gray-500 truncate">{car.brand}</p>}
+                    </div>
+                    {selected && (
+                      <div className="absolute top-2 right-2 bg-accent-orange text-dark-900 rounded-full p-0.5">
+                        <Check className="w-3 h-3" />
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="max-h-64 overflow-y-auto space-y-2">
             {onlineStations.length === 0 && (
@@ -610,13 +729,13 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
             )}
             {onlineStations.map((station) => (
               <label
-                key={station.id}
+                key={station.stationId}
                 className="flex items-center gap-3 p-3 bg-dark-900 border border-dark-600 rounded-lg hover:border-dark-500 cursor-pointer transition-colors"
               >
                 <input
                   type="checkbox"
-                  checked={selectedIds.includes(station.id)}
-                  onChange={() => toggleStation(station.id)}
+                  checked={selectedIds.includes(station.stationId)}
+                  onChange={() => toggleStation(station.stationId)}
                   className="w-5 h-5 rounded border-dark-600 text-accent-orange focus:ring-accent-orange bg-dark-900"
                 />
                 <div className="flex-1">
@@ -629,11 +748,21 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
               </label>
             ))}
           </div>
+          {error && (
+            <p className="text-red-400 text-sm bg-red-900/20 border border-red-900/40 rounded-lg p-2">
+              {error}
+            </p>
+          )}
           <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={isJoining}>
               Annuler
             </Button>
-            <Button variant="success" onClick={handleJoin} disabled={selectedIds.length === 0}>
+            <Button
+              variant="success"
+              onClick={handleJoin}
+              disabled={selectedIds.length === 0 || isJoining}
+              isLoading={isJoining}
+            >
               <Send className="w-4 h-4" />
               Envoyer {selectedIds.length > 0 && `(${selectedIds.length})`}
             </Button>

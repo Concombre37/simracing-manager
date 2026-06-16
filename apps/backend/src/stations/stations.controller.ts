@@ -47,6 +47,12 @@ export class StationsController {
     return this.stationsService.findAll();
   }
 
+  @Get('connected')
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
+  getConnected() {
+    return this.agentGateway.getConnectedStationIds();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.stationsService.findOne(id);
