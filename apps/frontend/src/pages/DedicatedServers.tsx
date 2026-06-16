@@ -223,6 +223,8 @@ export function DedicatedServers() {
           stations={stations}
           onClose={() => setJoiningServer(null)}
           onJoin={async (stationIds, carAcId) => {
+            // eslint-disable-next-line no-console
+            console.log('[POD] sending join', { serverId: joiningServer.id, stationIds, carAcId });
             await dedicatedServersApi.join(joiningServer.id, stationIds, carAcId);
             setJoiningServer(null);
           }}
@@ -347,6 +349,10 @@ function CreateServerModal({ stations, onClose, onSubmit, isSubmitting }: Create
           {onlineStations.length === 0 && (
             <p className="text-red-400 text-sm mt-1">Aucun agent en ligne</p>
           )}
+          <p className="text-xs text-gray-500 mt-1">
+            Les ports seront alloués automatiquement dans les plages 9600-9700 (UDP/TCP) et
+            8081-8181 (HTTP).
+          </p>
         </div>
 
         <div>
