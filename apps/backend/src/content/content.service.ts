@@ -20,7 +20,7 @@ export class ContentService {
     const packages = await this.findAll();
     return {
       version: '1.0.0',
-      packages: packages.map((pkg) => ({
+      packages: packages.map((pkg: (typeof packages)[number]) => ({
         id: pkg.id,
         type: pkg.type,
         name: pkg.name,

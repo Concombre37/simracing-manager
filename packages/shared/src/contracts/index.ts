@@ -2,13 +2,19 @@ import { StationConfig } from '../types';
 import { StationStatus } from '../enums';
 
 export interface AgentToServerEvents {
+  'agent:register': (payload: { stationId: string; stationName: string; version?: string }) => void;
   'agent:heartbeat': (payload: HeartbeatPayload) => void;
   'agent:log': (payload: LogPayload) => void;
   'agent:results': (payload: ResultsPayload) => void;
   'agent:status': (payload: StatusPayload) => void;
+  'agent:content': (payload: { stationId: string; content: Record<string, unknown> }) => void;
+  'server:started': (payload: { serverId: string; serverDir?: string }) => void;
+  'server:stopped': (payload: { serverId: string; error?: string }) => void;
 }
 
 export interface ServerToAgentEvents {
+  'agent:provisioned': (payload: { stationId: string; apiKey: string }) => void;
+  'agent:unauthorized': (payload: { reason: string }) => void;
   'session:launch': (payload: LaunchSessionPayload) => void;
   'session:stop': () => void;
   'ac:idealLine': () => void;
@@ -18,6 +24,9 @@ export interface ServerToAgentEvents {
   'system:restart': () => void;
   'system:update': () => void;
   'content:sync': () => void;
+  'server:join': (payload: { host: string; port: number; password?: string }) => void;
+  'server:launch': (payload: LaunchDedicatedServerPayload) => void;
+  'server:stop': (payload: { serverId: string }) => void;
 }
 
 export interface ServerToClientEvents {
@@ -59,4 +68,15 @@ export interface LaunchSessionPayload {
   sessionId: string;
   config: unknown;
   stationConfig?: StationConfig;
+}
+
+export interface LaunchDedicatedServerPayload {
+  serverId: string;
+  name: string;
+  track: string;
+  trackLayout?: string;
+  cars: string[];
+  maxClients: number;
+  password?: string;
+  rconPassword?: string;
 }

@@ -49,4 +49,12 @@ export class LuaBridge {
   async recenterVR(): Promise<void> {
     await this.sendCommand('recenterVR');
   }
+
+  async joinServer(host: string, port: number, password?: string): Promise<void> {
+    await this.sendCommand('joinServer', {
+      host,
+      port: String(port),
+      ...(password && { password }),
+    });
+  }
 }

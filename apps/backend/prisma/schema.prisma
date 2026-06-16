@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "debian-openssl-1.1.x"]
 }
 
 datasource db {
@@ -28,10 +29,12 @@ model Station {
   lastSeenAt  DateTime? @map("last_seen_at")
   status      String    @default("offline")
   config      Json?
+  content     Json?
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
-  sessions Session[]
+  sessions        Session[]
+  dedicatedServers DedicatedServer[]
 
   @@map("stations")
 }
@@ -83,16 +86,23 @@ model ContentPackage {
 }
 
 model DedicatedServer {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
   name           String
-  host           String
-  port           Int
+  stationId      String    @map("station_id") @db.Uuid
+  station        Station   @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  track          String
+  trackLayout    String?   @map("track_layout")
+  cars           String[]
+  maxClients     Int       @default(10) @map("max_clients")
   password       String?
-  rconPassword   String?  @map("rcon_password")
-  isLocal        Boolean  @default(false) @map("is_local")
-  processName    String?  @map("process_name")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  rconPassword   String?   @map("rcon_password")
+  config         Json?
+  status         String    @default("stopped")
+  serverDir      String?   @map("server_dir")
+  startedAt      DateTime? @map("started_at")
+  endedAt        DateTime? @map("ended_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   @@map("dedicated_servers")
 }

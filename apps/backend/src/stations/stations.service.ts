@@ -101,6 +101,50 @@ export class StationsService {
     return this.prisma.station.findFirst({ where: { apiKeyHash: hash } });
   }
 
+  async provision(
+    stationId: string,
+    stationName: string,
+    version?: string,
+  ): Promise<StationWithApiKey> {
+    let station = await this.prisma.station.findUnique({
+      where: { stationId },
+    });
+
+    const apiKey = this.generateApiKey();
+    const apiKeyHash = this.hashApiKey(apiKey);
+
+    if (station) {
+      station = await this.prisma.station.update({
+        where: { stationId },
+        data: {
+          apiKeyHash,
+          name: stationName,
+          version: version ?? station.version,
+          status: StationStatus.ONLINE,
+          lastSeenAt: new Date(),
+        },
+      });
+    } else {
+      station = await this.prisma.station.create({
+        data: {
+          stationId,
+          name: stationName,
+          apiKeyHash,
+          version: version ?? null,
+          status: StationStatus.ONLINE,
+          config: {},
+        },
+      });
+    }
+
+    return {
+      id: station.id,
+      stationId: station.stationId,
+      name: station.name,
+      apiKey,
+    };
+  }
+
   async updateHeartbeat(payload: HeartbeatPayload) {
     const status = payload.acRunning
       ? StationStatus.IN_GAME
@@ -121,6 +165,13 @@ export class StationsService {
     return this.prisma.station.update({
       where: { stationId },
       data: { status, lastSeenAt: new Date() },
+    });
+  }
+
+  async updateContent(stationId: string, content: Record<string, unknown>) {
+    return this.prisma.station.update({
+      where: { stationId },
+      data: { content: content as Prisma.InputJsonValue },
     });
   }
 

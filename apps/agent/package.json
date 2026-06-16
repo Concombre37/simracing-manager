@@ -1,6 +1,6 @@
 {
   "name": "@simracing/agent",
-  "version": "2.0.0",
+  "version": "2.0.3",
   "private": true,
   "description": "Local agent for SimRacing Manager stations",
   "main": "./dist/index.js",
@@ -8,12 +8,15 @@
     "simracing-agent": "./dist/index.js"
   },
   "scripts": {
+    "prebuild": "node scripts/write-version.js",
     "build": "tsc",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/**/*.ts",
     "test": "vitest run",
+    "prepackage": "npm run build",
     "package": "pkg . --out-path exe",
+    "prepackage:win": "npm run build",
     "package:win": "pkg . --targets node18-win-x64 --out-path exe"
   },
   "dependencies": {

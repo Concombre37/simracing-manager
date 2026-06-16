@@ -6,7 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuthPayload } from '../auth.service';
 
 export interface AuthenticatedUser {
-  userId: string;
+  sub: string;
   email: string;
   role: string;
 }
@@ -31,6 +31,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user) {
       throw new UnauthorizedException();
     }
-    return { userId: user.id, email: user.email, role: user.role };
+    return { sub: user.id, email: user.email, role: user.role };
   }
 }

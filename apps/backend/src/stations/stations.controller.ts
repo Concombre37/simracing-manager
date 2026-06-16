@@ -97,4 +97,12 @@ export class StationsController {
     await this.agentGateway.emitStop(station.stationId);
     return { success: true };
   }
+
+  @Post(':id/update-agent')
+  @Roles(UserRole.ADMIN)
+  async updateAgent(@Param('id') id: string) {
+    const station = await this.stationsService.findOne(id);
+    await this.agentGateway.emitUpdateAgent(station.stationId);
+    return { success: true };
+  }
 }

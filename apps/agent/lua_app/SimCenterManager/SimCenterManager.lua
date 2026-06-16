@@ -55,6 +55,16 @@ function SimCenterManager.execute(cmd)
     for _ = 1, 4 do
       ac.recenterVR()
     end
+  elseif cmd.type == "joinServer" then
+    local host = cmd.host or "127.0.0.1"
+    local port = tonumber(cmd.port) or 9600
+    local password = cmd.password or ""
+    ac.log("Joining server " .. host .. ":" .. tostring(port))
+    if ac.joinOnlineRace then
+      ac.joinOnlineRace(host, port, password)
+    else
+      ac.tryToStart(true)
+    end
   end
 end
 

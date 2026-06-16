@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: simracing-postgres
     privileged: true
     restart: unless-stopped
@@ -8,13 +8,13 @@ services:
       POSTGRES_USER: simracing
       POSTGRES_PASSWORD: simracing
       POSTGRES_DB: simracing
-    ports:
-      - '127.0.0.1:5432:5432'
     volumes:
       - postgres-data:/var/lib/postgresql/data
     tmpfs:
       - /var/run/postgresql:rw,nosuid,size=100m
       - /tmp:rw,nosuid,size=100m
+    ports:
+      - '127.0.0.1:5432:5432'
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U simracing -d simracing']
       interval: 5s
@@ -26,6 +26,7 @@ services:
       context: .
       dockerfile: apps/backend/Dockerfile
     container_name: simracing-backend
+    privileged: true
     restart: unless-stopped
     ports:
       - '127.0.0.1:3002:3002'

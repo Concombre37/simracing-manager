@@ -1,6 +1,10 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { Button } from '../components/ui/Button';
+import { Input, Label } from '../components/ui/Input';
+import { Card } from '../components/ui/Card';
+import { AlertCircle } from 'lucide-react';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -17,55 +21,66 @@ export function Login() {
     try {
       await login(email, password);
       navigate('/');
-    } catch (err) {
-      setError('Invalid credentials');
+    } catch {
+      setError('Identifiants invalides');
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <form
-        onSubmit={handleSubmit}
-        className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl shadow-lg"
-      >
-        <h1 className="text-2xl font-bold text-center text-gray-900">SimRacing Manager</h1>
-        {error && <p className="text-sm text-red-600 text-center">{error}</p>}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-            required
-          />
+    <div className="min-h-screen flex items-center justify-center bg-dark-900 px-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-black tracking-tight mb-2">
+            <span className="text-accent-orange">SIM</span>
+            <span className="text-white">RACING</span>
+          </h1>
+          <p className="text-gray-400">Manager technique</p>
         </div>
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-            required
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {loading ? 'Signing in...' : 'Sign in'}
-        </button>
-      </form>
+
+        <Card>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-900/30 border border-red-800 rounded-lg text-red-300 text-sm">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                {error}
+              </div>
+            )}
+            <div>
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@hytlabs.com"
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="password">Mot de passe</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              isLoading={loading}
+              className="w-full"
+            >
+              Connexion
+            </Button>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }
