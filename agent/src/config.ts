@@ -31,7 +31,7 @@ AC_EXECUTABLE=acs.exe
 AUTO_DRIVE_HELPER=1
 
 # Timing du helper (ms) : attente avant appui, duree de l'appui, nombre d'appuis, intervalle
-AUTO_DRIVE_DELAY_MS=25000
+AUTO_DRIVE_DELAY_MS=35000
 AUTO_DRIVE_PRESS_MS=300
 AUTO_DRIVE_REPEAT=3
 AUTO_DRIVE_INTERVAL_MS=2000
@@ -89,7 +89,7 @@ export const config = {
 
   // Helper automatique pour l'ecran "volant rouge"
   autoDriveHelper: getEnv("AUTO_DRIVE_HELPER", "1") === "1",
-  autoDriveDelayMs: parseInt(getEnv("AUTO_DRIVE_DELAY_MS", "25000")),
+  autoDriveDelayMs: parseInt(getEnv("AUTO_DRIVE_DELAY_MS", "35000")),
   autoDrivePressMs: parseInt(getEnv("AUTO_DRIVE_PRESS_MS", "300")),
   autoDriveRepeat: parseInt(getEnv("AUTO_DRIVE_REPEAT", "3")),
   autoDriveIntervalMs: parseInt(getEnv("AUTO_DRIVE_INTERVAL_MS", "2000")),

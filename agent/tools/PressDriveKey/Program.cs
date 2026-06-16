@@ -1,5 +1,6 @@
 using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace PressDriveKey;
@@ -12,9 +13,19 @@ class Program
     static int Main(string[] args)
     {
         var options = Options.Parse(args);
+        var defaultLogPath = Path.Combine(AppContext.BaseDirectory, "PressDriveKey.log");
+        var logPath = string.IsNullOrWhiteSpace(options.LogPath) ? defaultLogPath : options.LogPath;
+
         try
         {
-            Log(options.LogPath, $"Demarrage de PressDriveKey (args: {string.Join(' ', args)})");
+            Log(logPath, $"Demarrage de PressDriveKey (args: {string.Join(' ', args)})");
+
+            if (!IsViGEmBusInstalled())
+            {
+                Log(logPath, "ERREUR: ViGEmBus n'est pas installe. Lancez l'agent en admin pour l'installer.");
+                return 1;
+            }
+            Log(logPath, "ViGEmBus detecte.");
 
             using var client = new ViGEmClient();
             var controller = client.CreateXbox360Controller();
@@ -72,7 +83,33 @@ class Program
         }
     }
 
-    static void Log(string? logPath, string message)
+    static bool IsViGEmBusInstalled()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "sc",
+                Arguments = "query ViGEmBus",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null) return false;
+            string output = proc.StandardOutput.ReadToEnd();
+            proc.WaitForExit();
+            return output.Contains("ViGEmBus", StringComparison.OrdinalIgnoreCase)
+                && (output.Contains("RUNNING", StringComparison.OrdinalIgnoreCase)
+                    || output.Contains("STOPPED", StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    static void Log(string logPath, string message)
     {
         var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [PressDriveKey] {message}";
         try
@@ -81,14 +118,11 @@ class Program
         }
         catch { }
 
-        if (!string.IsNullOrWhiteSpace(logPath))
+        try
         {
-            try
-            {
-                File.AppendAllText(logPath, line + Environment.NewLine);
-            }
-            catch { }
+            File.AppendAllText(logPath, line + Environment.NewLine);
         }
+        catch { }
     }
 
     record Options(

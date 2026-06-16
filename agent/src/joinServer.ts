@@ -551,8 +551,15 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
     "logs",
     "spawn.log",
   );
+  const driveKeyLogPath = path.join(
+    config.documentsPath,
+    "Assetto Corsa",
+    "logs",
+    "pressdrivekey.log",
+  );
   await fs.ensureDir(path.dirname(raceIniPath));
   await fs.ensureDir(path.dirname(logPath));
+  await fs.ensureDir(path.dirname(driveKeyLogPath));
   await fs.writeFile(raceIniPath, buildRaceIni(cfg), "utf-8");
 
   const isWindows = process.platform === "win32";
@@ -578,6 +585,13 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
 
     const cmDir = path.dirname(cmExe);
     if (isWindows) {
+      // Lancer le helper avant Content Manager pour que la manette virtuelle soit
+      // deja connectee quand Assetto Corsa demarre (meilleure detection DirectInput).
+      scheduleDriveKeyPress(driveKeyLogPath);
+
+      // Petite pause pour laisser ViGEmBus connecter la manette virtuelle.
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       // Lancement direct de Content Manager.exe avec l'URI en argument et le bon
       // répertoire de travail. rundll32 utilisait System32 comme cwd ce qui pouvait
       // provoquer des erreurs de chargement de DLLs (0xc000007b) lorsque CM
@@ -589,11 +603,6 @@ export async function joinServer(cfg: JoinServerConfig): Promise<void> {
         windowsHide: false,
       });
       child.unref();
-
-      // AC affiche parfois un ecran "appuyez sur une touche pour conduire" apres
-      // le chargement. On lance un script PowerShell qui attend la fenetre AC et
-      // envoie un appui sur Espace pour passer cet ecran automatiquement.
-      scheduleDriveKeyPress(logPath);
     } else {
       const child = spawn("xdg-open", [uri], {
         detached: true,
