@@ -263,6 +263,11 @@ interface CreateServerModalProps {
   isSubmitting: boolean;
 }
 
+function cleanTrackName(name: string): string {
+  const idx = name.indexOf(' - ');
+  return idx >= 0 ? name.slice(0, idx).trim() : name.trim();
+}
+
 function CreateServerModal({ stations, onClose, onSubmit, isSubmitting }: CreateServerModalProps) {
   const [name, setName] = useState('');
   const [stationId, setStationId] = useState('');
@@ -369,7 +374,7 @@ function CreateServerModal({ stations, onClose, onSubmit, isSubmitting }: Create
                   setTrackId(track.acId);
                   setTrackLayout(track.layouts.length > 0 ? track.layouts[0] : 'random');
                   if (!name) {
-                    setName(`Serveur ${track.name}`);
+                    setName(`Serveur ${cleanTrackName(track.name)}`);
                   }
                 }}
                 className={`relative text-left rounded-lg border overflow-hidden transition hover:ring-1 hover:ring-accent-orange/50 ${
