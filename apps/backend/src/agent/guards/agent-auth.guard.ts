@@ -50,10 +50,10 @@ export class AgentAuthGuard implements CanActivate {
 
     (client as Socket & AgentAuthData).stationId = station.stationId;
     (client as Socket & AgentAuthData).apiKey = auth.token;
-    await client.join(`station:${station.stationId}`);
-    console.log(
-      `Agent joined room station:${station.stationId} (socket ${client.id})`,
-    );
+    const room = `station:${station.stationId}`;
+    if (!client.rooms.has(room)) {
+      await client.join(room);
+    }
     return true;
   }
 }

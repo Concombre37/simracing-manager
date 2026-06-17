@@ -43,4 +43,5 @@ export const stationsApi = {
   launch: (id: string) => api.post(`/stations/${id}/launch`).then((res) => res.data),
   stop: (id: string) => api.post(`/stations/${id}/stop`).then((res) => res.data),
   updateAgent: (id: string) => api.post(`/stations/${id}/update-agent`).then((res) => res.data),
+  syncContent: (id: string) => api.post(`/stations/${id}/sync-content`).then((res) => res.data),
 };

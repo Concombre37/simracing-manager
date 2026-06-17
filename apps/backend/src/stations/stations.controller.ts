@@ -111,4 +111,12 @@ export class StationsController {
     await this.agentGateway.emitUpdateAgent(station.stationId);
     return { success: true };
   }
+
+  @Post(':id/sync-content')
+  @Roles(UserRole.ADMIN)
+  async syncContent(@Param('id') id: string) {
+    const station = await this.stationsService.findOne(id);
+    await this.agentGateway.emitContentSync(station.stationId);
+    return { success: true };
+  }
 }

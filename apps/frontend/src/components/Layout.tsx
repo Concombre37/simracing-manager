@@ -1,6 +1,15 @@
 import { Link, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { LayoutDashboard, Monitor, Server, Users, LogOut, Trophy, Settings } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Monitor,
+  Server,
+  Users,
+  LogOut,
+  Trophy,
+  Settings,
+  Image,
+} from 'lucide-react';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -11,6 +20,7 @@ const navItems = [
 
 const adminNavItems = [
   { path: '/users', label: 'Utilisateurs', icon: Users },
+  { path: '/content-previews', label: 'Images', icon: Image },
   { path: '/settings', label: 'Paramètres', icon: Settings },
 ];
 

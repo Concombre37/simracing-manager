@@ -9,6 +9,7 @@ import { Stations } from './pages/Stations';
 import { DedicatedServers } from './pages/DedicatedServers';
 import { Users } from './pages/Users';
 import { Leaderboard } from './pages/Leaderboard';
+import { ContentPreviews } from './pages/ContentPreviews';
 
 const queryClient = new QueryClient();
 
@@ -78,6 +79,14 @@ export function App() {
               element={
                 <ProtectedRoute adminOnly>
                   <Users />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/content-previews"
+              element={
+                <ProtectedRoute adminOnly>
+                  <ContentPreviews />
                 </ProtectedRoute>
               }
             />
