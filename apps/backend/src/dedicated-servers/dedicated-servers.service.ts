@@ -3,7 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import net from 'net';
+import * as net from 'net';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { CreateDedicatedServerDto } from './dto/create-dedicated-server.dto';
