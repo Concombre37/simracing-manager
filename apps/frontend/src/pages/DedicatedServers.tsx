@@ -264,7 +264,7 @@ interface CreateServerModalProps {
 }
 
 function cleanTrackName(name: string): string {
-  const idx = name.indexOf(' - ');
+  const idx = name.search(/(\s+-\s+|-)/);
   return idx >= 0 ? name.slice(0, idx).trim() : name.trim();
 }
 
