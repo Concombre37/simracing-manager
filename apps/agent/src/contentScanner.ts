@@ -86,28 +86,66 @@ async function readImageAsBase64(filePath: string): Promise<string | undefined> 
   }
 }
 
-async function findCarPreview(carDir: string): Promise<string | undefined> {
-  const rootPreview = await readImageAsBase64(path.join(carDir, 'preview.png'));
+async function findFirstImage(baseDir: string, names: string[]): Promise<string | undefined> {
+  for (const name of names) {
+    const preview = await readImageAsBase64(path.join(baseDir, name));
+    if (preview) return preview;
+  }
+  return undefined;
+}
+
+const PREVIEW_NAMES = ['preview.png', 'preview.jpg', 'preview.jpeg'];
+
+async function findCarPreview(
+  logger: Logger,
+  carDir: string,
+  acId: string,
+): Promise<string | undefined> {
+  const rootPreview = await findFirstImage(carDir, PREVIEW_NAMES);
   if (rootPreview) return rootPreview;
 
   const skinsDir = path.join(carDir, 'skins');
   try {
     const skins = await fs.readdir(skinsDir);
     for (const skin of skins) {
-      const skinPreview = await readImageAsBase64(path.join(skinsDir, skin, 'preview.png'));
+      const skinPreview = await findFirstImage(path.join(skinsDir, skin), PREVIEW_NAMES);
       if (skinPreview) return skinPreview;
     }
   } catch {
     // ignore
   }
+
+  logger.debug(
+    { acId, tried: [path.join(carDir, 'preview.*'), path.join(skinsDir, '*', 'preview.*')] },
+    'No car preview found',
+  );
   return undefined;
 }
 
-async function findTrackPreview(trackDir: string): Promise<string | undefined> {
-  for (const name of ['preview.png', 'preview.jpg', 'preview.jpeg']) {
-    const preview = await readImageAsBase64(path.join(trackDir, name));
-    if (preview) return preview;
+async function findTrackPreview(
+  logger: Logger,
+  trackDir: string,
+  layouts: string[],
+  acId: string,
+): Promise<string | undefined> {
+  const rootPreview = await findFirstImage(trackDir, PREVIEW_NAMES);
+  if (rootPreview) return rootPreview;
+
+  for (const layout of layouts) {
+    const layoutPreview = await findFirstImage(path.join(trackDir, layout), PREVIEW_NAMES);
+    if (layoutPreview) return layoutPreview;
   }
+
+  logger.debug(
+    {
+      acId,
+      tried: [
+        path.join(trackDir, 'preview.*'),
+        ...layouts.map((l) => path.join(trackDir, l, 'preview.*')),
+      ],
+    },
+    'No track preview found',
+  );
   return undefined;
 }
 
@@ -172,7 +210,7 @@ export class ContentScanner {
           name: uiJson?.name || entry,
           brand: uiJson?.brand,
           category: uiJson?.class,
-          preview: await findCarPreview(carDir),
+          preview: await findCarPreview(this.logger, carDir, entry),
         };
         this.cache.setCar({ ...car, updatedAt });
         content.cars.push(car);
@@ -223,7 +261,7 @@ export class ContentScanner {
           acId: entry,
           name: uiJson?.name || entry,
           layouts,
-          preview: await findTrackPreview(trackDir),
+          preview: await findTrackPreview(this.logger, trackDir, layouts, entry),
         };
         this.cache.setTrack({ ...track, updatedAt });
         content.tracks.push(track);
@@ -233,20 +271,34 @@ export class ContentScanner {
     }
 
     await this.cache.save();
+
+    const carsWithoutPreview = content.cars.filter((c) => !c.preview).map((c) => c.acId);
+    const tracksWithoutPreview = content.tracks.filter((t) => !t.preview).map((t) => t.acId);
+
     this.logger.info(
-      { cars: content.cars.length, tracks: content.tracks.length, acPath },
+      {
+        cars: content.cars.length,
+        tracks: content.tracks.length,
+        carsWithPreview: content.cars.length - carsWithoutPreview.length,
+        tracksWithPreview: content.tracks.length - tracksWithoutPreview.length,
+        carsWithoutPreview: carsWithoutPreview.slice(0, 10),
+        tracksWithoutPreview: tracksWithoutPreview.slice(0, 10),
+        acPath,
+      },
       'Assetto Corsa content scanned',
     );
     return content;
   }
 
   private async getCarPreviewPaths(carDir: string): Promise<string[]> {
-    const paths: string[] = [path.join(carDir, 'preview.png')];
+    const paths: string[] = PREVIEW_NAMES.map((n) => path.join(carDir, n));
     const skinsDir = path.join(carDir, 'skins');
     try {
       const skins = await fs.readdir(skinsDir);
       for (const skin of skins) {
-        paths.push(path.join(skinsDir, skin, 'preview.png'));
+        for (const name of PREVIEW_NAMES) {
+          paths.push(path.join(skinsDir, skin, name));
+        }
       }
     } catch {
       // ignore
