@@ -1,6 +1,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
+import { Jimp } from 'jimp';
 import { config } from './config';
 import { ContentCache, maxMtime } from './contentCache';
 
@@ -34,18 +35,47 @@ async function readJsonSafe<T>(filePath: string): Promise<T | undefined> {
   }
 }
 
-const MAX_PREVIEW_BYTES = 60 * 1024;
+const MAX_PREVIEW_BYTES = 500 * 1024;
+const PREVIEW_MAX_DIMENSION = 512;
+const PREVIEW_JPEG_QUALITY = 85;
+
+async function compressImageBuffer(
+  buffer: Buffer,
+): Promise<{ mime: string; data: string } | undefined> {
+  try {
+    const image = await Jimp.read(buffer);
+    image.scaleToFit({ w: PREVIEW_MAX_DIMENSION, h: PREVIEW_MAX_DIMENSION });
+    const compressed = await image.getBuffer('image/jpeg', { quality: PREVIEW_JPEG_QUALITY });
+    return { mime: 'image/jpeg', data: compressed.toString('base64') };
+  } catch {
+    return undefined;
+  }
+}
 
 async function readImageAsBase64(filePath: string): Promise<string | undefined> {
   try {
     await fs.access(filePath);
     const stat = await fs.stat(filePath);
-    if (!stat.isFile() || stat.size > MAX_PREVIEW_BYTES) return undefined;
+    if (!stat.isFile()) return undefined;
+
     const buffer = await fs.readFile(filePath);
     const ext = path.extname(filePath).toLowerCase();
-    const mime =
+    const originalMime =
       ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
-    return `data:${mime};base64,${buffer.toString('base64')}`;
+
+    const compressed = await compressImageBuffer(buffer);
+    if (compressed) {
+      const dataUrl = `data:${compressed.mime};base64,${compressed.data}`;
+      if (Buffer.byteLength(dataUrl, 'utf8') <= MAX_PREVIEW_BYTES) {
+        return dataUrl;
+      }
+    }
+
+    if (stat.size <= MAX_PREVIEW_BYTES) {
+      return `data:${originalMime};base64,${buffer.toString('base64')}`;
+    }
+
+    return undefined;
   } catch {
     return undefined;
   }

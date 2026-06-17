@@ -10,7 +10,10 @@ interface CachedTrack extends Track {
   updatedAt: number;
 }
 
+const CACHE_VERSION = 3;
+
 interface CacheData {
+  version?: number;
   acPath?: string;
   cars: CachedCar[];
   tracks: CachedTrack[];
@@ -31,11 +34,19 @@ export class ContentCache {
       await fs.access(this.filePath);
       const raw = await fs.readFile(this.filePath, 'utf-8');
       const parsed = JSON.parse(raw) as CacheData;
-      this.data = {
-        acPath: parsed.acPath,
-        cars: Array.isArray(parsed.cars) ? parsed.cars : [],
-        tracks: Array.isArray(parsed.tracks) ? parsed.tracks : [],
-      };
+      if (parsed.version !== CACHE_VERSION) {
+        this.logger.info(
+          { cachedVersion: parsed.version, currentVersion: CACHE_VERSION },
+          'Content cache version mismatch, invalidating cache',
+        );
+        this.data = { cars: [], tracks: [] };
+      } else {
+        this.data = {
+          acPath: parsed.acPath,
+          cars: Array.isArray(parsed.cars) ? parsed.cars : [],
+          tracks: Array.isArray(parsed.tracks) ? parsed.tracks : [],
+        };
+      }
       this.rebuildMaps();
       this.logger.info(
         { cars: this.data.cars.length, tracks: this.data.tracks.length },
@@ -49,7 +60,11 @@ export class ContentCache {
 
   async save(): Promise<void> {
     try {
-      await fs.writeFile(this.filePath, JSON.stringify(this.data), 'utf-8');
+      await fs.writeFile(
+        this.filePath,
+        JSON.stringify({ ...this.data, version: CACHE_VERSION }),
+        'utf-8',
+      );
     } catch (err) {
       this.logger.warn({ err }, 'Failed to save content cache');
     }

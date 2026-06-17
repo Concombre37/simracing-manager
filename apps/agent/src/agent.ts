@@ -258,18 +258,26 @@ export class SimRacingAgent {
 
   private async sendContent(): Promise<void> {
     try {
+      this.logger.info('Scanning content for upload');
       const content = await this.contentScanner.scan();
       const hash = crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex');
       if (hash === this.lastContentHash) {
-        this.logger.debug('Content unchanged, skipping upload');
+        this.logger.info('Content unchanged, skipping upload');
         return;
       }
       this.lastContentHash = hash;
-      this.socket?.emit('agent:content', {
+      if (!this.socket?.connected) {
+        this.logger.warn('Socket not connected, cannot send content');
+        return;
+      }
+      this.socket.emit('agent:content', {
         stationId: config.STATION_ID,
         content: content as unknown as Record<string, unknown>,
       });
-      this.logger.info('Content sent to backend');
+      this.logger.info(
+        { cars: content.cars.length, tracks: content.tracks.length },
+        'Content sent to backend',
+      );
     } catch (err) {
       this.logger.error({ err }, 'Failed to send content');
     }

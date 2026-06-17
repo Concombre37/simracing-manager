@@ -1,6 +1,6 @@
 {
   "name": "@simracing/agent",
-  "version": "2.0.8",
+  "version": "2.0.10",
   "private": true,
   "description": "Local agent for SimRacing Manager stations",
   "main": "./dist/index.js",
@@ -23,9 +23,10 @@
     "@simracing/shared": "*",
     "axios": "^1.7.2",
     "dotenv": "^16.4.5",
-    "socket.io-client": "^4.7.5",
+    "jimp": "^1.6.1",
     "pino": "^9.2.0",
     "pino-pretty": "^11.2.0",
+    "socket.io-client": "^4.7.5",
     "zod": "^3.23.8"
   },
   "devDependencies": {

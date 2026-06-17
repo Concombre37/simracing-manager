@@ -34,7 +34,7 @@ interface AuthenticatedSocket extends Socket {
 @WebSocketGateway({
   namespace: 'agent',
   cors: { origin: '*' },
-  maxHttpBufferSize: 50 * 1024 * 1024,
+  maxHttpBufferSize: 100 * 1024 * 1024,
 })
 @UseGuards(AgentAuthGuard)
 export class AgentGateway
@@ -147,7 +147,11 @@ export class AgentGateway
     payload: HeartbeatPayload,
   ): Promise<void> {
     client.stationId = payload.stationId;
-    await client.join(`station:${payload.stationId}`);
+    const room = `station:${payload.stationId}`;
+    if (!client.rooms.has(room)) {
+      await client.join(room);
+      this.logger.log(`Agent joined room ${room} (heartbeat)`);
+    }
     this.connectedStationIds.add(payload.stationId);
     const station = await this.stationsService.updateHeartbeat(payload);
     this.dashboardGateway.emitStationUpdated(station.stationId, station.status);
@@ -174,12 +178,20 @@ export class AgentGateway
     client: AuthenticatedSocket,
     payload: { stationId: string; content: Record<string, unknown> },
   ): Promise<void> {
-    client.stationId = payload.stationId;
-    await this.stationsService.updateContent(
-      payload.stationId,
-      payload.content,
-    );
-    this.logger.log(`Content received from ${payload.stationId}`);
+    try {
+      client.stationId = payload.stationId;
+      this.logger.log(`Content received from ${payload.stationId}`);
+      await this.stationsService.updateContent(
+        payload.stationId,
+        payload.content,
+      );
+      this.logger.log(`Content processed for ${payload.stationId}`);
+    } catch (err) {
+      this.logger.error(
+        { err, stationId: payload.stationId },
+        'Failed to process content',
+      );
+    }
   }
 
   @SubscribeMessage('server:started')
