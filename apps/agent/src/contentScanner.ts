@@ -1,9 +1,14 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
-import { Jimp } from 'jimp';
+import { createJimp } from '@jimp/core';
+import resize from '@jimp/plugin-resize';
+import jpeg from '@jimp/js-jpeg';
+import png from '@jimp/js-png';
 import { config } from './config';
 import { ContentCache, maxMtime } from './contentCache';
+
+const Jimp = createJimp({ plugins: [resize as any], formats: [jpeg, png] });
 
 export interface Car {
   acId: string;

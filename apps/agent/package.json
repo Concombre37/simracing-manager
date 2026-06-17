@@ -1,6 +1,6 @@
 {
   "name": "@simracing/agent",
-  "version": "2.0.10",
+  "version": "2.0.11",
   "private": true,
   "description": "Local agent for SimRacing Manager stations",
   "main": "./dist/index.js",
@@ -20,10 +20,13 @@
     "package:win": "pkg . --targets node18-win-x64 --out-path exe"
   },
   "dependencies": {
+    "@jimp/core": "^1.6.1",
+    "@jimp/js-jpeg": "^1.6.1",
+    "@jimp/js-png": "^1.6.1",
+    "@jimp/plugin-resize": "^1.6.1",
     "@simracing/shared": "*",
     "axios": "^1.7.2",
     "dotenv": "^16.4.5",
-    "jimp": "^1.6.1",
     "pino": "^9.2.0",
     "pino-pretty": "^11.2.0",
     "socket.io-client": "^4.7.5",
