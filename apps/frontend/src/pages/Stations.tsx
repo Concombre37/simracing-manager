@@ -9,6 +9,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { CreateStationModal } from '../components/CreateStationModal';
+import { BlankingMediaModal } from '../components/BlankingMediaModal';
 import {
   Play,
   Square,
@@ -24,6 +25,9 @@ import {
   Monitor,
   Wifi,
   Download,
+  Eye,
+  EyeOff,
+  ImageIcon,
 } from 'lucide-react';
 
 export function Stations() {
@@ -36,6 +40,7 @@ export function Stations() {
     name: string;
     apiKey: string;
   } | null>(null);
+  const [blankingStation, setBlankingStation] = useState<Station | null>(null);
   const socket = useSocket('/');
 
   const { data, isLoading, error } = useQuery({
@@ -194,6 +199,26 @@ export function Stations() {
                   <Glasses className="w-4 h-4" />
                   Recenter VR
                 </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => sendCommand(station.stationId, 'blankingHide')}
+                >
+                  <Eye className="w-4 h-4" />
+                  Masquer écran
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => sendCommand(station.stationId, 'blankingShow')}
+                >
+                  <EyeOff className="w-4 h-4" />
+                  Afficher écran
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setBlankingStation(station)}>
+                  <ImageIcon className="w-4 h-4" />
+                  Écran d'attente
+                </Button>
               </div>
             )}
 
@@ -266,6 +291,10 @@ export function Stations() {
           onClose={() => setShowModal(false)}
           onCreated={() => queryClient.invalidateQueries({ queryKey: ['stations'] })}
         />
+      )}
+
+      {blankingStation && (
+        <BlankingMediaModal station={blankingStation} onClose={() => setBlankingStation(null)} />
       )}
 
       {apiKeyStation && (

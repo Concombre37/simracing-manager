@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   dedicatedServersApi,
   type DedicatedServer,
-  type Track,
   type Car as AcCar,
 } from '../services/dedicatedServers';
 import { stationsApi, type Station } from '../services/stations';
@@ -12,6 +11,8 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input, Label } from '../components/ui/Input';
+import { CreateServerModal } from '../components/CreateServerModal';
+import { findTrackName } from '../utils/track';
 import {
   Server,
   Plus,
@@ -26,7 +27,6 @@ import {
   Square,
   Car,
   MapPin,
-  ImageOff,
 } from 'lucide-react';
 
 export function DedicatedServers() {
@@ -123,7 +123,13 @@ export function DedicatedServers() {
                 <div className="flex items-center gap-2 text-gray-400">
                   <MapPin className="w-4 h-4 text-gray-500" />
                   <span>
-                    Circuit : {server.track}
+                    Circuit :{' '}
+                    {findTrackName(
+                      server.track,
+                      server.station.content as
+                        | { tracks?: { acId: string; name: string }[] }
+                        | undefined,
+                    )}
                     {server.trackLayout ? ` (${server.trackLayout})` : ''}
                   </span>
                 </div>
@@ -245,305 +251,6 @@ function StatusBadge({ status }: { status: DedicatedServer['status'] }) {
     default:
       return <Badge variant="gray">Arrêté</Badge>;
   }
-}
-
-interface CreateServerModalProps {
-  stations: Station[];
-  onClose: () => void;
-  onSubmit: (data: {
-    name: string;
-    stationId: string;
-    track: string;
-    trackLayout?: string;
-    cars: string[];
-    maxClients: number;
-    password?: string;
-    rconPassword?: string;
-  }) => void;
-  isSubmitting: boolean;
-}
-
-function cleanTrackName(name: string): string {
-  const idx = name.search(/(\s+-\s+|-)/);
-  return idx >= 0 ? name.slice(0, idx).trim() : name.trim();
-}
-
-function CreateServerModal({ stations, onClose, onSubmit, isSubmitting }: CreateServerModalProps) {
-  const [name, setName] = useState('');
-  const [stationId, setStationId] = useState('');
-  const [trackId, setTrackId] = useState('');
-  const [trackLayout, setTrackLayout] = useState('');
-  const [selectedCars, setSelectedCars] = useState<string[]>([]);
-  const [maxClients, setMaxClients] = useState(10);
-  const [password, setPassword] = useState('');
-  const [rconPassword, setRconPassword] = useState('');
-
-  const selectedStation = useMemo(
-    () => stations.find((s) => s.id === stationId),
-    [stations, stationId],
-  );
-
-  const content = useMemo<{
-    cars: AcCar[];
-    tracks: Track[];
-  }>(() => {
-    if (!selectedStation?.content) return { cars: [], tracks: [] };
-    const c = selectedStation.content as { cars?: AcCar[]; tracks?: Track[] };
-    return {
-      cars: c.cars ?? [],
-      tracks: c.tracks ?? [],
-    };
-  }, [selectedStation]);
-
-  const selectedTrack = useMemo(
-    () => content.tracks.find((t) => t.acId === trackId),
-    [content.tracks, trackId],
-  );
-
-  const onlineStations = stations.filter((s) => s.status === 'online' || s.status === 'in_game');
-
-  function toggleCar(carAcId: string) {
-    setSelectedCars((prev) =>
-      prev.includes(carAcId) ? prev.filter((c) => c !== carAcId) : [...prev, carAcId],
-    );
-  }
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    onSubmit({
-      name,
-      stationId,
-      track: trackId,
-      ...(trackLayout && { trackLayout }),
-      cars: selectedCars,
-      maxClients,
-      ...(password && { password }),
-      ...(rconPassword && { rconPassword }),
-    });
-  }
-
-  return (
-    <Modal title="Créer un serveur dédié" onClose={onClose} size="lg">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="name">Nom du serveur</Label>
-          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-        </div>
-
-        <div>
-          <Label htmlFor="station">Agent hôte</Label>
-          <select
-            id="station"
-            value={stationId}
-            onChange={(e) => {
-              setStationId(e.target.value);
-              setTrackId('');
-              setTrackLayout('');
-              setSelectedCars([]);
-            }}
-            required
-            className="w-full bg-dark-900 border border-dark-600 rounded-lg px-3 py-2 text-white focus:border-accent-orange focus:ring-1 focus:ring-accent-orange"
-          >
-            <option value="">Sélectionner un agent</option>
-            {onlineStations.map((station) => (
-              <option key={station.id} value={station.id}>
-                {station.name} ({station.stationId})
-              </option>
-            ))}
-          </select>
-          {onlineStations.length === 0 && (
-            <p className="text-red-400 text-sm mt-1">Aucun agent en ligne</p>
-          )}
-          <p className="text-xs text-gray-500 mt-1">
-            Les ports seront alloués automatiquement dans les plages 9600-9700 (UDP/TCP) et
-            8081-8181 (HTTP).
-          </p>
-        </div>
-
-        <div>
-          <Label>Circuit</Label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-56 overflow-y-auto p-1">
-            {content.tracks.length === 0 && (
-              <p className="text-gray-500 text-sm col-span-full">Aucun circuit détecté</p>
-            )}
-            {content.tracks.map((track) => (
-              <button
-                key={track.acId}
-                type="button"
-                onClick={() => {
-                  setTrackId(track.acId);
-                  setTrackLayout(track.layouts.length > 0 ? track.layouts[0] : 'random');
-                  if (!name) {
-                    setName(`Serveur ${cleanTrackName(track.name)}`);
-                  }
-                }}
-                className={`relative text-left rounded-lg border overflow-hidden transition hover:ring-1 hover:ring-accent-orange/50 ${
-                  trackId === track.acId
-                    ? 'border-accent-orange ring-1 ring-accent-orange'
-                    : 'border-dark-600 bg-dark-900'
-                }`}
-              >
-                <div className="aspect-video bg-dark-800 flex items-center justify-center">
-                  {track.preview ? (
-                    <img
-                      src={track.preview}
-                      alt={track.name}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <ImageOff className="w-8 h-8 text-gray-600" />
-                  )}
-                </div>
-                <div className="p-2">
-                  <p className="text-sm font-medium text-white truncate">{track.name}</p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {track.layouts.length > 0
-                      ? `${track.layouts.length} layout(s)`
-                      : 'Aucun layout'}
-                  </p>
-                </div>
-                {trackId === track.acId && (
-                  <div className="absolute top-2 right-2 bg-accent-orange text-dark-900 rounded-full p-0.5">
-                    <Check className="w-3 h-3" />
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {selectedTrack && (
-            <div className="mt-3">
-              <Label htmlFor="layout">Layout</Label>
-              <select
-                id="layout"
-                value={trackLayout}
-                onChange={(e) => setTrackLayout(e.target.value)}
-                disabled={selectedTrack.layouts.length === 0}
-                className="w-full bg-dark-900 border border-dark-600 rounded-lg px-3 py-2 text-white focus:border-accent-orange focus:ring-1 focus:ring-accent-orange disabled:opacity-50"
-              >
-                {selectedTrack.layouts.length === 0 ? (
-                  <option value="random">Aléatoire</option>
-                ) : (
-                  selectedTrack.layouts.map((layout) => (
-                    <option key={layout} value={layout}>
-                      {layout}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between">
-            <Label>Voitures ({selectedCars.length})</Label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setSelectedCars(content.cars.map((c) => c.acId))}
-                className="text-xs text-accent-orange hover:underline"
-              >
-                Tout
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedCars([])}
-                className="text-xs text-gray-500 hover:underline"
-              >
-                Aucune
-              </button>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-64 overflow-y-auto p-1">
-            {content.cars.length === 0 && (
-              <p className="text-gray-500 text-sm col-span-full">Aucune voiture détectée</p>
-            )}
-            {content.cars.map((car) => {
-              const selected = selectedCars.includes(car.acId);
-              return (
-                <button
-                  key={car.acId}
-                  type="button"
-                  onClick={() => toggleCar(car.acId)}
-                  className={`relative text-left rounded-lg border overflow-hidden transition hover:ring-1 hover:ring-accent-orange/50 ${
-                    selected
-                      ? 'border-accent-orange ring-1 ring-accent-orange'
-                      : 'border-dark-600 bg-dark-900'
-                  }`}
-                >
-                  <div className="aspect-video bg-dark-800 flex items-center justify-center">
-                    {car.preview ? (
-                      <img
-                        src={car.preview}
-                        alt={car.name}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <Car className="w-8 h-8 text-gray-600" />
-                    )}
-                  </div>
-                  <div className="p-2">
-                    <p className="text-sm font-medium text-white truncate">{car.name}</p>
-                    {car.brand && <p className="text-xs text-gray-500 truncate">{car.brand}</p>}
-                  </div>
-                  {selected && (
-                    <div className="absolute top-2 right-2 bg-accent-orange text-dark-900 rounded-full p-0.5">
-                      <Check className="w-3 h-3" />
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          <div>
-            <Label htmlFor="maxClients">Max clients</Label>
-            <Input
-              id="maxClients"
-              type="number"
-              min={1}
-              max={64}
-              value={maxClients}
-              onChange={(e) => setMaxClients(Number(e.target.value))}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="password">Mot de passe</Label>
-            <Input id="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="rconPassword">RCON</Label>
-            <Input
-              id="rconPassword"
-              value={rconPassword}
-              onChange={(e) => setRconPassword(e.target.value)}
-              placeholder="admin"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Annuler
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            isLoading={isSubmitting}
-            disabled={!stationId || !trackId || selectedCars.length === 0}
-          >
-            Créer et démarrer
-          </Button>
-        </div>
-      </form>
-    </Modal>
-  );
 }
 
 interface ServerFormModalProps {

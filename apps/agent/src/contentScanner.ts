@@ -131,6 +131,9 @@ async function findTrackPreview(
   const rootPreview = await findFirstImage(trackDir, PREVIEW_NAMES);
   if (rootPreview) return rootPreview;
 
+  const uiPreview = await findFirstImage(path.join(trackDir, 'ui'), PREVIEW_NAMES);
+  if (uiPreview) return uiPreview;
+
   for (const layout of layouts) {
     const layoutPreview = await findFirstImage(path.join(trackDir, layout), PREVIEW_NAMES);
     if (layoutPreview) return layoutPreview;
@@ -244,11 +247,26 @@ export class ContentScanner {
           continue;
         }
 
-        const uiJson = await readJsonSafe<{ name?: string }>(uiPath);
+        let uiJson = await readJsonSafe<{ name?: string }>(uiPath);
+        if (!uiJson) {
+          uiJson = await readJsonSafe<{ name?: string }>(
+            path.join(trackDir, 'ui', 'ui_track.json'),
+          );
+        }
 
+        const ignoredLayoutDirs = new Set([
+          'ui',
+          'data',
+          'ai',
+          'models',
+          'skins',
+          'sfx',
+          'textures',
+        ]);
         const layouts: string[] = [];
         const subEntries = await fs.readdir(trackDir).catch(() => []);
         for (const sub of subEntries) {
+          if (ignoredLayoutDirs.has(sub.toLowerCase())) continue;
           const subDir = path.join(trackDir, sub);
           const subStat = await fs.stat(subDir).catch(() => null);
           if (!subStat?.isDirectory()) continue;
@@ -263,6 +281,11 @@ export class ContentScanner {
           layouts,
           preview: await findTrackPreview(this.logger, trackDir, layouts, entry),
         };
+        track.name = track.name
+          .replace(/\s+-\s*layout\s*$/i, '')
+          .replace(/-layout\s*$/i, '')
+          .replace(/\s+layout\s*$/i, '')
+          .trim();
         this.cache.setTrack({ ...track, updatedAt });
         content.tracks.push(track);
       }

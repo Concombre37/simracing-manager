@@ -36,9 +36,20 @@ export function Textarea({
   );
 }
 
-export function Label({ children, htmlFor }: { children: React.ReactNode; htmlFor?: string }) {
+export function Label({
+  children,
+  htmlFor,
+  className = '',
+}: {
+  children: React.ReactNode;
+  htmlFor?: string;
+  className?: string;
+}) {
   return (
-    <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-300 mb-1">
+    <label
+      htmlFor={htmlFor}
+      className={`block text-sm font-medium text-gray-300 mb-1 ${className}`}
+    >
       {children}
     </label>
   );

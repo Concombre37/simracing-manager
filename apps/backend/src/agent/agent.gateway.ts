@@ -23,6 +23,8 @@ import {
   StationStatus,
 } from '@simracing/shared';
 import { DashboardGateway } from '../dashboard/dashboard.gateway';
+import { TelemetryService } from '../telemetry/telemetry.service';
+import { TelemetrySnapshot } from '@simracing/shared';
 
 interface AuthenticatedSocket extends Socket {
   stationId?: string;
@@ -52,6 +54,7 @@ export class AgentGateway
     @Inject(forwardRef(() => DedicatedServersService))
     private readonly dedicatedServersService: DedicatedServersService,
     private readonly dashboardGateway: DashboardGateway,
+    private readonly telemetryService: TelemetryService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -75,7 +78,20 @@ export class AgentGateway
           case 'contentSync':
             await this.emitContentSync(payload.stationId);
             break;
+          case 'blankingHide':
+            await this.emitBlankingHide(payload.stationId);
+            break;
+          case 'blankingShow':
+            await this.emitBlankingShow(payload.stationId);
+            break;
         }
+      },
+    );
+
+    this.eventEmitter.on(
+      'blanking.mediaUpdated',
+      async (payload: { stationId: string }) => {
+        await this.emitBlankingMediaUpdated(payload.stationId);
       },
     );
   }
@@ -194,6 +210,15 @@ export class AgentGateway
     }
   }
 
+  @SubscribeMessage('agent:telemetry')
+  async handleTelemetry(
+    _client: AuthenticatedSocket,
+    payload: TelemetrySnapshot,
+  ): Promise<void> {
+    this.telemetryService.update(payload);
+    this.dashboardGateway.emitStationTelemetry(payload);
+  }
+
   @SubscribeMessage('server:started')
   async handleServerStarted(
     _client: AuthenticatedSocket,
@@ -262,6 +287,18 @@ export class AgentGateway
 
   async emitContentSync(stationId: string): Promise<void> {
     this.server.to(`station:${stationId}`).emit('content:sync');
+  }
+
+  async emitBlankingHide(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('blanking:hide');
+  }
+
+  async emitBlankingShow(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('blanking:show');
+  }
+
+  async emitBlankingMediaUpdated(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('blanking:mediaUpdated');
   }
 
   async emitUpdateAgent(stationId: string): Promise<void> {

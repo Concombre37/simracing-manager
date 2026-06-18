@@ -9,6 +9,7 @@ import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { WsJwtAuthGuard } from '../auth/guards/ws-jwt-auth.guard';
+import { TelemetrySnapshot } from '@simracing/shared';
 
 export interface StationCommandPayload {
   stationId: string;
@@ -19,7 +20,9 @@ export interface StationCommandPayload {
     | 'autoShifter'
     | 'teleportToPits'
     | 'recenterVR'
-    | 'contentSync';
+    | 'contentSync'
+    | 'blankingHide'
+    | 'blankingShow';
 }
 
 @WebSocketGateway({ cors: { origin: '*' } })
@@ -44,6 +47,10 @@ export class DashboardGateway
 
   emitStationUpdated(stationId: string, status: string): void {
     this.server.emit('station:updated', { stationId, status });
+  }
+
+  emitStationTelemetry(payload: TelemetrySnapshot): void {
+    this.server.emit('station:telemetry', payload);
   }
 
   @SubscribeMessage('station:command')

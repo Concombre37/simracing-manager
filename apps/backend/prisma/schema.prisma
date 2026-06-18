@@ -36,6 +36,7 @@ model Station {
   sessions        Session[]
   dedicatedServers DedicatedServer[]
   contentPreviews ContentPreview[]
+  blankingMedia   BlankingMedia[]
 
   @@map("stations")
 }
@@ -124,4 +125,19 @@ model ContentPreview {
 
   @@unique([stationId, type, acId])
   @@map("content_previews")
+}
+
+model BlankingMedia {
+  id        String   @id @default(uuid()) @db.Uuid
+  stationId String   @map("station_id") @db.Uuid
+  station   Station  @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  filename  String
+  mimeType  String   @map("mime_type")
+  sizeBytes Int      @map("size_bytes")
+  order     Int      @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([stationId, order])
+  @@map("blanking_media")
 }

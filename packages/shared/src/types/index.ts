@@ -74,3 +74,15 @@ export interface RacePlayer {
   totalTimeMs: number | null;
   laps: number;
 }
+
+export interface BlankingMediaFile {
+  id: string;
+  stationId: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  order: number;
+  downloadUrl: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+}

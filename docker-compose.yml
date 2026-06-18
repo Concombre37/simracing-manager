@@ -37,9 +37,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRES_IN: 7d
       CORS_ORIGIN: ${CORS_ORIGIN:-https://simracing.hytlabs.com}
+    volumes:
+      - blanking-media-uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
 
 volumes:
   postgres-data:
+  blanking-media-uploads:

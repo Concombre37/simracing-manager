@@ -8,6 +8,7 @@ export interface AgentToServerEvents {
   'agent:results': (payload: ResultsPayload) => void;
   'agent:status': (payload: StatusPayload) => void;
   'agent:content': (payload: { stationId: string; content: Record<string, unknown> }) => void;
+  'agent:telemetry': (payload: TelemetrySnapshot) => void;
   'server:started': (payload: {
     serverId: string;
     serverDir?: string;
@@ -42,10 +43,14 @@ export interface ServerToAgentEvents {
   }) => void;
   'server:launch': (payload: LaunchDedicatedServerPayload) => void;
   'server:stop': (payload: { serverId: string }) => void;
+  'blanking:hide': () => void;
+  'blanking:show': () => void;
+  'blanking:mediaUpdated': () => void;
 }
 
 export interface ServerToClientEvents {
   'station:updated': (payload: { stationId: string; status: string }) => void;
+  'station:telemetry': (payload: TelemetrySnapshot) => void;
 }
 
 export interface HeartbeatPayload {
@@ -77,6 +82,28 @@ export interface StatusPayload {
   stationId: string;
   status: StationStatus;
   message?: string;
+}
+
+export interface TelemetrySnapshot {
+  stationId: string;
+  sessionId?: string;
+  timestamp: number;
+  speedKmh: number;
+  rpm: number;
+  gear: number;
+  throttle: number;
+  brake: number;
+  steering: number;
+  lapTimeMs?: number;
+  bestLapMs?: number;
+  lastLapMs?: number;
+  lapCount?: number;
+  position?: number;
+  trackPosition?: number;
+  worldPosition?: { x: number; y: number; z: number };
+  isInMainMenu?: boolean;
+  isSessionStarted?: boolean;
+  isOnlineRace?: boolean;
 }
 
 export interface LaunchSessionPayload {

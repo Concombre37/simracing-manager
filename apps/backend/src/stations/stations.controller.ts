@@ -11,6 +11,7 @@ import {
 import { StationsService } from './stations.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { AgentGateway } from '../agent/agent.gateway';
+import { TelemetryService } from '../telemetry/telemetry.service';
 import {
   createStationSchema,
   CreateStationDto,
@@ -32,6 +33,7 @@ export class StationsController {
     private readonly stationsService: StationsService,
     private readonly sessionsService: SessionsService,
     private readonly agentGateway: AgentGateway,
+    private readonly telemetryService: TelemetryService,
   ) {}
 
   @Post()
@@ -56,6 +58,13 @@ export class StationsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.stationsService.findOne(id);
+  }
+
+  @Get(':id/telemetry')
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
+  async getTelemetry(@Param('id') id: string) {
+    const station = await this.stationsService.findOne(id);
+    return this.telemetryService.getCurrent(station.stationId);
   }
 
   @Patch(':id')

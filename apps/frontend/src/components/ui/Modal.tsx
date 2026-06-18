@@ -5,7 +5,7 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   onClose: () => void;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
 }
 
 export function Modal({ title, children, onClose, size = 'md' }: ModalProps) {
@@ -21,12 +21,13 @@ export function Modal({ title, children, onClose, size = 'md' }: ModalProps) {
     sm: 'max-w-md',
     md: 'max-w-lg',
     lg: 'max-w-2xl',
+    xl: 'max-w-5xl',
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
       <div
-        className={`bg-dark-800 rounded-2xl shadow-2xl w-full ${sizes[size]} border border-dark-600 overflow-hidden`}
+        className={`bg-dark-800 rounded-2xl shadow-2xl w-full ${sizes[size]} border border-dark-600 overflow-hidden max-h-[90vh] flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b border-dark-600 flex items-center justify-between">
@@ -38,7 +39,7 @@ export function Modal({ title, children, onClose, size = 'md' }: ModalProps) {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div className="p-6 overflow-y-auto">{children}</div>
       </div>
     </div>
   );

@@ -30,6 +30,18 @@ export interface StationWithApiKey extends Station {
   apiKey: string;
 }
 
+export interface BlankingMediaFile {
+  id: string;
+  stationId: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  order: number;
+  downloadUrl: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const stationsApi = {
   getAll: () => api.get<Station[]>('/stations').then((res) => res.data),
   getById: (id: string) => api.get<Station>(`/stations/${id}`).then((res) => res.data),
@@ -44,4 +56,21 @@ export const stationsApi = {
   stop: (id: string) => api.post(`/stations/${id}/stop`).then((res) => res.data),
   updateAgent: (id: string) => api.post(`/stations/${id}/update-agent`).then((res) => res.data),
   syncContent: (id: string) => api.post(`/stations/${id}/sync-content`).then((res) => res.data),
+  getBlankingMedia: (id: string) =>
+    api.get<BlankingMediaFile[]>(`/stations/${id}/blanking-media`).then((res) => res.data),
+  uploadBlankingMedia: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api
+      .post<BlankingMediaFile>(`/stations/${id}/blanking-media`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then((res) => res.data);
+  },
+  deleteBlankingMedia: (stationId: string, mediaId: string) =>
+    api.delete(`/stations/${stationId}/blanking-media/${mediaId}`).then((res) => res.data),
+  reorderBlankingMedia: (stationId: string, mediaIds: string[]) =>
+    api
+      .patch(`/stations/${stationId}/blanking-media/reorder`, { mediaIds })
+      .then((res) => res.data),
 };

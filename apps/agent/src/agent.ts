@@ -1,6 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import { Logger } from 'pino';
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs/promises';
 import {
   AgentToServerEvents,
   ServerToAgentEvents,
@@ -8,6 +10,8 @@ import {
   LaunchSessionPayload,
   LaunchDedicatedServerPayload,
   StationStatus,
+  LaunchMode,
+  TelemetrySnapshot,
 } from '@simracing/shared';
 import { config } from './config';
 import { VERSION } from './version';
@@ -19,12 +23,23 @@ import { ServerLauncher } from './serverLauncher';
 import { updateEnvValue } from './envWriter';
 import { getLocalIp } from './network';
 import { Updater } from './updater';
+import { findContentManagerExe, normalizeCmPath } from './cmLocator';
+import { promptForContentManagerPath, validateFilePath } from './dialogs';
+import { resolveAcPath } from './acPathResolver';
+import { TelemetryReceiver } from './telemetryReceiver';
+import { TelemetryFileReader } from './telemetryFileReader';
+import { ProcessMonitor } from './processMonitor';
+import { BlankingManager } from './blankingManager';
+import { AcSharedMemoryChecker } from './acSharedMemory';
+import { BlankingMediaSync } from './blankingMediaSync';
 
 export class SimRacingAgent {
   private socket: Socket<ServerToAgentEvents, AgentToServerEvents> | null = null;
-  private heartbeatInterval: NodeJS.Timeout | null = null;
+  private heartbeatRunning = false;
+  private heartbeatTimeout: NodeJS.Timeout | null = null;
   private contentInterval: NodeJS.Timeout | null = null;
   private acRunning = false;
+  private acLoaded = false;
   private cmRunning = false;
   private vrConnected = false;
   private apiKey: string | undefined = config.API_KEY;
@@ -36,6 +51,12 @@ export class SimRacingAgent {
   private contentScanner: ContentScanner;
   private serverLauncher: ServerLauncher;
   private updater: Updater;
+  private telemetryReceiver: TelemetryReceiver | null = null;
+  private telemetryFileReader: TelemetryFileReader | null = null;
+  private processMonitor: ProcessMonitor;
+  private blankingManager: BlankingManager;
+  private acSharedMemory: AcSharedMemoryChecker;
+  private blankingMediaSync: BlankingMediaSync;
 
   constructor(private readonly logger: Logger) {
     this.acLauncher = new AcLauncher(logger);
@@ -44,15 +65,98 @@ export class SimRacingAgent {
     this.contentScanner = new ContentScanner(logger);
     this.serverLauncher = new ServerLauncher(logger);
     this.updater = new Updater(logger);
+    this.processMonitor = new ProcessMonitor(logger);
+    this.blankingManager = new BlankingManager(logger);
+    this.acSharedMemory = new AcSharedMemoryChecker(logger);
+    this.blankingMediaSync = new BlankingMediaSync(logger, this.blankingManager);
+  }
+
+  private onTelemetrySnapshot(snapshot: TelemetrySnapshot): void {
+    this.blankingManager.onTelemetry(snapshot);
+  }
+
+  private startTelemetry(): void {
+    this.stopTelemetry();
+    this.telemetryReceiver = new TelemetryReceiver(this.logger, this.socket, (snapshot) =>
+      this.onTelemetrySnapshot(snapshot),
+    );
+    this.telemetryReceiver.start();
+    this.telemetryFileReader = new TelemetryFileReader(this.logger, this.socket, (snapshot) =>
+      this.onTelemetrySnapshot(snapshot),
+    );
+    this.telemetryFileReader.start();
+  }
+
+  private stopTelemetry(): void {
+    this.telemetryReceiver?.stop();
+    this.telemetryReceiver = null;
+    this.telemetryFileReader?.stop();
+    this.telemetryFileReader = null;
   }
 
   async start(): Promise<void> {
+    await this.resolveAcPath();
+    await this.ensureContentManagerPath();
+    await this.blankingManager.init();
+    await this.acSharedMemory.init();
+    this.blankingManager.setAuto();
+
     if (!this.apiKey) {
       await this.provision();
       return;
     }
 
     await this.connectWithApiKey(this.apiKey);
+  }
+
+  private async resolveAcPath(): Promise<void> {
+    if (!config.AC_PATH) {
+      const acPath = await resolveAcPath();
+      if (acPath) {
+        config.AC_PATH = acPath;
+        try {
+          updateEnvValue('AC_PATH', acPath);
+          this.logger.info({ acPath }, 'Assetto Corsa path resolved and saved');
+        } catch (err) {
+          this.logger.warn({ err, acPath }, 'Failed to save AC_PATH to .env');
+        }
+      } else {
+        this.logger.warn('Could not auto-resolve Assetto Corsa path');
+      }
+    }
+    if (config.AC_PATH) {
+      await this.acLauncher.ensureLuaAppInstalled();
+    }
+  }
+
+  private async ensureContentManagerPath(): Promise<void> {
+    if (process.platform !== 'win32') return;
+    if (config.LAUNCH_MODE !== LaunchMode.CONTENT_MANAGER) return;
+    if (config.CM_PATH) return;
+
+    const found = await findContentManagerExe(this.logger);
+    if (found) return;
+
+    this.logger.warn('Content Manager path not found, prompting user');
+    const userInput = promptForContentManagerPath();
+    if (!userInput) {
+      this.logger.warn('User cancelled Content Manager path prompt');
+      return;
+    }
+
+    const normalized = normalizeCmPath(userInput);
+    if (!validateFilePath(normalized)) {
+      this.logger.warn({ path: normalized }, 'Provided Content Manager path does not exist');
+      return;
+    }
+
+    config.CM_PATH = normalized;
+    try {
+      updateEnvValue('CM_PATH', normalized);
+      this.logger.info({ cmPath: normalized }, 'Content Manager path saved to .env');
+    } catch (err) {
+      this.logger.warn({ err, cmPath: normalized }, 'Failed to save CM_PATH to .env');
+    }
   }
 
   private async provision(): Promise<void> {
@@ -130,9 +234,12 @@ export class SimRacingAgent {
         { stationId: config.STATION_ID, socketId: this.socket?.id },
         'Connected to backend',
       );
+      void this.writeStationConfig();
+      this.startTelemetry();
       this.startHeartbeat();
       void this.sendContent();
       this.startContentSync();
+      void this.blankingMediaSync.sync(config.STATION_ID);
     });
 
     this.socket.on('connect_error', (err) => {
@@ -155,6 +262,7 @@ export class SimRacingAgent {
       this.logger.warn({ reason }, 'Disconnected from backend');
       this.stopHeartbeat();
       this.stopContentSync();
+      this.stopTelemetry();
       // Reconnect using the same API key after a short delay unless the key was invalidated.
       if (this.apiKey && reason !== 'io client disconnect') {
         setTimeout(() => {
@@ -181,6 +289,9 @@ export class SimRacingAgent {
     this.socket.on('server:launch', (payload) => this.handleLaunchDedicatedServer(payload));
     this.socket.on('server:stop', (payload) => this.handleStopDedicatedServer(payload));
     this.socket.on('content:sync', () => this.handleContentSync());
+    this.socket.on('blanking:hide', () => this.blankingManager.hide());
+    this.socket.on('blanking:show', () => this.blankingManager.show());
+    this.socket.on('blanking:mediaUpdated', () => this.handleBlankingMediaUpdated());
   }
 
   private isApiKeyError(message: string): boolean {
@@ -216,12 +327,25 @@ export class SimRacingAgent {
   async stop(): Promise<void> {
     this.stopHeartbeat();
     this.stopContentSync();
+    this.stopTelemetry();
     await this.acLauncher.stop();
     this.socket?.disconnect();
   }
 
   private startHeartbeat(): void {
-    this.heartbeatInterval = setInterval(() => {
+    if (this.heartbeatRunning) return;
+    this.heartbeatRunning = true;
+
+    const beat = async (): Promise<void> => {
+      if (!this.heartbeatRunning) return;
+      try {
+        this.acRunning = await this.processMonitor.isAcRunning();
+        this.acLoaded = await this.acSharedMemory.isAcLoaded();
+        this.blankingManager.setAcRunning(this.acRunning);
+        this.blankingManager.setAcLoaded(this.acLoaded);
+      } catch (err) {
+        this.logger.debug({ err }, 'Failed to refresh AC process state');
+      }
       const payload: HeartbeatPayload = {
         stationId: config.STATION_ID,
         stationName: config.STATION_NAME,
@@ -233,13 +357,31 @@ export class SimRacingAgent {
         timestamp: Date.now(),
       };
       this.socket?.emit('agent:heartbeat', payload);
-    }, 2000);
+      this.heartbeatTimeout = setTimeout(() => void beat(), 2000);
+    };
+
+    void beat();
   }
 
   private stopHeartbeat(): void {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
+    this.heartbeatRunning = false;
+    if (this.heartbeatTimeout) {
+      clearTimeout(this.heartbeatTimeout);
+      this.heartbeatTimeout = null;
+    }
+  }
+
+  private async writeStationConfig(): Promise<void> {
+    try {
+      const documentsPath =
+        config.DOCUMENTS_PATH ??
+        path.join(process.env.USERPROFILE ?? '', 'Documents', 'Assetto Corsa');
+      const dir = path.join(documentsPath, 'cfg', 'SimCenterManager');
+      await fs.mkdir(dir, { recursive: true });
+      await fs.writeFile(path.join(dir, 'station.txt'), config.STATION_ID, 'utf-8');
+      this.logger.debug({ stationId: config.STATION_ID }, 'Wrote station config for Lua telemetry');
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to write station config for Lua telemetry');
     }
   }
 
@@ -347,6 +489,15 @@ export class SimRacingAgent {
     }
   }
 
+  private async handleBlankingMediaUpdated(): Promise<void> {
+    this.logger.info('Received blanking media updated command');
+    try {
+      await this.blankingMediaSync.sync(config.STATION_ID);
+    } catch (err) {
+      this.logger.error({ err }, 'Blanking media sync failed');
+    }
+  }
+
   private async handleJoinServer(payload: {
     host: string;
     port: number;
@@ -360,6 +511,7 @@ export class SimRacingAgent {
     this.logger.info(payload, 'Received join server command');
     try {
       await this.acLauncher.joinServer(payload);
+      this.acRunning = true;
       this.logger.info('Join server command completed');
     } catch (err) {
       this.logger.error({ err }, 'Failed to execute join server command');

@@ -57,4 +57,19 @@ export class LuaBridge {
       ...(password && { password }),
     });
   }
+
+  async setJoinFlag(): Promise<void> {
+    const flagPath = path.join(path.dirname(this.commandFile), 'join.flag');
+    await fs.writeFile(flagPath, '1', 'utf-8');
+    this.logger.info('Join flag written for Lua app');
+  }
+
+  async clearJoinFlag(): Promise<void> {
+    const flagPath = path.join(path.dirname(this.commandFile), 'join.flag');
+    try {
+      await fs.unlink(flagPath);
+    } catch {
+      // ignore
+    }
+  }
 }

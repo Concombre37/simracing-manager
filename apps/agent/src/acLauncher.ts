@@ -1,10 +1,11 @@
 import { spawn, ChildProcess, execFile } from 'child_process';
-import { promises as fs, readFileSync } from 'fs';
+import { promises as fs } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
 import { config } from './config';
 import { LaunchSessionPayload } from '@simracing/shared';
 import { LuaBridge } from './luaBridge';
+import { findContentManagerExe } from './cmLocator';
 
 export interface JoinServerConfig {
   host: string;
@@ -62,13 +63,16 @@ export class AcLauncher {
   }
 
   async joinServer(joinConfig: JoinServerConfig): Promise<void> {
-    this.logger.info(joinConfig, 'Joining server');
+    this.logger.info(joinConfig, 'Joining server (direct acs.exe)');
 
     const documentsPath = this.getDocumentsPath();
     const cfgDir = path.join(documentsPath, 'cfg');
     await fs.mkdir(cfgDir, { recursive: true });
 
-    await this.writeRaceIni(cfgDir, {
+    await this.ensureLuaAppInstalled();
+    await this.luaBridge.setJoinFlag();
+
+    await this.writeJoinRaceIni(cfgDir, {
       track: joinConfig.track,
       trackLayout: joinConfig.trackLayout,
       car: joinConfig.carAcId,
@@ -79,13 +83,14 @@ export class AcLauncher {
       serverName: joinConfig.serverName,
     });
 
-    if (config.LAUNCH_MODE === 'cm') {
-      await this.ensureLuaAppInstalled();
-      await this.launchViaContentManager(joinConfig, 'join');
-      await this.luaBridge.joinServer(joinConfig.host, joinConfig.port, joinConfig.password);
-    } else {
-      await this.launchDirect(documentsPath);
-    }
+    await this.configureVideoIni(documentsPath);
+    await this.configureAssistsIni(documentsPath);
+
+    await this.launchAcs();
+
+    // The Lua app will continuously call ac.tryToStart(true) while the join flag
+    // is present and AC is in the main menu. We also send an explicit command now.
+    await this.luaBridge.autoStart();
   }
 
   async stop(): Promise<void> {
@@ -200,7 +205,7 @@ export class AcLauncher {
     cfg: JoinServerConfig,
     mode: 'online' | 'join' = 'online',
   ): Promise<void> {
-    const cmExe = await this.findContentManagerExe();
+    const cmExe = await findContentManagerExe(this.logger);
     if (!cmExe) {
       throw new Error("Content Manager non trouvé. Définissez CM_PATH dans le .env de l'agent.");
     }
@@ -228,69 +233,6 @@ export class AcLauncher {
       this.logger.error({ err }, 'Failed to spawn Content Manager');
     });
     this.logger.info({ uri, cmExe }, 'Launched via Content Manager');
-  }
-
-  private async findContentManagerExe(): Promise<string | undefined> {
-    if (config.CM_PATH) {
-      const cmExe = path.join(config.CM_PATH, 'Content Manager.exe');
-      if (await this.pathExists(cmExe)) return cmExe;
-      this.logger.warn({ cmExe }, 'Configured CM_PATH does not contain Content Manager.exe');
-    }
-
-    const defaultPaths = [
-      path.join(process.env.LOCALAPPDATA ?? '', 'AcTools Content Manager', 'Content Manager.exe'),
-      path.join(process.env.PROGRAMFILES ?? '', 'AcTools Content Manager', 'Content Manager.exe'),
-      path.join(
-        process.env['PROGRAMFILES(X86)'] ?? '',
-        'AcTools Content Manager',
-        'Content Manager.exe',
-      ),
-    ];
-
-    for (const p of defaultPaths) {
-      if (await this.pathExists(p)) return p;
-    }
-
-    const libraries = this.getSteamLibraries();
-    for (const lib of libraries) {
-      const dir = path.join(lib, 'steamapps', 'common', 'Assetto Corsa');
-      if (!(await this.pathExists(dir))) continue;
-      try {
-        const entries = await fs.readdir(dir);
-        const found = entries.find((e) => /^Content Manager\s*.+\.exe$/i.test(e));
-        if (found) return path.join(dir, found);
-      } catch {
-        // ignore
-      }
-    }
-
-    return undefined;
-  }
-
-  private getSteamLibraries(): string[] {
-    const libs: string[] = [];
-    const letters = 'CDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    for (const letter of letters) {
-      libs.push(`${letter}:\\Steam`);
-      libs.push(`${letter}:\\Program Files (x86)\\Steam`);
-      libs.push(`${letter}:\\Program Files\\Steam`);
-    }
-
-    const vdf = path.join('C:', 'Program Files (x86)', 'Steam', 'steamapps', 'libraryfolders.vdf');
-    try {
-      const data = readFileSync(vdf, 'utf-8');
-      const matches = data.match(/"path"\s+"(.+?)"/g);
-      if (matches) {
-        for (const m of matches) {
-          const p = m.replace(/\\"/g, '"').match(/"path"\s+"(.+?)"/);
-          if (p && p[1] && !libs.includes(p[1])) libs.push(p[1]);
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    return libs;
   }
 
   private async ensureSteamRunning(): Promise<void> {
@@ -344,18 +286,173 @@ export class AcLauncher {
   }
 
   private async launchDirect(_documentsPath: string): Promise<void> {
-    const acPath =
-      config.AC_PATH ?? 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\assettocorsa';
+    await this.launchAcs();
+  }
+
+  private async launchAcs(): Promise<void> {
+    const acPath = this.getAcPath();
     const acsExe = path.join(acPath, 'acs.exe');
+    if (!(await this.pathExists(acsExe))) {
+      throw new Error(`acs.exe introuvable à ${acsExe}. Vérifie AC_PATH dans le .env.`);
+    }
+
+    // Kill any existing AC process so the new race.ini is read.
+    if (process.platform === 'win32') {
+      spawn('taskkill', ['/F', '/IM', 'acs.exe'], { stdio: 'ignore' });
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
     this.currentProcess = spawn(acsExe, [], {
       cwd: acPath,
       detached: true,
       stdio: 'ignore',
+      windowsHide: false,
     });
-    this.logger.info({ exe: acsExe }, 'Launched Assetto Corsa directly');
+    this.currentProcess.on('error', (err) => {
+      this.logger.error({ err }, 'Failed to spawn acs.exe');
+    });
+    this.logger.info({ exe: acsExe }, 'Launched acs.exe');
   }
 
-  private async ensureLuaAppInstalled(): Promise<void> {
+  private getAcPath(): string {
+    return config.AC_PATH ?? 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\assettocorsa';
+  }
+
+  private async writeJoinRaceIni(
+    cfgDir: string,
+    cfg: {
+      track: string;
+      trackLayout?: string;
+      car: string;
+      serverIp?: string;
+      serverPort?: number;
+      serverHttpPort?: number;
+      password?: string;
+      serverName?: string;
+    },
+  ): Promise<void> {
+    const raceIniPath = path.join(cfgDir, 'race.ini');
+    const lines = [
+      '[HEADER]',
+      'VERSION=2',
+      'TYPE=RACE',
+      '',
+      '[RACE]',
+      `TRACK=${cfg.track}`,
+      `CONFIG_TRACK=${cfg.trackLayout ?? ''}`,
+      `MODEL=${cfg.car}`,
+      '',
+      '[CAR_0]',
+      `MODEL=${cfg.car}`,
+      'SKIN=',
+      'SETUP=',
+      '',
+      '[REMOTE]',
+      'ACTIVE=1',
+      `SERVER_IP=${cfg.serverIp ?? ''}`,
+      `SERVER_PORT=${cfg.serverPort ?? ''}`,
+      `SERVER_HTTP_PORT=${cfg.serverHttpPort ?? 8081}`,
+      `SERVER_NAME=${cfg.serverName ?? 'Serveur SimCenter'}`,
+      `PASSWORD=${cfg.password ?? ''}`,
+      `REQUESTED_CAR=${cfg.car}`,
+      '',
+    ];
+    await fs.writeFile(raceIniPath, lines.join('\n'), 'utf-8');
+    this.logger.info({ path: raceIniPath }, 'race.ini written for direct join');
+  }
+
+  private async configureVideoIni(documentsPath: string): Promise<void> {
+    const videoIniPath = path.join(documentsPath, 'cfg', 'video.ini');
+    if (!(await this.pathExists(videoIniPath))) return;
+
+    const modeMap: Record<string, string> = {
+      single: 'DEFAULT',
+      triple: 'TRIPLE',
+      vr: 'OPENVR',
+    };
+    const targetMode = modeMap[config.SCREEN_MODE] ?? 'DEFAULT';
+
+    try {
+      const content = await fs.readFile(videoIniPath, 'utf-8');
+      const updated = this.setIniValue(content, 'CAMERA', 'MODE', targetMode);
+      await fs.writeFile(videoIniPath, updated, 'utf-8');
+      this.logger.info({ path: videoIniPath, mode: targetMode }, 'video.ini updated');
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to update video.ini');
+    }
+  }
+
+  private async configureAssistsIni(documentsPath: string): Promise<void> {
+    const assistsIniPath = path.join(documentsPath, 'cfg', 'assists.ini');
+    const isEasy = config.ASSIST_PRESET === 'easy';
+
+    const lines = [
+      '[ASSISTS]',
+      `IDEAL_LINE=${isEasy ? 1 : 0}`,
+      'AUTO_BLIP=1',
+      `STABILITY_CONTROL=${isEasy ? 100 : 0}`,
+      'AUTO_BRAKE=0',
+      `AUTO_SHIFTER=${isEasy ? 1 : 0}`,
+      'ABS=1',
+      'TRACTION_CONTROL=1',
+      'AUTO_CLUTCH=1',
+      'VISUALDAMAGE=1',
+      'DAMAGE=0',
+      'FUEL_RATE=1',
+      'TYRE_WEAR=1',
+      'TYRE_BLANKETS=1',
+      'SLIPSTREAM=1',
+      '',
+    ];
+
+    try {
+      await fs.writeFile(assistsIniPath, lines.join('\n'), 'utf-8');
+      this.logger.info(
+        { path: assistsIniPath, preset: config.ASSIST_PRESET },
+        'assists.ini written',
+      );
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to write assists.ini');
+    }
+  }
+
+  private setIniValue(content: string, section: string, key: string, value: string): string {
+    const sectionPattern = new RegExp(`\\[${section}\\]`, 'i');
+    if (!sectionPattern.test(content)) {
+      return content + `\n[${section}]\n${key}=${value}\n`;
+    }
+
+    const lines = content.split('\n');
+    let inSection = false;
+    let replaced = false;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('[') && line.endsWith(']')) {
+        inSection = line.slice(1, -1).toLowerCase() === section.toLowerCase();
+        continue;
+      }
+      if (inSection && line.toLowerCase().startsWith(key.toLowerCase() + '=')) {
+        lines[i] = `${key}=${value}`;
+        replaced = true;
+        break;
+      }
+    }
+
+    if (!replaced) {
+      // Append after the section header.
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim().toLowerCase() === `[${section.toLowerCase()}]`) {
+          lines.splice(i + 1, 0, `${key}=${value}`);
+          break;
+        }
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  async ensureLuaAppInstalled(): Promise<void> {
     if (process.platform !== 'win32') return;
     const acPath = config.AC_PATH;
     if (!acPath) return;
@@ -375,10 +472,12 @@ export class AcLauncher {
     try {
       await fs.mkdir(targetDir, { recursive: true });
       for (const { src, dest } of files) {
-        if (await this.pathExists(src)) {
-          await fs.copyFile(src, dest);
-        } else {
-          this.logger.warn({ src }, 'Lua app source not found in snapshot');
+        try {
+          const content = await fs.readFile(src, 'utf-8');
+          await fs.writeFile(dest, content, 'utf-8');
+          this.logger.debug({ src, dest }, 'Lua app file copied');
+        } catch (readErr) {
+          this.logger.warn({ src, err: readErr }, 'Lua app source not readable from snapshot');
         }
       }
       this.logger.info({ targetDir }, 'Lua app installed');
