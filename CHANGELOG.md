@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.1 — Hotfix backend Docker
+
+### Corrigé
+
+- Import `path` corrigé dans `blanking-media.service.ts` (`import * as path`) pour éviter l’erreur `Cannot read properties of undefined (reading 'join')` au démarrage du conteneur.
+
 ## v2.2.0 — Blanking screen personnalisable (images & vidéos)
 
 ### Ajouté
