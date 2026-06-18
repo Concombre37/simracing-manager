@@ -1,6 +1,6 @@
 {
   "name": "@simracing/backend",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "SimRacing Manager backend API",
   "author": "Concombre37",
   "private": true,
