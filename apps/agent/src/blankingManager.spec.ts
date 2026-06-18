@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
+import { readFileSync } from 'fs';
 import { BlankingManager } from './blankingManager';
 import type { TelemetrySnapshot } from '@simracing/shared';
 
@@ -44,17 +45,26 @@ function makeSnapshot(overrides: Partial<TelemetrySnapshot> = {}): TelemetrySnap
   };
 }
 
-function lastSpawnArgs(): { file: string; playlistJson?: string; slideIntervalMs?: string } {
+function lastSpawnArgs(): { file: string; playlistPath?: string; slideIntervalMs?: string } {
   const calls = vi.mocked(spawn).mock.calls;
   const lastCall = calls[calls.length - 1];
   const args = lastCall[1] as string[];
   const fileIndex = args.indexOf('-File');
   const file = fileIndex >= 0 ? args[fileIndex + 1] : '';
-  const playlistIndex = args.indexOf('-PlaylistJson');
-  const playlistJson = playlistIndex >= 0 ? args[playlistIndex + 1] : undefined;
+  const playlistIndex = args.indexOf('-PlaylistPath');
+  const playlistPath = playlistIndex >= 0 ? args[playlistIndex + 1] : undefined;
   const intervalIndex = args.indexOf('-SlideIntervalMs');
   const slideIntervalMs = intervalIndex >= 0 ? args[intervalIndex + 1] : undefined;
-  return { file, playlistJson, slideIntervalMs };
+  return { file, playlistPath, slideIntervalMs };
+}
+
+function readPlaylistFile(playlistPath?: string): unknown {
+  if (!playlistPath) return undefined;
+  try {
+    return JSON.parse(readFileSync(playlistPath, 'utf-8'));
+  } catch {
+    return undefined;
+  }
 }
 
 describe('BlankingManager', () => {
@@ -73,6 +83,8 @@ describe('BlankingManager', () => {
     vi.mocked(spawn).mockReturnValue(createFakeProcess() as never);
     manager = new BlankingManager(mockLogger);
     (manager as unknown as { scriptPath: string }).scriptPath = 'C:\\temp\\blanking.ps1';
+    (manager as unknown as { playlistPath: string }).playlistPath =
+      'C:\\temp\\blanking-playlist.json';
   });
 
   afterEach(() => {
@@ -141,9 +153,9 @@ describe('BlankingManager', () => {
     manager.setAuto();
     manager.setAcRunning(false);
     expect(manager.isBlankingActive()).toBe(true);
-    const { playlistJson } = lastSpawnArgs();
-    expect(playlistJson).toBeDefined();
-    const parsed = JSON.parse(playlistJson!);
+    const { playlistPath } = lastSpawnArgs();
+    expect(playlistPath).toBeDefined();
+    const parsed = readPlaylistFile(playlistPath);
     expect(parsed).toEqual([]);
   });
 
@@ -156,8 +168,8 @@ describe('BlankingManager', () => {
     manager.setMediaPaths(['C:\\media\\slide1.jpg', 'C:\\media\\intro.mp4']);
 
     // The manager should have spawned a new PowerShell process with the updated playlist.
-    const { playlistJson } = lastSpawnArgs();
-    const parsed = JSON.parse(playlistJson!);
+    const { playlistPath } = lastSpawnArgs();
+    const parsed = readPlaylistFile(playlistPath);
     expect(parsed).toEqual([
       { path: 'C:\\media\\slide1.jpg', type: 'image' },
       { path: 'C:\\media\\intro.mp4', type: 'video' },

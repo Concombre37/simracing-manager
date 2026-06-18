@@ -1,5 +1,5 @@
 param(
-  [string]$PlaylistJson = '[]',
+  [string]$PlaylistPath = '',
   [int]$SlideIntervalMs = 10000,
   [string]$Message = 'SimRacing Manager'
 )
@@ -8,10 +8,13 @@ Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
 
 $playlist = @()
-try {
-  $playlist = $PlaylistJson | ConvertFrom-Json
-} catch {
-  Write-Warning "Failed to parse playlist JSON: $_"
+if ($PlaylistPath -and (Test-Path $PlaylistPath)) {
+  try {
+    $json = Get-Content $PlaylistPath -Raw -ErrorAction Stop
+    $playlist = $json | ConvertFrom-Json -ErrorAction Stop
+  } catch {
+    Write-Warning "Failed to read/parse playlist from $PlaylistPath : $_"
+  }
 }
 
 # Normalize playlist items
@@ -45,8 +48,6 @@ $videoPlayer.IsMuted = $true
 $videoPlayer.Visibility = 'Collapsed'
 $videoPlayer.LoadedBehavior = 'Manual'
 $videoPlayer.UnloadedBehavior = 'Close'
-[System.Windows.Controls.Grid]::SetColumnSpan($videoPlayer, 1)
-[System.Windows.Controls.Grid]::SetRowSpan($videoPlayer, 1)
 [void]$grid.Children.Add($videoPlayer)
 
 $imagePlayer = New-Object System.Windows.Controls.Image
@@ -74,14 +75,18 @@ function Show-CurrentSlide {
   if ($items.Count -eq 0) { return }
 
   $item = $items[$currentIndex]
-  $currentVisual = if ($videoPlayer.Visibility -eq 'Visible') { $videoPlayer } else { $imagePlayer }
+  $previousVisual = if ($videoPlayer.Visibility -eq 'Visible') { $videoPlayer } else { $imagePlayer }
 
   if ($item.Type -eq 'video') {
     $nextVisual = $videoPlayer
-    $videoPlayer.Source = [System.Uri]::new($item.Path)
-    $videoPlayer.Visibility = 'Visible'
-    $imagePlayer.Visibility = 'Collapsed'
-    $videoPlayer.Play()
+    try {
+      $videoPlayer.Source = [System.Uri]::new($item.Path)
+      $videoPlayer.Visibility = 'Visible'
+      $imagePlayer.Visibility = 'Collapsed'
+      $videoPlayer.Play()
+    } catch {
+      Write-Warning "Failed to load video $($item.Path): $_"
+    }
   } else {
     $nextVisual = $imagePlayer
     try {
@@ -90,16 +95,17 @@ function Show-CurrentSlide {
       $bitmap.UriSource = [System.Uri]::new($item.Path)
       $bitmap.CacheOption = 'OnLoad'
       $bitmap.EndInit()
+      if ($bitmap.IsFrozen -eq $false) { $bitmap.Freeze() | Out-Null }
       $imagePlayer.Source = $bitmap
+      $imagePlayer.Visibility = 'Visible'
+      $videoPlayer.Visibility = 'Collapsed'
+      $videoPlayer.Stop()
     } catch {
       Write-Warning "Failed to load image $($item.Path): $_"
     }
-    $imagePlayer.Visibility = 'Visible'
-    $videoPlayer.Visibility = 'Collapsed'
-    $videoPlayer.Stop()
   }
 
-  if (-not $SkipAnimation -and $currentVisual -ne $nextVisual) {
+  if (-not $SkipAnimation -and $previousVisual -ne $nextVisual) {
     $fadeIn = New-Object System.Windows.Media.Animation.DoubleAnimation(0.0, 1.0, [System.TimeSpan]::FromMilliseconds(500))
     $nextVisual.BeginAnimation([System.Windows.UIElement]::OpacityProperty, $fadeIn)
   }

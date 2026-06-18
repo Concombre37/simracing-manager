@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs/promises';
+import { writeFileSync } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
 import { TelemetrySnapshot } from '@simracing/shared';
@@ -20,6 +21,7 @@ export class BlankingManager {
   private lastTelemetryAt = 0;
   private readonly telemetryTimeoutMs = 5000;
   private scriptPath: string | null = null;
+  private playlistPath: string | null = null;
   private mediaPaths: string[] = [];
   private slideIntervalMs = 10000;
 
@@ -33,7 +35,11 @@ export class BlankingManager {
       this.scriptPath = path.join(tmpDir, 'blanking.ps1');
       const content = await fs.readFile(src, 'utf-8');
       await fs.writeFile(this.scriptPath, content, 'utf-8');
-      this.logger.debug({ scriptPath: this.scriptPath }, 'Blanking script extracted');
+      this.playlistPath = path.join(tmpDir, 'blanking-playlist.json');
+      this.logger.debug(
+        { scriptPath: this.scriptPath, playlistPath: this.playlistPath },
+        'Blanking script extracted',
+      );
     } catch (err) {
       this.logger.error({ err }, 'Failed to extract blanking script');
     }
@@ -151,6 +157,10 @@ export class BlankingManager {
 
     const playlist = this.buildPlaylist();
     const playlistJson = JSON.stringify(playlist);
+    if (this.playlistPath) {
+      writeFileSync(this.playlistPath, playlistJson, 'utf-8');
+    }
+
     const args = [
       '-Sta',
       '-WindowStyle',
@@ -159,8 +169,8 @@ export class BlankingManager {
       'Bypass',
       '-File',
       this.scriptPath,
-      '-PlaylistJson',
-      playlistJson,
+      '-PlaylistPath',
+      this.playlistPath ?? '',
       '-SlideIntervalMs',
       String(this.slideIntervalMs),
     ];
