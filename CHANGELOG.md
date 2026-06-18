@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.2 — Fix affichage images/vidéos sur l’écran d’attente
+
+### Corrigé
+
+- La playlist d’images/vidéos est maintenant écrite dans un fichier JSON temporaire et passée au script PowerShell par chemin, évitant les problèmes d’échappement des arguments CLI.
+- L’écran d’attente affiche correctement les images/vidéos uploadées depuis le site.
+
 ## v2.2.1 — Hotfix backend Docker
 
 ### Corrigé
