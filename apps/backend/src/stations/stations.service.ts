@@ -154,6 +154,7 @@ export class StationsService {
         name: payload.stationName,
         version: payload.version,
         localIp: payload.localIp,
+        macAddress: payload.macAddress,
         lastSeenAt: new Date(payload.timestamp),
         status,
       },

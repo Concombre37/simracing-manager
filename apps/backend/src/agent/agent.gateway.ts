@@ -84,6 +84,16 @@ export class AgentGateway
           case 'blankingShow':
             await this.emitBlankingShow(payload.stationId);
             break;
+          case 'shutdown':
+            await this.emitShutdown(payload.stationId);
+            break;
+          case 'wake':
+            // Wake-on-LAN is handled by the power-management REST endpoint;
+            // this case prevents the dashboard WS command from being silently ignored.
+            this.logger.warn(
+              `Wake command received via dashboard WS for ${payload.stationId}; use POST /stations/:id/wake instead.`,
+            );
+            break;
         }
       },
     );
@@ -299,6 +309,17 @@ export class AgentGateway
 
   async emitBlankingMediaUpdated(stationId: string): Promise<void> {
     this.server.to(`station:${stationId}`).emit('blanking:mediaUpdated');
+  }
+
+  async emitShutdown(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('system:shutdown');
+  }
+
+  async emitWakeOnLan(
+    stationId: string,
+    payload: { targetMac: string; targetIp?: string },
+  ): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('wol:send', payload);
   }
 
   async emitUpdateAgent(stationId: string): Promise<void> {

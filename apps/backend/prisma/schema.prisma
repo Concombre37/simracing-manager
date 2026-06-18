@@ -26,6 +26,7 @@ model Station {
   apiKeyHash  String?   @map("api_key_hash")
   version     String?
   localIp     String?   @map("local_ip")
+  macAddress  String?   @map("mac_address")
   lastSeenAt  DateTime? @map("last_seen_at")
   status      String    @default("offline")
   config      Json?

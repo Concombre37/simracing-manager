@@ -30,6 +30,8 @@ export interface ServerToAgentEvents {
   'vr:recenter': () => void;
   'system:restart': () => void;
   'system:update': () => void;
+  'system:shutdown': () => void;
+  'wol:send': (payload: { targetMac: string; targetIp?: string }) => void;
   'content:sync': () => void;
   'server:join': (payload: {
     host: string;
@@ -58,6 +60,7 @@ export interface HeartbeatPayload {
   stationName: string;
   version: string;
   localIp: string | null;
+  macAddress: string | null;
   acRunning: boolean;
   cmRunning: boolean;
   vrConnected: boolean;

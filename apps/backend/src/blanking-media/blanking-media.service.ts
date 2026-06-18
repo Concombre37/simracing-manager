@@ -41,15 +41,10 @@ export class BlankingMediaService {
   ) {}
 
   async findByStation(stationId: string): Promise<BlankingMediaFile[]> {
-    const station = await this.prisma.station.findUnique({
-      where: { id: stationId },
-    });
-    if (!station) {
-      throw new NotFoundException('Station not found');
-    }
+    const station = await this.findStationByIdOrStationId(stationId);
 
     const media = await this.prisma.blankingMedia.findMany({
-      where: { stationId },
+      where: { stationId: station.id },
       orderBy: { order: 'asc' },
     });
 
@@ -70,76 +65,51 @@ export class BlankingMediaService {
     stationId: string,
     file: Express.Multer.File,
   ): Promise<BlankingMediaFile> {
-    const station = await this.prisma.station.findUnique({
-      where: { id: stationId },
-    });
-    if (!station) {
-      throw new NotFoundException('Station not found');
-    }
+    const station = await this.findStationByIdOrStationId(stationId);
+    return this.saveMediaForStation(station, file);
+  }
 
-    if (!ALLOWED_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException(
-        `File type not allowed: ${file.mimetype}. Allowed: ${ALLOWED_TYPES.join(', ')}`,
-      );
-    }
+  async uploadToStations(
+    stationIds: string[],
+    file: Express.Multer.File,
+  ): Promise<{
+    success: number;
+    failed: { stationId: string; reason: string }[];
+  }> {
+    this.validateFile(file);
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
-      throw new BadRequestException(
-        `File too large: ${file.size} bytes (max ${MAX_FILE_SIZE_BYTES} bytes)`,
-      );
-    }
-
-    const maxOrderRow = await this.prisma.blankingMedia.findFirst({
-      where: { stationId },
-      orderBy: { order: 'desc' },
-    });
-    const nextOrder = (maxOrderRow?.order ?? -1) + 1;
-
-    const ext =
-      path.extname(file.originalname) || this.mimeToExt(file.mimetype);
-    const id = randomUUID();
-    const filename = `${id}${ext}`;
-    const dir = path.join(UPLOAD_DIR, stationId);
-    await fs.mkdir(dir, { recursive: true });
-    const filePath = path.join(dir, filename);
-    await fs.writeFile(filePath, file.buffer);
-
-    const media = await this.prisma.blankingMedia.create({
-      data: {
-        id,
-        stationId,
-        filename: file.originalname,
-        mimeType: file.mimetype,
-        sizeBytes: file.size,
-        order: nextOrder,
-      },
+    const stations = await this.prisma.station.findMany({
+      where: { id: { in: stationIds } },
     });
 
-    this.emitMediaUpdated(station.stationId);
+    const foundIds = new Set(stations.map((s) => s.id));
+    const failed: { stationId: string; reason: string }[] = [];
 
-    return {
-      id: media.id,
-      stationId: media.stationId,
-      filename: media.filename,
-      mimeType: media.mimeType,
-      sizeBytes: media.sizeBytes,
-      order: media.order,
-      downloadUrl: `/api/blanking-media/${media.id}/download`,
-      createdAt: media.createdAt,
-      updatedAt: media.updatedAt,
-    };
+    for (const id of stationIds) {
+      if (!foundIds.has(id)) {
+        failed.push({ stationId: id, reason: 'Station not found' });
+      }
+    }
+
+    let success = 0;
+    for (const station of stations) {
+      try {
+        await this.saveMediaForStation(station, file);
+        success++;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        failed.push({ stationId: station.id, reason: message });
+      }
+    }
+
+    return { success, failed };
   }
 
   async reorder(stationId: string, mediaIds: string[]): Promise<void> {
-    const station = await this.prisma.station.findUnique({
-      where: { id: stationId },
-    });
-    if (!station) {
-      throw new NotFoundException('Station not found');
-    }
+    const station = await this.findStationByIdOrStationId(stationId);
 
     const media = await this.prisma.blankingMedia.findMany({
-      where: { stationId },
+      where: { stationId: station.id },
     });
 
     const mediaIdsSet = new Set(media.map((m) => m.id));
@@ -163,15 +133,10 @@ export class BlankingMediaService {
   }
 
   async remove(stationId: string, mediaId: string): Promise<void> {
-    const station = await this.prisma.station.findUnique({
-      where: { id: stationId },
-    });
-    if (!station) {
-      throw new NotFoundException('Station not found');
-    }
+    const station = await this.findStationByIdOrStationId(stationId);
 
     const media = await this.prisma.blankingMedia.findFirst({
-      where: { id: mediaId, stationId },
+      where: { id: mediaId, stationId: station.id },
     });
     if (!media) {
       throw new NotFoundException('Media not found');
@@ -180,7 +145,7 @@ export class BlankingMediaService {
     await this.prisma.blankingMedia.delete({ where: { id: mediaId } });
 
     const ext = path.extname(media.filename) || this.mimeToExt(media.mimeType);
-    const filePath = path.join(UPLOAD_DIR, stationId, `${media.id}${ext}`);
+    const filePath = path.join(UPLOAD_DIR, station.id, `${media.id}${ext}`);
     try {
       await fs.unlink(filePath);
     } catch {
@@ -189,7 +154,7 @@ export class BlankingMediaService {
 
     // Compact remaining orders
     const remaining = await this.prisma.blankingMedia.findMany({
-      where: { stationId },
+      where: { stationId: station.id },
       orderBy: { order: 'asc' },
     });
     await this.prisma.$transaction(
@@ -225,6 +190,88 @@ export class BlankingMediaService {
       mimeType: media.mimeType,
       filename: media.filename,
     };
+  }
+
+  private validateFile(file: Express.Multer.File): void {
+    if (!ALLOWED_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `File type not allowed: ${file.mimetype}. Allowed: ${ALLOWED_TYPES.join(', ')}`,
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      throw new BadRequestException(
+        `File too large: ${file.size} bytes (max ${MAX_FILE_SIZE_BYTES} bytes)`,
+      );
+    }
+  }
+
+  private async saveMediaForStation(
+    station: { id: string; stationId: string },
+    file: Express.Multer.File,
+  ): Promise<BlankingMediaFile> {
+    const maxOrderRow = await this.prisma.blankingMedia.findFirst({
+      where: { stationId: station.id },
+      orderBy: { order: 'desc' },
+    });
+    const nextOrder = (maxOrderRow?.order ?? -1) + 1;
+
+    const ext =
+      path.extname(file.originalname) || this.mimeToExt(file.mimetype);
+    const id = randomUUID();
+    const filename = `${id}${ext}`;
+    const dir = path.join(UPLOAD_DIR, station.id);
+    await fs.mkdir(dir, { recursive: true });
+    const filePath = path.join(dir, filename);
+    await fs.writeFile(filePath, file.buffer);
+
+    const media = await this.prisma.blankingMedia.create({
+      data: {
+        id,
+        stationId: station.id,
+        filename: file.originalname,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        order: nextOrder,
+      },
+    });
+
+    this.emitMediaUpdated(station.stationId);
+
+    return {
+      id: media.id,
+      stationId: media.stationId,
+      filename: media.filename,
+      mimeType: media.mimeType,
+      sizeBytes: media.sizeBytes,
+      order: media.order,
+      downloadUrl: `/api/blanking-media/${media.id}/download`,
+      createdAt: media.createdAt,
+      updatedAt: media.updatedAt,
+    };
+  }
+
+  private async findStationByIdOrStationId(id: string) {
+    if (this.isUuid(id)) {
+      const station = await this.prisma.station.findUnique({
+        where: { id },
+      });
+      if (station) return station;
+    }
+
+    const station = await this.prisma.station.findUnique({
+      where: { stationId: id },
+    });
+    if (!station) {
+      throw new NotFoundException('Station not found');
+    }
+    return station;
+  }
+
+  private isUuid(value: string): boolean {
+    return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+      value,
+    );
   }
 
   private emitMediaUpdated(stationId: string): void {

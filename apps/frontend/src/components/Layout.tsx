@@ -10,6 +10,7 @@ import {
   Settings,
   Image,
   Activity,
+  MonitorPlay,
 } from 'lucide-react';
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
 const adminNavItems = [
   { path: '/users', label: 'Utilisateurs', icon: Users },
   { path: '/content-previews', label: 'Images', icon: Image },
+  { path: '/blanking-media', label: 'Écrans', icon: MonitorPlay },
   { path: '/settings', label: 'Paramètres', icon: Settings },
 ];
 

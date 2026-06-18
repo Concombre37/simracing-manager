@@ -7,6 +7,7 @@ export interface Station {
   apiKeyHash: string | null;
   version: string | null;
   localIp: string | null;
+  macAddress: string | null;
   lastSeenAt: string | null;
   status: 'offline' | 'online' | 'in_game' | 'updating';
   config: Record<string, unknown> | null;
@@ -69,8 +70,32 @@ export const stationsApi = {
   },
   deleteBlankingMedia: (stationId: string, mediaId: string) =>
     api.delete(`/stations/${stationId}/blanking-media/${mediaId}`).then((res) => res.data),
+  uploadBlankingMediaBulk: (stationIds: string[], file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('stationIds', JSON.stringify(stationIds));
+    return api
+      .post<{ success: number; failed: { stationId: string; reason: string }[] }>(
+        '/blanking-media/bulk',
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        },
+      )
+      .then((res) => res.data);
+  },
   reorderBlankingMedia: (stationId: string, mediaIds: string[]) =>
     api
       .patch(`/stations/${stationId}/blanking-media/reorder`, { mediaIds })
       .then((res) => res.data),
+  wake: (id: string) =>
+    api
+      .post<{
+        relayStationId: string;
+        targetMac: string;
+        targetIp: string | null;
+      }>(`/stations/${id}/wake`)
+      .then((res) => res.data),
+  shutdown: (id: string) =>
+    api.post<{ success: boolean }>(`/stations/${id}/shutdown`).then((res) => res.data),
 };

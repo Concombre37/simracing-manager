@@ -21,7 +21,7 @@ import { ContentSync } from './contentSync';
 import { ContentScanner } from './contentScanner';
 import { ServerLauncher } from './serverLauncher';
 import { updateEnvValue } from './envWriter';
-import { getLocalIp } from './network';
+import { getLocalIp, getMacAddress } from './network';
 import { Updater } from './updater';
 import { findContentManagerExe, normalizeCmPath } from './cmLocator';
 import { promptForContentManagerPath, validateFilePath } from './dialogs';
@@ -32,6 +32,7 @@ import { ProcessMonitor } from './processMonitor';
 import { BlankingManager } from './blankingManager';
 import { AcSharedMemoryChecker } from './acSharedMemory';
 import { BlankingMediaSync } from './blankingMediaSync';
+import { sendWakeOnLan } from './wol';
 
 export class SimRacingAgent {
   private socket: Socket<ServerToAgentEvents, AgentToServerEvents> | null = null;
@@ -292,6 +293,8 @@ export class SimRacingAgent {
     this.socket.on('blanking:hide', () => this.blankingManager.hide());
     this.socket.on('blanking:show', () => this.blankingManager.show());
     this.socket.on('blanking:mediaUpdated', () => this.handleBlankingMediaUpdated());
+    this.socket.on('system:shutdown', () => this.handleShutdown());
+    this.socket.on('wol:send', (payload) => this.handleWakeOnLan(payload));
   }
 
   private isApiKeyError(message: string): boolean {
@@ -351,6 +354,7 @@ export class SimRacingAgent {
         stationName: config.STATION_NAME,
         version: VERSION,
         localIp: getLocalIp(),
+        macAddress: getMacAddress(),
         acRunning: this.acRunning,
         cmRunning: this.cmRunning,
         vrConnected: this.vrConnected,
@@ -495,6 +499,29 @@ export class SimRacingAgent {
       await this.blankingMediaSync.sync(config.STATION_ID);
     } catch (err) {
       this.logger.error({ err }, 'Blanking media sync failed');
+    }
+  }
+
+  private async handleShutdown(): Promise<void> {
+    this.logger.info('Received shutdown command');
+    try {
+      if (process.platform === 'win32') {
+        const { execFile } = await import('child_process');
+        execFile('shutdown', ['/s', '/t', '0']);
+      } else {
+        this.logger.warn('Shutdown command is only implemented on Windows');
+      }
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to execute shutdown command');
+    }
+  }
+
+  private async handleWakeOnLan(payload: { targetMac: string; targetIp?: string }): Promise<void> {
+    this.logger.info(payload, 'Received Wake-on-LAN relay command');
+    try {
+      await sendWakeOnLan(payload.targetMac, this.logger);
+    } catch (err) {
+      this.logger.error({ err }, 'Wake-on-LAN relay failed');
     }
   }
 

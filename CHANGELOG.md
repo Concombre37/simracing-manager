@@ -1,5 +1,27 @@
 # Changelog
 
+## v2.2.3 — Wake-on-LAN et arrêt distant des PODs
+
+### Ajouté
+
+- **Page Paramètres** (`/settings`) affichant pour chaque POD :
+  - IP locale ;
+  - adresse MAC ;
+  - statut de connexion ;
+  - boutons **Allumer** et **Éteindre**.
+- **Wake-on-LAN** via relais POD : un POD déjà allumé sur le même sous-réseau envoie le magic packet vers la MAC cible.
+- **Arrêt distant** : commande `system:shutdown` envoyée à l’agent, qui exécute `shutdown /s /t 0` sur Windows.
+- Collecte automatique de l’adresse MAC par l’agent et envoi dans chaque heartbeat.
+- Endpoints REST protégés : `POST /api/stations/:id/wake` et `POST /api/stations/:id/shutdown`.
+
+### Technique
+
+- Nouveau champ `mac_address` sur le modèle Prisma `Station` + migration.
+- Extension des contrats `@simracing/shared` : `HeartbeatPayload.macAddress`, `ServerToAgentEvents` (`system:shutdown`, `wol:send`).
+- Nouveau module backend `power-management` (service + controller).
+- Nouveau module agent `wol.ts` utilisant `wake_on_lan` pour envoyer les magic packets.
+- Dépendance agent ajoutée : `wake_on_lan`.
+
 ## v2.2.2 — Fix affichage images/vidéos sur l’écran d’attente
 
 ### Corrigé

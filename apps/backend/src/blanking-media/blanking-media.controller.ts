@@ -11,6 +11,7 @@ import {
   Body,
   Res,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
@@ -18,6 +19,7 @@ import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AdminOrStationAuthGuard } from '../auth/guards/admin-or-station-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -32,8 +34,7 @@ export class BlankingMediaController {
   constructor(private readonly blankingMediaService: BlankingMediaService) {}
 
   @Get('stations/:id/blanking-media')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(AdminOrStationAuthGuard)
   async findByStation(@Param('id') stationId: string) {
     return this.blankingMediaService.findByStation(stationId);
   }
@@ -73,6 +74,42 @@ export class BlankingMediaController {
   ) {
     await this.blankingMediaService.remove(stationId, mediaId);
     return { success: true };
+  }
+
+  @Post('blanking-media/bulk')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadBulk(
+    @Body('stationIds') stationIdsRaw: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new NotFoundException('No file uploaded');
+    }
+
+    let stationIds: string[];
+    try {
+      stationIds = JSON.parse(stationIdsRaw);
+      if (
+        !Array.isArray(stationIds) ||
+        !stationIds.every((id) => typeof id === 'string')
+      ) {
+        throw new BadRequestException(
+          'stationIds must be a JSON array of strings',
+        );
+      }
+    } catch {
+      throw new BadRequestException(
+        'stationIds must be a valid JSON array of strings',
+      );
+    }
+
+    if (stationIds.length === 0) {
+      throw new BadRequestException('At least one station must be selected');
+    }
+
+    return this.blankingMediaService.uploadToStations(stationIds, file);
   }
 
   @Get('blanking-media/:id/download')

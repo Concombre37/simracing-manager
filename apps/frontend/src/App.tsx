@@ -11,6 +11,8 @@ import { Users } from './pages/Users';
 import { Leaderboard } from './pages/Leaderboard';
 import { Telemetry } from './pages/Telemetry';
 import { ContentPreviews } from './pages/ContentPreviews';
+import { BlankingMedia } from './pages/BlankingMedia';
+import { Settings } from './pages/Settings';
 
 const queryClient = new QueryClient();
 
@@ -96,6 +98,22 @@ export function App() {
               element={
                 <ProtectedRoute adminOnly>
                   <ContentPreviews />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/blanking-media"
+              element={
+                <ProtectedRoute adminOnly>
+                  <BlankingMedia />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute adminOnly>
+                  <Settings />
                 </ProtectedRoute>
               }
             />

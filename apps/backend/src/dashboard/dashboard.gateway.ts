@@ -22,7 +22,9 @@ export interface StationCommandPayload {
     | 'recenterVR'
     | 'contentSync'
     | 'blankingHide'
-    | 'blankingShow';
+    | 'blankingShow'
+    | 'shutdown'
+    | 'wake';
 }
 
 @WebSocketGateway({ cors: { origin: '*' } })

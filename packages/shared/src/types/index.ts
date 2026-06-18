@@ -21,6 +21,7 @@ export interface Station {
   name: string;
   version: string | null;
   localIp: string | null;
+  macAddress: string | null;
   lastSeenAt: Date | null;
   status: StationStatus;
   config: StationConfig | null;
