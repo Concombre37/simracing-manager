@@ -127,7 +127,7 @@ async function checkNetworkAdapters(
   const script = `
 $adapters = Get-NetAdapter -Physical | Where-Object { $_.Status -eq 'Up' }
 foreach ($a in $adapters) {
-  $advanced = Get-NetAdapterAdvancedProperty -Name $a.Name -ErrorAction SilentlyContinue
+  $advanced = Get-NetAdapterAdvancedProperty -Name $a.Name -AllProperties -ErrorAction SilentlyContinue
   $power = $null
   try {
     $power = Get-NetAdapterPowerManagement -Name $a.Name -ErrorAction Stop
@@ -135,8 +135,8 @@ foreach ($a in $adapters) {
     $power = $null
   }
 
-  $wolMagic = ($advanced | Where-Object { $_.DisplayName -like '*Wake on Magic Packet*' }).DisplayValue
-  $wolPattern = ($advanced | Where-Object { $_.DisplayName -like '*Wake on Pattern Match*' }).DisplayValue
+  $wolMagic = ($advanced | Where-Object { $_.DisplayName -like '*Wake*Magic*' -or $_.DisplayName -like '*WOL*' -or $_.DisplayName -like '*Wake on LAN*' }).DisplayValue | Select-Object -First 1
+  $wolPattern = ($advanced | Where-Object { $_.DisplayName -like '*Wake*Pattern*' }).DisplayValue | Select-Object -First 1
 
   [PSCustomObject]@{
     name = $a.Name
@@ -208,9 +208,25 @@ function cleanValue(value: string): string {
 
 function detectInterfaceType(description: string): NetworkAdapterWolCheck['interfaceType'] {
   const lower = description.toLowerCase();
-  if (lower.includes('wi-fi') || lower.includes('wireless') || lower.includes('802.11'))
+  if (
+    lower.includes('wi-fi') ||
+    lower.includes('wireless') ||
+    lower.includes('802.11') ||
+    lower.includes('wlan')
+  )
     return 'Wi-Fi';
-  if (lower.includes('ethernet') || lower.includes('gigabit') || lower.includes('realtek pci'))
+  if (
+    lower.includes('ethernet') ||
+    lower.includes('gigabit') ||
+    lower.includes('realtek') ||
+    lower.includes('intel(r) i') ||
+    lower.includes('marvell') ||
+    lower.includes('broadcom') ||
+    lower.includes('killer') ||
+    lower.includes('usb gbe') ||
+    lower.includes('pci') ||
+    lower.includes('family controller')
+  )
     return 'Ethernet';
   return 'Unknown';
 }

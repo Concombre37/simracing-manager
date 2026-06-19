@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.7 — Fix auth post-provision et diagnostic WoL Ethernet
+
+### Corrigé
+
+- Mise à jour immédiate de `config.API_KEY` après l’auto-provisionnement, résolvant les erreurs 401 sur `content sync` et d’autres appels HTTP.
+- Diagnostic WoL : recherche élargie des propriétés avancées (`*Wake*Magic*`, `*WOL*`, `*Wake on LAN*`).
+- Meilleure détection des cartes Ethernet (Realtek, Intel, Marvell, Broadcom, Killer, etc.).
+
 ## v2.2.6 — Diagnostic WoL plus fiable
 
 ### Corrigé

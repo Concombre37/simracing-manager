@@ -195,6 +195,7 @@ export class SimRacingAgent {
           clearTimeout(timeout);
           this.logger.info({ stationId: data.stationId }, 'Agent provisioned');
           this.apiKey = data.apiKey;
+          config.API_KEY = data.apiKey;
           try {
             updateEnvValue('API_KEY', data.apiKey);
             this.logger.info('API key saved to .env');
