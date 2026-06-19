@@ -1,7 +1,7 @@
 {
   "name": "@simracing/frontend",
   "private": true,
-  "version": "2.2.3",
+  "version": "2.2.4",
   "description": "SimRacing Manager frontend dashboard",
   "type": "module",
   "scripts": {

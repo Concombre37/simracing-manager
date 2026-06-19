@@ -33,6 +33,7 @@ import { BlankingManager } from './blankingManager';
 import { AcSharedMemoryChecker } from './acSharedMemory';
 import { BlankingMediaSync } from './blankingMediaSync';
 import { sendWakeOnLan } from './wol';
+import { runWolDiagnostics } from './wolDiagnostics';
 
 export class SimRacingAgent {
   private socket: Socket<ServerToAgentEvents, AgentToServerEvents> | null = null;
@@ -107,6 +108,7 @@ export class SimRacingAgent {
       return;
     }
 
+    await this.runStartupDiagnostics();
     await this.connectWithApiKey(this.apiKey);
   }
 
@@ -519,9 +521,31 @@ export class SimRacingAgent {
   private async handleWakeOnLan(payload: { targetMac: string; targetIp?: string }): Promise<void> {
     this.logger.info(payload, 'Received Wake-on-LAN relay command');
     try {
-      await sendWakeOnLan(payload.targetMac, this.logger);
+      await sendWakeOnLan(payload.targetMac, this.logger, payload.targetIp);
     } catch (err) {
       this.logger.error({ err }, 'Wake-on-LAN relay failed');
+    }
+  }
+
+  private async runStartupDiagnostics(): Promise<void> {
+    try {
+      const diagnostics = await runWolDiagnostics(this.logger);
+      this.logger.info(
+        {
+          overallReady: diagnostics.overallReady,
+          fastStartupEnabled: diagnostics.fastStartupEnabled,
+          adapterCount: diagnostics.adapters.length,
+        },
+        'Wake-on-LAN diagnostics completed',
+      );
+      for (const warning of diagnostics.warnings) {
+        this.logger.warn(warning);
+      }
+      for (const adapter of diagnostics.adapters) {
+        this.logger.info({ adapter }, 'Network adapter WoL status');
+      }
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to run Wake-on-LAN diagnostics');
     }
   }
 

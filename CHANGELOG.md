@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.2.4 — Diagnostic et amélioration Wake-on-LAN
+
+### Ajouté
+
+- **Diagnostic WoL au démarrage de l’agent** : vérifie et loggue :
+  - état du démarrage rapide Windows (Fast Startup) ;
+  - cartes réseau actives et leur support Wake-on-LAN ;
+  - activation de _Wake on Magic Packet_ ;
+  - autorisation de réveil du PC par la carte réseau.
+- Envoi du magic packet sur les ports **9 et 7** pour maximiser la compatibilité.
+- Envoi en **unicast** vers l’IP cible quand elle est connue, avec fallback broadcast.
+- Augmentation du nombre de magic packets envoyés (5 par port).
+
+### Corrigé
+
+- Le relais WoL utilise maintenant l’adresse IP de la station cible quand elle est disponible.
+
 ## v2.2.3 — Wake-on-LAN et arrêt distant des PODs
 
 ### Ajouté
