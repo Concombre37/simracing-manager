@@ -22,11 +22,11 @@ import { UserRole } from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 @Controller('content')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class ContentController {
   constructor(private readonly contentService: ContentService) {}
 
   @Post('packages')
+  @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   create(
     @Body(new ZodValidationPipe(createContentPackageSchema))

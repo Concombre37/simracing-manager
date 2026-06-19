@@ -55,7 +55,7 @@ function pauseBeforeExit(code: number): void {
 
 async function main(): Promise<void> {
   // Lazy import so config errors are caught below.
-  const { config } = await import('./config');
+  const { config, envPath } = await import('./config');
   const { SimRacingAgent } = await import('./agent');
 
   const scopedLogger = logger.child({
@@ -64,6 +64,7 @@ async function main(): Promise<void> {
   });
 
   scopedLogger.info(`SimRacing Manager Agent v${config.VERSION} starting`);
+  scopedLogger.info({ envPath, acPath: config.AC_PATH ?? null }, 'Loaded configuration from .env');
   const agent = new SimRacingAgent(scopedLogger);
   await agent.start();
 }

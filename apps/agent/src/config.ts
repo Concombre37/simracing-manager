@@ -7,7 +7,7 @@ import { VERSION } from './version';
 
 // Load .env from the same directory as the executable.
 const baseDir = path.dirname(process.execPath);
-const envPath = path.join(baseDir, '.env');
+export const envPath = path.join(baseDir, '.env');
 
 // If no .env exists, create a default one so the agent can start and auto-provision.
 if (!existsSync(envPath)) {

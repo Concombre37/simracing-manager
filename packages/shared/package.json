@@ -1,6 +1,6 @@
 {
   "name": "@simracing/shared",
-  "version": "2.2.8",
+  "version": "2.2.9",
   "private": true,
   "description": "Shared types, DTOs and contracts for SimRacing Manager",
   "main": "./dist/index.js",

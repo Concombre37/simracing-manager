@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.9 — Fix auth content sync et debug AC_PATH
+
+### Corrigé
+
+- L’erreur 401 sur `GET /api/content/catalog` est maintenant résolue définitivement : `JwtAuthGuard` n’est plus appliqué au contrôleur `ContentController` entier, il ne protège plus que `POST /api/content/packages` (admin). Les endpoints agents (`catalog`, `download`) passent correctement par `AdminOrStationAuthGuard` avec une clé API `sk_...`.
+- L’agent logue au démarrage le chemin réel du `.env` chargé et la valeur de `AC_PATH`, pour faciliter le diagnostic quand le path Assetto Corsa n’est pas détecté.
+
 ## v2.2.8 — Fix content sync 401 et réduction taille previews
 
 ### Corrigé
