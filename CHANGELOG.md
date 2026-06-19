@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.6 — Diagnostic WoL plus fiable
+
+### Corrigé
+
+- Le diagnostic Wake-on-LAN ne considère plus le WoL comme désactivé si `Get-NetAdapterPowerManagement` ne retourne pas d’état de gestion d’alimentation.
+- Détection du type d’interface (Wi-Fi / Ethernet) et avertissement si le POD est en Wi-Fi.
+- Vérification supplémentaire via `powercfg /devicequery wake_from_any`.
+- Nettoyage des caractères parasites dans le nom et la MAC affichés par PowerShell.
+
 ## v2.2.5 — Fix diagnostic WoL et sync blanking media
 
 ### Corrigé
