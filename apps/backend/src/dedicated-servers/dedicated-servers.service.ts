@@ -22,9 +22,18 @@ export class DedicatedServersService {
   async create(
     dto: CreateDedicatedServerDto,
   ): Promise<DedicatedServerWithStation> {
-    const station = await this.prisma.station.findUnique({
-      where: { id: dto.stationId },
-    });
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        dto.stationId,
+      );
+    let station = isUuid
+      ? await this.prisma.station.findUnique({ where: { id: dto.stationId } })
+      : null;
+    if (!station) {
+      station = await this.prisma.station.findUnique({
+        where: { stationId: dto.stationId },
+      });
+    }
     if (!station) {
       throw new BadRequestException('Station not found');
     }
@@ -36,7 +45,7 @@ export class DedicatedServersService {
     return this.prisma.dedicatedServer.create({
       data: {
         name: dto.name,
-        stationId: dto.stationId,
+        stationId: station.id,
         track: dto.track,
         trackLayout: dto.trackLayout,
         cars: dto.cars,

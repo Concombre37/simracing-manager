@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.11 — Logs previews et support DDS
+
+### Corrigé
+
+- Ajout de logs explicites dans l’agent quand les previews de voitures/circuits ne sont pas trouvées ou ne peuvent pas être compressées.
+- Tentative de conversion des previews `.dds` via ImageMagick (`magick convert`) pour les setups où Assetto Corsa utilise ce format.
+- Le backend accepte `stationId` comme UUID ou comme nom de station (`stationId`) lors de la création d’un serveur dédié.
+
 ## v2.2.10 — Robustesse config agent (AC_PATH, CM_PATH, SERVER_URL)
 
 ### Corrigé

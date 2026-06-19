@@ -1,5 +1,8 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import os from 'os';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { Logger } from 'pino';
 import { createJimp } from '@jimp/core';
 import resize from '@jimp/plugin-resize';
@@ -7,6 +10,8 @@ import jpeg from '@jimp/js-jpeg';
 import png from '@jimp/js-png';
 import { config } from './config';
 import { ContentCache, maxMtime } from './contentCache';
+
+const execFileAsync = promisify(execFile);
 
 const Jimp = createJimp({ plugins: [resize as any], formats: [jpeg, png] });
 
@@ -46,76 +51,125 @@ const PREVIEW_JPEG_QUALITY = 65;
 
 async function compressImageBuffer(
   buffer: Buffer,
+  logger: Logger,
+  filePath: string,
 ): Promise<{ mime: string; data: string } | undefined> {
   try {
-    const image = await Jimp.read(buffer);
+    const image = await Jimp.read(buffer as any);
     image.scaleToFit({ w: PREVIEW_MAX_DIMENSION, h: PREVIEW_MAX_DIMENSION });
     const compressed = await image.getBuffer('image/jpeg', { quality: PREVIEW_JPEG_QUALITY });
     return { mime: 'image/jpeg', data: compressed.toString('base64') };
-  } catch {
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err), filePath },
+      'Failed to compress preview image',
+    );
     return undefined;
   }
 }
 
-async function readImageAsBase64(filePath: string): Promise<string | undefined> {
+async function convertDdsToPng(ddsPath: string, logger: Logger): Promise<Buffer | undefined> {
+  if (process.platform !== 'win32') return undefined;
+  const tmpPng = path.join(os.tmpdir(), `simracing-preview-${Date.now()}.png`);
+  try {
+    await execFileAsync('magick', ['convert', ddsPath, tmpPng], { timeout: 10000 });
+    const buffer = await fs.readFile(tmpPng);
+    await fs.unlink(tmpPng).catch(() => {});
+    return Buffer.from(buffer);
+  } catch (err) {
+    logger.debug(
+      { err: err instanceof Error ? err.message : String(err), ddsPath },
+      'ImageMagick DDS conversion failed',
+    );
+    await fs.unlink(tmpPng).catch(() => {});
+    return undefined;
+  }
+}
+
+async function readImageAsBase64(filePath: string, logger: Logger): Promise<string | undefined> {
   try {
     await fs.access(filePath);
     const stat = await fs.stat(filePath);
     if (!stat.isFile()) return undefined;
 
-    const buffer = await fs.readFile(filePath);
     const ext = path.extname(filePath).toLowerCase();
+    let buffer: Buffer<ArrayBufferLike> = Buffer.from(await fs.readFile(filePath));
     const originalMime =
       ext === '.png' ? 'image/png' : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
 
-    const compressed = await compressImageBuffer(buffer);
+    if (ext === '.dds') {
+      const converted = await convertDdsToPng(filePath, logger);
+      if (!converted) {
+        logger.warn({ filePath }, 'DDS preview could not be converted to PNG');
+        return undefined;
+      }
+      buffer = converted;
+    }
+
+    const compressed = await compressImageBuffer(buffer, logger, filePath);
     if (compressed) {
       const dataUrl = `data:${compressed.mime};base64,${compressed.data}`;
       if (Buffer.byteLength(dataUrl, 'utf8') <= MAX_PREVIEW_BYTES) {
         return dataUrl;
       }
+      logger.warn(
+        { filePath, sizeBytes: Buffer.byteLength(dataUrl, 'utf8') },
+        'Compressed preview still exceeds size limit',
+      );
     }
 
     if (stat.size <= MAX_PREVIEW_BYTES) {
       return `data:${originalMime};base64,${buffer.toString('base64')}`;
     }
 
+    logger.warn(
+      { filePath, sizeBytes: stat.size },
+      'Preview file exceeds size limit and could not be compressed',
+    );
     return undefined;
-  } catch {
+  } catch (err) {
+    logger.debug(
+      { err: err instanceof Error ? err.message : String(err), filePath },
+      'Failed to read preview file',
+    );
     return undefined;
   }
 }
 
-async function findFirstImage(baseDir: string, names: string[]): Promise<string | undefined> {
+async function findFirstImage(
+  baseDir: string,
+  names: string[],
+  logger: Logger,
+): Promise<string | undefined> {
   for (const name of names) {
-    const preview = await readImageAsBase64(path.join(baseDir, name));
+    const preview = await readImageAsBase64(path.join(baseDir, name), logger);
     if (preview) return preview;
   }
   return undefined;
 }
 
-const PREVIEW_NAMES = ['preview.png', 'preview.jpg', 'preview.jpeg'];
+const PREVIEW_NAMES = ['preview.png', 'preview.jpg', 'preview.jpeg', 'preview.dds'];
 
 async function findCarPreview(
   logger: Logger,
   carDir: string,
   acId: string,
 ): Promise<string | undefined> {
-  const rootPreview = await findFirstImage(carDir, PREVIEW_NAMES);
+  const rootPreview = await findFirstImage(carDir, PREVIEW_NAMES, logger);
   if (rootPreview) return rootPreview;
 
   const skinsDir = path.join(carDir, 'skins');
   try {
     const skins = await fs.readdir(skinsDir);
     for (const skin of skins) {
-      const skinPreview = await findFirstImage(path.join(skinsDir, skin), PREVIEW_NAMES);
+      const skinPreview = await findFirstImage(path.join(skinsDir, skin), PREVIEW_NAMES, logger);
       if (skinPreview) return skinPreview;
     }
   } catch {
     // ignore
   }
 
-  logger.debug(
+  logger.warn(
     { acId, tried: [path.join(carDir, 'preview.*'), path.join(skinsDir, '*', 'preview.*')] },
     'No car preview found',
   );
@@ -128,18 +182,18 @@ async function findTrackPreview(
   layouts: string[],
   acId: string,
 ): Promise<string | undefined> {
-  const rootPreview = await findFirstImage(trackDir, PREVIEW_NAMES);
+  const rootPreview = await findFirstImage(trackDir, PREVIEW_NAMES, logger);
   if (rootPreview) return rootPreview;
 
-  const uiPreview = await findFirstImage(path.join(trackDir, 'ui'), PREVIEW_NAMES);
+  const uiPreview = await findFirstImage(path.join(trackDir, 'ui'), PREVIEW_NAMES, logger);
   if (uiPreview) return uiPreview;
 
   for (const layout of layouts) {
-    const layoutPreview = await findFirstImage(path.join(trackDir, layout), PREVIEW_NAMES);
+    const layoutPreview = await findFirstImage(path.join(trackDir, layout), PREVIEW_NAMES, logger);
     if (layoutPreview) return layoutPreview;
   }
 
-  logger.debug(
+  logger.warn(
     {
       acId,
       tried: [

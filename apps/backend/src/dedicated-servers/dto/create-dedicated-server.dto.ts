@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const createDedicatedServerSchema = z.object({
   name: z.string().min(1).max(128),
-  stationId: z.string().uuid(),
+  stationId: z.string().min(1),
   track: z.string().min(1),
   trackLayout: z.string().optional(),
   cars: z.array(z.string()).min(1),
