@@ -40,9 +40,9 @@ async function readJsonSafe<T>(filePath: string): Promise<T | undefined> {
   }
 }
 
-const MAX_PREVIEW_BYTES = 500 * 1024;
-const PREVIEW_MAX_DIMENSION = 512;
-const PREVIEW_JPEG_QUALITY = 85;
+const MAX_PREVIEW_BYTES = 25 * 1024;
+const PREVIEW_MAX_DIMENSION = 192;
+const PREVIEW_JPEG_QUALITY = 65;
 
 async function compressImageBuffer(
   buffer: Buffer,

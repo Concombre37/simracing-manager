@@ -191,8 +191,9 @@ export class StationsService {
     const result: Record<string, unknown> = { ...content };
 
     const cars = Array.isArray(content.cars) ? [...content.cars] : [];
-    result.cars = await Promise.all(
-      cars.map(async (car: Record<string, unknown>) => {
+    result.cars = await this.processInBatches(
+      cars,
+      async (car: Record<string, unknown>) => {
         const previewUrl = await this.upsertPreview(
           stationDbId,
           'car',
@@ -201,12 +202,14 @@ export class StationsService {
           car.preview,
         );
         return { ...car, preview: previewUrl };
-      }),
+      },
+      25,
     );
 
     const tracks = Array.isArray(content.tracks) ? [...content.tracks] : [];
-    result.tracks = await Promise.all(
-      tracks.map(async (track: Record<string, unknown>) => {
+    result.tracks = await this.processInBatches(
+      tracks,
+      async (track: Record<string, unknown>) => {
         const previewUrl = await this.upsertPreview(
           stationDbId,
           'track',
@@ -215,10 +218,25 @@ export class StationsService {
           track.preview,
         );
         return { ...track, preview: previewUrl };
-      }),
+      },
+      25,
     );
 
     return result;
+  }
+
+  private async processInBatches<T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    batchSize: number,
+  ): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const batchResults = await Promise.all(batch.map(processor));
+      results.push(...batchResults);
+    }
+    return results;
   }
 
   private async upsertPreview(

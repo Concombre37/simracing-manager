@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.8 — Fix content sync 401 et réduction taille previews
+
+### Corrigé
+
+- L’endpoint `GET /api/content/catalog` accepte maintenant la clé API de station (via `AdminOrStationAuthGuard`), corrigeant l’erreur 401 lors du content sync.
+- Réduction drastique de la taille des previews envoyées par l’agent : 25 Ko max, 192×192, qualité JPEG 65.
+- Invalidation du cache agent (version 5) pour forcer la recompression des previews.
+- Log de la taille du payload `agent:content` avant envoi.
+- Traitement des previews par batch de 25 côté backend pour éviter la saturation de la DB.
+
 ## v2.2.7 — Fix auth post-provision et diagnostic WoL Ethernet
 
 ### Corrigé

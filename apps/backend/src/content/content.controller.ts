@@ -16,6 +16,7 @@ import {
 } from './dto/create-content-package.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { AdminOrStationAuthGuard } from '../auth/guards/admin-or-station-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -35,11 +36,13 @@ export class ContentController {
   }
 
   @Get('catalog')
+  @UseGuards(AdminOrStationAuthGuard)
   getCatalog() {
     return this.contentService.getCatalog();
   }
 
   @Get('packages/:id/download')
+  @UseGuards(AdminOrStationAuthGuard)
   async download(@Param('id') id: string, @Res() res: Response) {
     const pkg = await this.contentService.findById(id);
     if (!pkg) {

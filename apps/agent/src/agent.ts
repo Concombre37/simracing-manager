@@ -419,14 +419,23 @@ export class SimRacingAgent {
         this.logger.warn('Socket not connected, cannot send content');
         return;
       }
+      const payload = JSON.stringify({
+        stationId: config.STATION_ID,
+        content: content as unknown as Record<string, unknown>,
+      });
+      const payloadSizeMb = Buffer.byteLength(payload, 'utf8') / (1024 * 1024);
+      this.logger.info(
+        {
+          cars: content.cars.length,
+          tracks: content.tracks.length,
+          payloadSizeMb: payloadSizeMb.toFixed(2),
+        },
+        'Sending content to backend',
+      );
       this.socket.emit('agent:content', {
         stationId: config.STATION_ID,
         content: content as unknown as Record<string, unknown>,
       });
-      this.logger.info(
-        { cars: content.cars.length, tracks: content.tracks.length },
-        'Content sent to backend',
-      );
     } catch (err) {
       this.logger.error({ err }, 'Failed to send content');
     }
