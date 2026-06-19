@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.12 — Durée d’envoi des PODs sur un serveur
+
+### Ajouté
+
+- Dans le modal **Envoyer les POD**, choix d’une durée : 15, 30, 45, 60 minutes ou illimité.
+- À l’expiration de la durée, l’agent envoie une commande `quit` à Assetto Corsa puis affiche l’écran d’attente (blanking).
+- Le backend transmet `durationMinutes` dans la commande `server:join`.
+
 ## v2.2.11 — Logs previews et support DDS
 
 ### Corrigé

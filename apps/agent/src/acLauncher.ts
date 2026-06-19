@@ -16,6 +16,7 @@ export interface JoinServerConfig {
   track: string;
   trackLayout?: string;
   serverName?: string;
+  durationMinutes?: number;
 }
 
 export class AcLauncher {
@@ -102,6 +103,11 @@ export class AcLauncher {
       spawn('taskkill', ['/F', '/IM', 'acs.exe'], { stdio: 'ignore' });
       spawn('taskkill', ['/F', '/IM', 'ContentManager.exe'], { stdio: 'ignore' });
     }
+  }
+
+  async quit(): Promise<void> {
+    this.logger.info('Sending quit command to Assetto Corsa');
+    await this.luaBridge.quit();
   }
 
   private getDocumentsPath(): string {

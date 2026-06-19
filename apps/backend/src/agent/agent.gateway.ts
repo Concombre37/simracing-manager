@@ -337,6 +337,7 @@ export class AgentGateway
       track: string;
       trackLayout?: string;
       serverName?: string;
+      durationMinutes?: number;
     },
   ): Promise<void> {
     const room = `station:${stationId}`;

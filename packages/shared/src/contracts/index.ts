@@ -42,6 +42,7 @@ export interface ServerToAgentEvents {
     track: string;
     trackLayout?: string;
     serverName?: string;
+    durationMinutes?: number;
   }) => void;
   'server:launch': (payload: LaunchDedicatedServerPayload) => void;
   'server:stop': (payload: { serverId: string }) => void;

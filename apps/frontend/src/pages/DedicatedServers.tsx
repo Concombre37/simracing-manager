@@ -228,10 +228,15 @@ export function DedicatedServers() {
           server={joiningServer}
           stations={stations}
           onClose={() => setJoiningServer(null)}
-          onJoin={async (stationIds, carAcId) => {
+          onJoin={async (stationIds, carAcId, durationMinutes) => {
             // eslint-disable-next-line no-console
-            console.log('[POD] sending join', { serverId: joiningServer.id, stationIds, carAcId });
-            await dedicatedServersApi.join(joiningServer.id, stationIds, carAcId);
+            console.log('[POD] sending join', {
+              serverId: joiningServer.id,
+              stationIds,
+              carAcId,
+              durationMinutes,
+            });
+            await dedicatedServersApi.join(joiningServer.id, stationIds, carAcId, durationMinutes);
             setJoiningServer(null);
           }}
         />
@@ -337,15 +342,24 @@ interface JoinServerModalProps {
   server: DedicatedServer;
   stations: Station[];
   onClose: () => void;
-  onJoin: (stationIds: string[], carAcId: string) => void;
+  onJoin: (stationIds: string[], carAcId: string, durationMinutes?: number) => void;
 }
 
 function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [carAcId, setCarAcId] = useState<string>(server.cars[0] ?? '');
+  const [durationMinutes, setDurationMinutes] = useState<number | undefined>(undefined);
   const [joined, setJoined] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const durationOptions = [
+    { value: undefined, label: 'Illimité' },
+    { value: 15, label: '15 min' },
+    { value: 30, label: '30 min' },
+    { value: 45, label: '45 min' },
+    { value: 60, label: '60 min' },
+  ];
 
   const onlineStations = stations.filter(
     (s) => s.id !== server.stationId && (s.status === 'online' || s.status === 'in_game'),
@@ -365,7 +379,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
     setIsJoining(true);
     setError(null);
     try {
-      await onJoin(selectedIds, carAcId);
+      await onJoin(selectedIds, carAcId, durationMinutes);
       setJoined(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Échec de l’envoi des POD');
@@ -439,6 +453,25 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
                   </button>
                 );
               })}
+            </div>
+          </div>
+          <div>
+            <Label>Durée sur le serveur</Label>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {durationOptions.map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  onClick={() => setDurationMinutes(option.value)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    durationMinutes === option.value
+                      ? 'bg-accent-orange text-dark-900 shadow-lg shadow-accent-orange/30'
+                      : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
           </div>
           <div className="max-h-64 overflow-y-auto space-y-2">

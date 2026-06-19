@@ -47,6 +47,7 @@ export class SimRacingAgent {
   private apiKey: string | undefined = config.API_KEY;
   private isProvisioning = false;
   private lastContentHash = '';
+  private joinTimeout: NodeJS.Timeout | null = null;
   private acLauncher: AcLauncher;
   private luaBridge: LuaBridge;
   private contentSync: ContentSync;
@@ -568,14 +569,41 @@ export class SimRacingAgent {
     track: string;
     trackLayout?: string;
     serverName?: string;
+    durationMinutes?: number;
   }): Promise<void> {
     this.logger.info(payload, 'Received join server command');
+    if (this.joinTimeout) {
+      clearTimeout(this.joinTimeout);
+      this.joinTimeout = null;
+    }
     try {
       await this.acLauncher.joinServer(payload);
       this.acRunning = true;
       this.logger.info('Join server command completed');
+      if (payload.durationMinutes && payload.durationMinutes > 0) {
+        const ms = payload.durationMinutes * 60 * 1000;
+        this.logger.info(
+          { durationMinutes: payload.durationMinutes, ms },
+          'Scheduled auto-return after duration',
+        );
+        this.joinTimeout = setTimeout(() => {
+          void this.returnToPaddockAfterDuration();
+        }, ms);
+      }
     } catch (err) {
       this.logger.error({ err }, 'Failed to execute join server command');
+    }
+  }
+
+  private async returnToPaddockAfterDuration(): Promise<void> {
+    this.logger.info('Duration expired, returning POD to paddock');
+    try {
+      await this.acLauncher.quit();
+      this.acRunning = false;
+      this.blankingManager.show();
+      this.logger.info('POD returned to paddock (blanking shown)');
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to return POD to paddock');
     }
   }
 

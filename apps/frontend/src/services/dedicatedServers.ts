@@ -70,6 +70,8 @@ export const dedicatedServersApi = {
   remove: (id: string) =>
     api.delete<DedicatedServer>(`/dedicated-servers/${id}`).then((res) => res.data),
   stop: (id: string) => api.post(`/dedicated-servers/${id}/stop`).then((res) => res.data),
-  join: (id: string, stationIds: string[], carAcId: string) =>
-    api.post(`/dedicated-servers/${id}/join`, { stationIds, carAcId }).then((res) => res.data),
+  join: (id: string, stationIds: string[], carAcId: string, durationMinutes?: number) =>
+    api
+      .post(`/dedicated-servers/${id}/join`, { stationIds, carAcId, durationMinutes })
+      .then((res) => res.data),
 };

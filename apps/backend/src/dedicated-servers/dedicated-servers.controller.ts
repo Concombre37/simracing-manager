@@ -127,6 +127,7 @@ export class DedicatedServersController {
         track: server.track,
         trackLayout: server.trackLayout ?? undefined,
         serverName: server.name,
+        durationMinutes: dto.durationMinutes,
       });
     }
     return { success: true };
