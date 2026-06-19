@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.5 — Fix diagnostic WoL et sync blanking media
+
+### Corrigé
+
+- Le diagnostic Wake-on-LAN est maintenant exécuté après l’auto-provisionnement, pas seulement au démarrage avec une clé existante.
+- Ajout d’un log explicite au démarrage du diagnostic WoL.
+- Correction de la synchronisation des médias d’attente juste après le provisionnement : l’agent utilise la clé API reçue au lieu de `config.API_KEY` encore vide.
+
 ## v2.2.4 — Diagnostic et amélioration Wake-on-LAN
 
 ### Ajouté

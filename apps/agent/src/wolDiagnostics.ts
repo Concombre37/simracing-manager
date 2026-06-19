@@ -22,6 +22,7 @@ export interface NetworkAdapterWolCheck {
 }
 
 export async function runWolDiagnostics(logger: Logger): Promise<WolDiagnosticsResult> {
+  logger.info('Running Wake-on-LAN diagnostics...');
   const result: WolDiagnosticsResult = {
     fastStartupEnabled: null,
     adapters: [],

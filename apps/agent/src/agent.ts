@@ -108,7 +108,6 @@ export class SimRacingAgent {
       return;
     }
 
-    await this.runStartupDiagnostics();
     await this.connectWithApiKey(this.apiKey);
   }
 
@@ -237,12 +236,13 @@ export class SimRacingAgent {
         { stationId: config.STATION_ID, socketId: this.socket?.id },
         'Connected to backend',
       );
+      void this.runStartupDiagnostics();
       void this.writeStationConfig();
       this.startTelemetry();
       this.startHeartbeat();
       void this.sendContent();
       this.startContentSync();
-      void this.blankingMediaSync.sync(config.STATION_ID);
+      void this.blankingMediaSync.sync(config.STATION_ID, this.apiKey);
     });
 
     this.socket.on('connect_error', (err) => {
@@ -498,7 +498,7 @@ export class SimRacingAgent {
   private async handleBlankingMediaUpdated(): Promise<void> {
     this.logger.info('Received blanking media updated command');
     try {
-      await this.blankingMediaSync.sync(config.STATION_ID);
+      await this.blankingMediaSync.sync(config.STATION_ID, this.apiKey);
     } catch (err) {
       this.logger.error({ err }, 'Blanking media sync failed');
     }

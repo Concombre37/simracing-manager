@@ -14,12 +14,18 @@ export class BlankingMediaSync {
     private readonly blankingManager: BlankingManager,
   ) {}
 
-  async sync(stationId: string): Promise<void> {
+  async sync(stationId: string, apiKey?: string): Promise<void> {
     try {
+      const token = apiKey ?? config.API_KEY;
+      if (!token) {
+        this.logger.warn('No API key available, skipping blanking media sync');
+        return;
+      }
+
       this.logger.info('Syncing blanking media');
       const { data: mediaList } = await axios.get<BlankingMediaFile[]>(
         `${config.SERVER_URL}/api/stations/${stationId}/blanking-media`,
-        { headers: { Authorization: `Bearer ${config.API_KEY}` } },
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       await fs.mkdir(MEDIA_DIR, { recursive: true });
@@ -35,7 +41,7 @@ export class BlankingMediaSync {
         keptPaths.push(localPath);
 
         if (!localFiles.has(`${media.id}${ext}`)) {
-          await this.downloadMedia(media, localPath);
+          await this.downloadMedia(media, localPath, token);
         }
       }
 
@@ -69,12 +75,16 @@ export class BlankingMediaSync {
     }
   }
 
-  private async downloadMedia(media: BlankingMediaFile, localPath: string): Promise<void> {
+  private async downloadMedia(
+    media: BlankingMediaFile,
+    localPath: string,
+    apiKey?: string,
+  ): Promise<void> {
     this.logger.info({ mediaId: media.id, filename: media.filename }, 'Downloading blanking media');
     const response = await axios.get(
       `${config.SERVER_URL}/api/blanking-media/${media.id}/download`,
       {
-        headers: { Authorization: `Bearer ${config.API_KEY}` },
+        headers: { Authorization: `Bearer ${apiKey ?? config.API_KEY}` },
         responseType: 'arraybuffer',
       },
     );
