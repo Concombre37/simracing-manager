@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.10 — Robustesse config agent (AC_PATH, CM_PATH, SERVER_URL)
+
+### Corrigé
+
+- L’agent expande maintenant les variables d’environnement Windows (`%USERNAME%`, etc.) dans `AC_PATH`, `CM_PATH` et `DOCUMENTS_PATH`.
+- Suppression automatique du slash final dans `SERVER_URL` pour éviter les doubles slashes (`https://simracing.hytlabs.com//api/...`).
+- Trim des chemins configurés pour éviter les espaces parasites.
+
 ## v2.2.9 — Fix auth content sync et debug AC_PATH
 
 ### Corrigé

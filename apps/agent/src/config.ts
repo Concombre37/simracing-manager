@@ -51,24 +51,44 @@ if (!existsSync(envPath)) {
 
 dotenv.config({ path: envPath });
 
+function normalizeUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  return url.replace(/\/$/, '');
+}
+
+function expandEnvVars(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  if (process.platform !== 'win32') return value;
+  return value.replace(/%([^%]+)%/g, (_, name) => process.env[name] ?? `%${name}%`);
+}
+
+function normalizePath(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  return expandEnvVars(value.trim());
+}
+
 const configSchema = z.object({
   VERSION: z.string().default(VERSION),
-  SERVER_URL: z.string().url().default('https://simracing.hytlabs.com'),
+  SERVER_URL: z
+    .string()
+    .url()
+    .transform((v) => normalizeUrl(v) ?? 'https://simracing.hytlabs.com')
+    .default('https://simracing.hytlabs.com'),
   STATION_ID: z.string().min(1).default(getComputerName()),
   STATION_NAME: z.string().min(1).default(getComputerName()),
   API_KEY: z.string().optional(),
   AC_PATH: z
     .string()
     .optional()
-    .transform((v) => (v === '' ? undefined : v)),
+    .transform((v) => normalizePath(v) ?? undefined),
   CM_PATH: z
     .string()
     .optional()
-    .transform((v) => (v === '' ? undefined : v)),
+    .transform((v) => normalizePath(v) ?? undefined),
   DOCUMENTS_PATH: z
     .string()
     .optional()
-    .transform((v) => (v === '' ? undefined : v)),
+    .transform((v) => normalizePath(v) ?? undefined),
   LAUNCH_MODE: z.nativeEnum(LaunchMode).default(LaunchMode.CONTENT_MANAGER),
   SCREEN_MODE: z.nativeEnum(ScreenMode).default(ScreenMode.SINGLE),
   ASSIST_PRESET: z.nativeEnum(AssistPreset).default(AssistPreset.PRO),
