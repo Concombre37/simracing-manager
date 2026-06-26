@@ -429,6 +429,8 @@ export class SimRacingAgent {
         {
           cars: content.cars.length,
           tracks: content.tracks.length,
+          carsWithPreview: content.cars.filter((c) => c.preview).length,
+          tracksWithPreview: content.tracks.filter((t) => t.preview).length,
           payloadSizeMb: payloadSizeMb.toFixed(2),
         },
         'Sending content to backend',

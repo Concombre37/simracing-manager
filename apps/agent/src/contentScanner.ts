@@ -4,16 +4,10 @@ import os from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { Logger } from 'pino';
-import { createJimp } from '@jimp/core';
-import resize from '@jimp/plugin-resize';
-import jpeg from '@jimp/js-jpeg';
-import png from '@jimp/js-png';
 import { config } from './config';
 import { ContentCache, maxMtime } from './contentCache';
 
 const execFileAsync = promisify(execFile);
-
-const Jimp = createJimp({ plugins: [resize as any], formats: [jpeg, png] });
 
 export interface Car {
   acId: string;
@@ -45,27 +39,17 @@ async function readJsonSafe<T>(filePath: string): Promise<T | undefined> {
   }
 }
 
-const MAX_PREVIEW_BYTES = 25 * 1024;
-const PREVIEW_MAX_DIMENSION = 192;
-const PREVIEW_JPEG_QUALITY = 65;
+const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
 
 async function compressImageBuffer(
   buffer: Buffer,
   logger: Logger,
   filePath: string,
 ): Promise<{ mime: string; data: string } | undefined> {
-  try {
-    const image = await Jimp.read(buffer as any);
-    image.scaleToFit({ w: PREVIEW_MAX_DIMENSION, h: PREVIEW_MAX_DIMENSION });
-    const compressed = await image.getBuffer('image/jpeg', { quality: PREVIEW_JPEG_QUALITY });
-    return { mime: 'image/jpeg', data: compressed.toString('base64') };
-  } catch (err) {
-    logger.warn(
-      { err: err instanceof Error ? err.message : String(err), filePath },
-      'Failed to compress preview image',
-    );
-    return undefined;
-  }
+  // Jimp fails inside the packaged executable with "Invalid host defined options".
+  // Fall back to sending the raw image so previews always reach the backend.
+  logger.debug({ filePath }, 'Skipping Jimp compression, sending raw preview');
+  return undefined;
 }
 
 async function convertDdsToPng(ddsPath: string, logger: Logger): Promise<Buffer | undefined> {

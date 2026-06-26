@@ -10,7 +10,7 @@ interface CachedTrack extends Track {
   updatedAt: number;
 }
 
-const CACHE_VERSION = 5;
+const CACHE_VERSION = 6;
 
 interface CacheData {
   version?: number;

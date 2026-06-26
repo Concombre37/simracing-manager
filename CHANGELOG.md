@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.2.13 — Envoi des previews sans compression
+
+### Corrigé
+
+- L’agent ne tente plus de compresser les previews avec Jimp (qui échouait dans l’exécutable `pkg` avec `Invalid host defined options`).
+- Les previews sont maintenant envoyées brutes en base64, jusqu’à 2 Mo par image.
+- Limite côté backend portée à 1 Go pour accepter les gros payloads `agent:content`.
+- Invalidation du cache agent (version 6) pour forcer un nouveau scan avec les previews brutes.
+- Log du nombre de `carsWithPreview` / `tracksWithPreview` lors de l’envoi du contenu.
+- Suppression des dépendances `@jimp/*` de l’agent.
+
 ## v2.2.12 — Durée d’envoi des PODs sur un serveur
 
 ### Ajouté
