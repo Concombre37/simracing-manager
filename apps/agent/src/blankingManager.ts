@@ -7,6 +7,23 @@ import { TelemetrySnapshot } from '@simracing/shared';
 
 export type BlankingOverride = 'auto' | 'hide' | 'show';
 
+interface SessionResultsSummary {
+  clientName?: string;
+  carAcId?: string;
+  track?: string;
+  trackLayout?: string;
+  bestLapMs?: number;
+}
+
+function formatLapTime(ms: number): string {
+  if (!ms || ms <= 0) return '-';
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const millis = ms % 1000;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
+}
+
 interface PlaylistItem {
   path: string;
   type: 'image' | 'video';
@@ -24,6 +41,7 @@ export class BlankingManager {
   private playlistPath: string | null = null;
   private mediaPaths: string[] = [];
   private slideIntervalMs = 10000;
+  private resultsHtmlPath: string | null = null;
 
   constructor(private readonly logger: Logger) {}
 
@@ -67,6 +85,7 @@ export class BlankingManager {
   hide(): void {
     this.logger.info('Blanking override: hide');
     this.override = 'hide';
+    this.clearResults();
     this.evaluate();
   }
 
@@ -79,6 +98,7 @@ export class BlankingManager {
   setAuto(): void {
     this.logger.info('Blanking override: auto');
     this.override = 'auto';
+    this.clearResults();
     this.evaluate();
   }
 
@@ -101,6 +121,99 @@ export class BlankingManager {
 
   isBlankingActive(): boolean {
     return this.process !== null && !this.process.killed;
+  }
+
+  showResults(summary: SessionResultsSummary): void {
+    this.logger.info(summary, 'Showing session results');
+    this.generateResultsHtml(summary);
+    this.override = 'show';
+    this.evaluate();
+  }
+
+  clearResults(): void {
+    this.resultsHtmlPath = null;
+  }
+
+  private generateResultsHtml(summary: SessionResultsSummary): void {
+    const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
+    const htmlPath = path.join(tmpDir, 'session-results.html');
+    const bestLap = formatLapTime(summary.bestLapMs ?? 0);
+    const trackDisplay = summary.trackLayout
+      ? `${summary.track} (${summary.trackLayout})`
+      : (summary.track ?? '-');
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Session terminée</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+    body {
+      background: radial-gradient(circle at center, #111 0%, #000 100%);
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    h1 {
+      font-size: clamp(32px, 5vw, 96px);
+      margin: 0 0 0.6em;
+      color: #00d4ff;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: clamp(16px, 3vw, 48px);
+      width: min(90%, 1200px);
+    }
+    .item { background: rgba(255,255,255,0.06); border-radius: 16px; padding: clamp(16px, 2vw, 32px); }
+    .label { color: #888; font-size: clamp(12px, 1.4vw, 20px); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4em; }
+    .value { font-size: clamp(20px, 2.6vw, 48px); font-weight: 600; }
+    .best-lap .value { color: #00d4ff; }
+  </style>
+</head>
+<body>
+  <h1>Session terminée</h1>
+  <div class="grid">
+    <div class="item">
+      <div class="label">Pilote</div>
+      <div class="value">${this.escapeHtml(summary.clientName ?? '-')}</div>
+    </div>
+    <div class="item">
+      <div class="label">Voiture</div>
+      <div class="value">${this.escapeHtml(summary.carAcId ?? '-')}</div>
+    </div>
+    <div class="item">
+      <div class="label">Circuit</div>
+      <div class="value">${this.escapeHtml(trackDisplay)}</div>
+    </div>
+    <div class="item best-lap">
+      <div class="label">Meilleur tour</div>
+      <div class="value">${bestLap}</div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    writeFileSync(htmlPath, html, 'utf-8');
+    this.resultsHtmlPath = htmlPath;
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   private isDriving(snapshot: TelemetrySnapshot): boolean {
@@ -174,6 +287,10 @@ export class BlankingManager {
       '-SlideIntervalMs',
       String(this.slideIntervalMs),
     ];
+
+    if (this.resultsHtmlPath) {
+      args.push('-ResultsHtmlPath', this.resultsHtmlPath);
+    }
 
     this.process = spawn('powershell.exe', args, {
       detached: false,

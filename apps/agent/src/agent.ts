@@ -53,6 +53,11 @@ export class SimRacingAgent {
     durationMinutes: number;
     startedAt: number;
     timeout: NodeJS.Timeout | null;
+    clientName?: string;
+    carAcId?: string;
+    track?: string;
+    trackLayout?: string;
+    bestLapMs?: number;
   } | null = null;
   private acLauncher: AcLauncher;
   private luaBridge: LuaBridge;
@@ -91,7 +96,19 @@ export class SimRacingAgent {
       message: `Telemetry received: speed=${Math.round(snapshot.speedKmh)} km/h, rpm=${Math.round(snapshot.rpm)}`,
       timestamp: Date.now(),
     });
+    this.trackBestLap(snapshot);
     this.blankingManager.onTelemetry(snapshot);
+  }
+
+  private trackBestLap(snapshot: TelemetrySnapshot): void {
+    if (!this.currentSession || snapshot.sessionId !== this.currentSession.sessionId) return;
+    if (typeof snapshot.bestLapMs === 'number' && snapshot.bestLapMs > 0) {
+      const current = this.currentSession.bestLapMs;
+      if (!current || snapshot.bestLapMs < current) {
+        this.currentSession.bestLapMs = snapshot.bestLapMs;
+        this.logger.debug({ bestLapMs: snapshot.bestLapMs }, 'New best lap recorded');
+      }
+    }
   }
 
   private sendLog(
@@ -504,6 +521,7 @@ export class SimRacingAgent {
     await this.acLauncher.stop();
     this.acRunning = false;
     this.clearCurrentSession();
+    this.blankingManager.clearResults();
     this.socket?.emit('agent:status', {
       stationId: config.STATION_ID,
       status: StationStatus.ONLINE,
@@ -528,6 +546,11 @@ export class SimRacingAgent {
     }
     const newDuration = Math.max(0, this.currentSession.durationMinutes + payload.minutes);
     this.currentSession.durationMinutes = newDuration;
+    if (newDuration === 0) {
+      this.logger.info('Session duration reduced to zero, ending immediately');
+      void this.returnToPaddockAfterDuration();
+      return;
+    }
     this.scheduleSessionEnd();
   }
 
@@ -676,6 +699,10 @@ export class SimRacingAgent {
           durationMinutes: payload.durationMinutes,
           startedAt: Date.now(),
           timeout: null,
+          clientName: payload.clientName,
+          carAcId: payload.carAcId,
+          track: payload.track,
+          trackLayout: payload.trackLayout,
         };
         this.scheduleSessionEnd();
       }
@@ -686,18 +713,26 @@ export class SimRacingAgent {
 
   private async returnToPaddockAfterDuration(): Promise<void> {
     this.logger.info('Duration expired, returning POD to paddock');
-    const sessionId = this.currentSession?.sessionId;
+    const session = this.currentSession;
     this.clearCurrentSession();
     try {
       await this.acLauncher.quit();
       this.acRunning = false;
-      this.blankingManager.show();
       this.socket?.emit('agent:status', {
         stationId: config.STATION_ID,
         status: StationStatus.ONLINE,
       });
-      if (sessionId) {
-        this.socket?.emit('agent:session:ended', { sessionId });
+      if (session) {
+        this.blankingManager.showResults({
+          clientName: session.clientName,
+          carAcId: session.carAcId,
+          track: session.track,
+          trackLayout: session.trackLayout,
+          bestLapMs: session.bestLapMs,
+        });
+        this.socket?.emit('agent:session:ended', { sessionId: session.sessionId });
+      } else {
+        this.blankingManager.show();
       }
       this.logger.info('POD returned to paddock (blanking shown)');
     } catch (err) {

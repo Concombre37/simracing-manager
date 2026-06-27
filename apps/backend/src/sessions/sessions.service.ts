@@ -80,12 +80,18 @@ export class SessionsService {
   }
 
   async extend(sessionId: string, minutes: number) {
-    const session = await this.findOne(sessionId);
-    const currentDuration = session.durationMinutes ?? 0;
-    const newDuration = Math.max(0, currentDuration + minutes);
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { station: true },
+    });
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+    const newDuration = Math.max(0, (session.durationMinutes ?? 0) + minutes);
     return this.prisma.session.update({
       where: { id: sessionId },
       data: { durationMinutes: newDuration },
+      include: { station: true },
     });
   }
 

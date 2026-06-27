@@ -56,6 +56,10 @@ export class SessionsController {
     @Body('minutes', ParseIntPipe) minutes: number,
   ) {
     const session = await this.sessionsService.extend(id, minutes);
+    await this.agentGateway.emitSessionExtend(session.station.stationId, {
+      sessionId: session.id,
+      minutes,
+    });
     this.dashboardGateway.server.emit('session:updated', {
       sessionId: session.id,
       stationId: session.stationId,

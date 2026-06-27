@@ -449,4 +449,11 @@ export class AgentGateway
   async emitStopSession(stationId: string): Promise<void> {
     this.server.to(`station:${stationId}`).emit('session:stop');
   }
+
+  async emitSessionExtend(
+    stationId: string,
+    payload: { sessionId: string; minutes: number },
+  ): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('session:extend', payload);
+  }
 }

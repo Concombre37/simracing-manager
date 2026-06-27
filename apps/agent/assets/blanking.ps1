@@ -1,7 +1,8 @@
 param(
   [string]$PlaylistPath = '',
   [int]$SlideIntervalMs = 10000,
-  [string]$Message = 'SimRacing Manager'
+  [string]$Message = 'SimRacing Manager',
+  [string]$ResultsHtmlPath = ''
 )
 
 Add-Type -AssemblyName PresentationFramework
@@ -55,7 +56,15 @@ $imagePlayer.Stretch = 'UniformToFill'
 $imagePlayer.Visibility = 'Collapsed'
 [void]$grid.Children.Add($imagePlayer)
 
-if ($items.Count -eq 0 -and $Message -and $Message -ne '') {
+$webBrowser = $null
+if ($ResultsHtmlPath -and (Test-Path $ResultsHtmlPath)) {
+  $webBrowser = New-Object System.Windows.Controls.WebBrowser
+  $webBrowser.HorizontalAlignment = 'Stretch'
+  $webBrowser.VerticalAlignment = 'Stretch'
+  [void]$grid.Children.Add($webBrowser)
+}
+
+if (-not $webBrowser -and $items.Count -eq 0 -and $Message -and $Message -ne '') {
   $label = New-Object System.Windows.Controls.Label
   $label.Content = $Message
   $label.Foreground = 'Gray'
@@ -134,7 +143,9 @@ $videoPlayer.Add_MediaEnded({
 $window.Add_Loaded({
   $this.Topmost = $true
   $this.Activate() | Out-Null
-  if ($items.Count -gt 0) {
+  if ($webBrowser -ne $null) {
+    $webBrowser.Navigate([System.Uri]::new($ResultsHtmlPath))
+  } elseif ($items.Count -gt 0) {
     Show-CurrentSlide -SkipAnimation
   }
 })
