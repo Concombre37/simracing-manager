@@ -223,9 +223,18 @@ export class AgentGateway
 
   @SubscribeMessage('agent:telemetry')
   async handleTelemetry(
-    _client: AuthenticatedSocket,
+    client: AuthenticatedSocket,
     payload: TelemetrySnapshot,
   ): Promise<void> {
+    this.logger.log(
+      {
+        stationId: payload.stationId,
+        socketStationId: client.stationId,
+        speedKmh: payload.speedKmh,
+        timestamp: payload.timestamp,
+      },
+      'Telemetry snapshot received',
+    );
     this.telemetryService.update(payload);
     this.dashboardGateway.emitStationTelemetry(payload);
   }

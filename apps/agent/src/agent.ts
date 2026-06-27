@@ -81,7 +81,31 @@ export class SimRacingAgent {
   }
 
   private onTelemetrySnapshot(snapshot: TelemetrySnapshot): void {
+    this.logger.debug(
+      { stationId: snapshot.stationId, speedKmh: snapshot.speedKmh },
+      'Local telemetry snapshot received',
+    );
+    this.socket?.emit('agent:log', {
+      stationId: config.STATION_ID,
+      level: 'debug',
+      message: `Telemetry received: speed=${Math.round(snapshot.speedKmh)} km/h, rpm=${Math.round(snapshot.rpm)}`,
+      timestamp: Date.now(),
+    });
     this.blankingManager.onTelemetry(snapshot);
+  }
+
+  private sendLog(
+    level: 'info' | 'warn' | 'error' | 'debug',
+    message: string,
+    meta?: Record<string, unknown>,
+  ): void {
+    this.socket?.emit('agent:log', {
+      stationId: config.STATION_ID,
+      level,
+      message,
+      meta,
+      timestamp: Date.now(),
+    });
   }
 
   private startTelemetry(): void {
@@ -393,10 +417,18 @@ export class SimRacingAgent {
         path.join(process.env.USERPROFILE ?? '', 'Documents', 'Assetto Corsa');
       const dir = path.join(documentsPath, 'cfg', 'SimCenterManager');
       await fs.mkdir(dir, { recursive: true });
-      await fs.writeFile(path.join(dir, 'station.txt'), config.STATION_ID, 'utf-8');
-      this.logger.debug({ stationId: config.STATION_ID }, 'Wrote station config for Lua telemetry');
+      const stationFile = path.join(dir, 'station.txt');
+      await fs.writeFile(stationFile, config.STATION_ID, 'utf-8');
+      this.logger.info(
+        { stationFile, stationId: config.STATION_ID },
+        'Wrote station config for Lua telemetry',
+      );
+      this.sendLog('info', 'Station config written', { stationFile, stationId: config.STATION_ID });
     } catch (err) {
       this.logger.warn({ err }, 'Failed to write station config for Lua telemetry');
+      this.sendLog('warn', 'Failed to write station config', {
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

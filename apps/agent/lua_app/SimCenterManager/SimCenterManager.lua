@@ -146,7 +146,10 @@ end
 
 local function sendTelemetry(sim, car)
   local stationId = readStationId()
-  if not stationId then return end
+  if not stationId then
+    ac.log("[SimCenterManager] Cannot send telemetry: stationId not found in " .. stationFile)
+    return
+  end
   if not ensureTelemetryUdp() then return end
 
   local pos = car.position or { x = 0, y = 0, z = 0 }

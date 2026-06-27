@@ -467,9 +467,15 @@ export class AcLauncher {
   }
 
   async ensureLuaAppInstalled(): Promise<void> {
-    if (process.platform !== 'win32') return;
+    if (process.platform !== 'win32') {
+      this.logger.debug('Lua app install skipped: not Windows');
+      return;
+    }
     const acPath = config.AC_PATH;
-    if (!acPath) return;
+    if (!acPath) {
+      this.logger.warn('Lua app install skipped: AC_PATH not set');
+      return;
+    }
 
     const targetDir = path.join(acPath, 'apps', 'lua', 'SimCenterManager');
     const files = [
@@ -489,12 +495,16 @@ export class AcLauncher {
         try {
           const content = await fs.readFile(src, 'utf-8');
           await fs.writeFile(dest, content, 'utf-8');
-          this.logger.debug({ src, dest }, 'Lua app file copied');
+          this.logger.info({ src, dest }, 'Lua app file copied');
         } catch (readErr) {
           this.logger.warn({ src, err: readErr }, 'Lua app source not readable from snapshot');
         }
       }
-      this.logger.info({ targetDir }, 'Lua app installed');
+      const manifestPath = path.join(targetDir, 'manifest.ini');
+      const luaPath = path.join(targetDir, 'SimCenterManager.lua');
+      const manifestExists = await this.pathExists(manifestPath);
+      const luaExists = await this.pathExists(luaPath);
+      this.logger.info({ targetDir, manifestExists, luaExists }, 'Lua app install completed');
     } catch (err) {
       this.logger.warn({ err }, 'Failed to install Lua app');
     }
