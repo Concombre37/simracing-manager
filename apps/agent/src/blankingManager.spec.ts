@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
 import { readFileSync } from 'fs';
+import os from 'os';
+import path from 'path';
 import { BlankingManager } from './blankingManager';
 import type { TelemetrySnapshot } from '@simracing/shared';
 
@@ -82,9 +84,12 @@ describe('BlankingManager', () => {
   beforeEach(() => {
     vi.mocked(spawn).mockReturnValue(createFakeProcess() as never);
     manager = new BlankingManager(mockLogger);
-    (manager as unknown as { scriptPath: string }).scriptPath = 'C:\\temp\\blanking.ps1';
-    (manager as unknown as { playlistPath: string }).playlistPath =
-      'C:\\temp\\blanking-playlist.json';
+    const tmpDir = os.tmpdir();
+    (manager as unknown as { scriptPath: string }).scriptPath = path.join(tmpDir, 'blanking.ps1');
+    (manager as unknown as { playlistPath: string }).playlistPath = path.join(
+      tmpDir,
+      'blanking-playlist.json',
+    );
   });
 
   afterEach(() => {

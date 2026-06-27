@@ -9,7 +9,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/**/*.ts",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
     "typescript": "^5.4.5",
