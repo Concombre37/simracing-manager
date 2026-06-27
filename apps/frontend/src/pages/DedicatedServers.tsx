@@ -27,7 +27,14 @@ import {
   Square,
   Car,
   MapPin,
+  User,
+  Zap,
 } from 'lucide-react';
+const DIFFICULTY_OPTIONS = {
+  EASY: 'EASY' as const,
+  PRO: 'PRO' as const,
+  CUSTOM: 'CUSTOM' as const,
+};
 
 export function DedicatedServers() {
   const queryClient = useQueryClient();
@@ -228,15 +235,14 @@ export function DedicatedServers() {
           server={joiningServer}
           stations={stations}
           onClose={() => setJoiningServer(null)}
-          onJoin={async (stationIds, carAcId, durationMinutes) => {
+          onJoin={async (pods, durationMinutes) => {
             // eslint-disable-next-line no-console
             console.log('[POD] sending join', {
               serverId: joiningServer.id,
-              stationIds,
-              carAcId,
+              pods,
               durationMinutes,
             });
-            await dedicatedServersApi.join(joiningServer.id, stationIds, carAcId, durationMinutes);
+            await dedicatedServersApi.join(joiningServer.id, pods, durationMinutes);
             setJoiningServer(null);
           }}
         />
@@ -338,16 +344,25 @@ function ServerFormModal({ title, server, onClose, onSubmit, isSubmitting }: Ser
   );
 }
 
+interface JoinPodConfig {
+  stationId: string;
+  carAcId: string;
+  clientName: string;
+  difficulty: 'EASY' | 'PRO' | 'CUSTOM';
+  selected: boolean;
+}
+
 interface JoinServerModalProps {
   server: DedicatedServer;
   stations: Station[];
   onClose: () => void;
-  onJoin: (stationIds: string[], carAcId: string, durationMinutes?: number) => void;
+  onJoin: (
+    pods: { stationId: string; carAcId: string; clientName?: string; difficulty?: string }[],
+    durationMinutes?: number,
+  ) => void;
 }
 
 function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalProps) {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [carAcId, setCarAcId] = useState<string>(server.cars[0] ?? '');
   const [durationMinutes, setDurationMinutes] = useState<number | undefined>(undefined);
   const [joined, setJoined] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
@@ -370,16 +385,47 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
     return new Map(cars.map((c) => [c.acId, c]));
   }, [server.station.content]);
 
-  const toggleStation = (id: string) => {
-    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  const [podConfigs, setPodConfigs] = useState<Record<string, JoinPodConfig>>(() => {
+    const initial: Record<string, JoinPodConfig> = {};
+    const defaultCar = server.cars[0] ?? '';
+    for (const station of onlineStations) {
+      initial[station.stationId] = {
+        stationId: station.stationId,
+        carAcId: defaultCar,
+        clientName: '',
+        difficulty: DIFFICULTY_OPTIONS.PRO,
+        selected: false,
+      };
+    }
+    return initial;
+  });
+
+  const updatePod = (stationId: string, patch: Partial<JoinPodConfig>) => {
+    setPodConfigs((prev) => ({
+      ...prev,
+      [stationId]: { ...prev[stationId], ...patch },
+    }));
   };
 
+  const selectedPods = useMemo(
+    () => Object.values(podConfigs).filter((p) => p.selected),
+    [podConfigs],
+  );
+
   async function handleJoin() {
-    if (!carAcId || selectedIds.length === 0) return;
+    if (selectedPods.length === 0) return;
     setIsJoining(true);
     setError(null);
     try {
-      await onJoin(selectedIds, carAcId, durationMinutes);
+      await onJoin(
+        selectedPods.map((p) => ({
+          stationId: p.stationId,
+          carAcId: p.carAcId,
+          clientName: p.clientName || undefined,
+          difficulty: p.difficulty,
+        })),
+        durationMinutes,
+      );
       setJoined(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Échec de l’envoi des POD');
@@ -389,7 +435,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
   }
 
   return (
-    <Modal title={`Envoyer les POD sur ${server.name}`} onClose={onClose} size="md">
+    <Modal title={`Envoyer les POD sur ${server.name}`} onClose={onClose} size="lg">
       {joined ? (
         <div className="text-center py-8">
           <div className="w-16 h-16 bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -397,7 +443,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
           </div>
           <h3 className="text-xl font-semibold text-white mb-2">Commande envoyée</h3>
           <p className="text-gray-400 mb-6">
-            {selectedIds.length} POD ont reçu l'ordre de rejoindre{' '}
+            {selectedPods.length} POD ont reçu l'ordre de rejoindre{' '}
             {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
           </p>
           <Button variant="primary" onClick={onClose} className="w-full">
@@ -405,56 +451,14 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-5">
           <p className="text-sm text-gray-400">
-            Sélectionne les stations à envoyer sur{' '}
+            Configure chaque POD à envoyer sur{' '}
             <span className="text-accent-orange font-mono">
               {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
             </span>
           </p>
-          <div>
-            <Label>Voiture à attribuer aux POD</Label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-h-56 overflow-y-auto p-1">
-              {server.cars.map((id) => {
-                const car = carMap.get(id);
-                const selected = carAcId === id;
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => setCarAcId(id)}
-                    className={`relative text-left rounded-lg border overflow-hidden transition hover:ring-1 hover:ring-accent-orange/50 ${
-                      selected
-                        ? 'border-accent-orange ring-1 ring-accent-orange'
-                        : 'border-dark-600 bg-dark-900'
-                    }`}
-                  >
-                    <div className="aspect-video bg-dark-800 flex items-center justify-center">
-                      {car?.preview ? (
-                        <img
-                          src={car.preview}
-                          alt={car?.name ?? id}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <Car className="w-8 h-8 text-gray-600" />
-                      )}
-                    </div>
-                    <div className="p-2">
-                      <p className="text-sm font-medium text-white truncate">{car?.name ?? id}</p>
-                      {car?.brand && <p className="text-xs text-gray-500 truncate">{car.brand}</p>}
-                    </div>
-                    {selected && (
-                      <div className="absolute top-2 right-2 bg-accent-orange text-dark-900 rounded-full p-0.5">
-                        <Check className="w-3 h-3" />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+
           <div>
             <Label>Durée sur le serveur</Label>
             <div className="flex flex-wrap gap-2 mt-2">
@@ -474,36 +478,114 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
               ))}
             </div>
           </div>
-          <div className="max-h-64 overflow-y-auto space-y-2">
+
+          <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-1">
             {onlineStations.length === 0 && (
               <p className="text-gray-500 text-center py-4">Aucun POD en ligne</p>
             )}
-            {onlineStations.map((station) => (
-              <label
-                key={station.stationId}
-                className="flex items-center gap-3 p-3 bg-dark-900 border border-dark-600 rounded-lg hover:border-dark-500 cursor-pointer transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(station.stationId)}
-                  onChange={() => toggleStation(station.stationId)}
-                  className="w-5 h-5 rounded border-dark-600 text-accent-orange focus:ring-accent-orange bg-dark-900"
-                />
-                <div className="flex-1">
-                  <p className="font-medium text-white">{station.name}</p>
-                  <p className="text-xs text-gray-500 font-mono">{station.stationId}</p>
+            {onlineStations.map((station) => {
+              const config = podConfigs[station.stationId];
+              if (!config) return null;
+              return (
+                <div
+                  key={station.stationId}
+                  className={`p-4 rounded-xl border transition-colors ${
+                    config.selected
+                      ? 'bg-dark-900 border-accent-orange ring-1 ring-accent-orange'
+                      : 'bg-dark-800 border-dark-600 hover:border-dark-500'
+                  }`}
+                >
+                  <div className="flex items-start gap-3 mb-3">
+                    <input
+                      type="checkbox"
+                      checked={config.selected}
+                      onChange={(e) => updatePod(station.stationId, { selected: e.target.checked })}
+                      className="mt-1 w-5 h-5 rounded border-dark-600 text-accent-orange focus:ring-accent-orange bg-dark-900"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-white">{station.name}</p>
+                        <Badge variant={station.status === 'in_game' ? 'blue' : 'green'}>
+                          {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-500 font-mono">{station.stationId}</p>
+                    </div>
+                  </div>
+
+                  {config.selected && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pl-8">
+                      <div>
+                        <Label className="text-xs">Nom du client</Label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <input
+                            type="text"
+                            value={config.clientName}
+                            onChange={(e) =>
+                              updatePod(station.stationId, { clientName: e.target.value })
+                            }
+                            placeholder="Client"
+                            className="w-full pl-9 pr-3 py-2 bg-dark-900 border border-dark-600 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-accent-orange"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs">Difficulté</Label>
+                        <div className="relative">
+                          <Zap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <select
+                            value={config.difficulty}
+                            onChange={(e) =>
+                              updatePod(station.stationId, {
+                                difficulty: e.target.value as 'EASY' | 'PRO' | 'CUSTOM',
+                              })
+                            }
+                            className="w-full pl-9 pr-3 py-2 bg-dark-900 border border-dark-600 rounded-lg text-white focus:outline-none focus:border-accent-orange appearance-none"
+                          >
+                            <option value={DIFFICULTY_OPTIONS.EASY}>Easy</option>
+                            <option value={DIFFICULTY_OPTIONS.PRO}>Pro</option>
+                            <option value={DIFFICULTY_OPTIONS.CUSTOM}>Custom</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs">Voiture</Label>
+                        <div className="relative">
+                          <Car className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <select
+                            value={config.carAcId}
+                            onChange={(e) =>
+                              updatePod(station.stationId, { carAcId: e.target.value })
+                            }
+                            className="w-full pl-9 pr-3 py-2 bg-dark-900 border border-dark-600 rounded-lg text-white focus:outline-none focus:border-accent-orange appearance-none"
+                          >
+                            {server.cars.map((id) => {
+                              const car = carMap.get(id);
+                              return (
+                                <option key={id} value={id}>
+                                  {car?.name ?? id}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <Badge variant={station.status === 'in_game' ? 'blue' : 'green'}>
-                  {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
-                </Badge>
-              </label>
-            ))}
+              );
+            })}
           </div>
+
           {error && (
             <p className="text-red-400 text-sm bg-red-900/20 border border-red-900/40 rounded-lg p-2">
               {error}
             </p>
           )}
+
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={onClose} disabled={isJoining}>
               Annuler
@@ -511,11 +593,11 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
             <Button
               variant="success"
               onClick={handleJoin}
-              disabled={selectedIds.length === 0 || isJoining}
+              disabled={selectedPods.length === 0 || isJoining}
               isLoading={isJoining}
             >
               <Send className="w-4 h-4" />
-              Envoyer {selectedIds.length > 0 && `(${selectedIds.length})`}
+              Envoyer {selectedPods.length > 0 && `(${selectedPods.length})`}
             </Button>
           </div>
         </div>

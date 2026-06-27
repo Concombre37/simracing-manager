@@ -9,7 +9,7 @@ import { Stations } from './pages/Stations';
 import { DedicatedServers } from './pages/DedicatedServers';
 import { Users } from './pages/Users';
 import { Leaderboard } from './pages/Leaderboard';
-import { Telemetry } from './pages/Telemetry';
+import { Sessions } from './pages/Sessions';
 import { ContentPreviews } from './pages/ContentPreviews';
 import { BlankingMedia } from './pages/BlankingMedia';
 import { Settings } from './pages/Settings';
@@ -78,10 +78,10 @@ export function App() {
               }
             />
             <Route
-              path="/telemetry"
+              path="/en-cours"
               element={
                 <ProtectedRoute>
-                  <Telemetry />
+                  <Sessions />
                 </ProtectedRoute>
               }
             />

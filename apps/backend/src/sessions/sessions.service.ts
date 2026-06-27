@@ -70,4 +70,30 @@ export class SessionsService {
       data: { status: SessionStatus.CANCELLED, endedAt: new Date() },
     });
   }
+
+  async findActive() {
+    return this.prisma.session.findMany({
+      where: { status: SessionStatus.RUNNING },
+      include: { station: true },
+      orderBy: { startedAt: 'desc' },
+    });
+  }
+
+  async extend(sessionId: string, minutes: number) {
+    const session = await this.findOne(sessionId);
+    const currentDuration = session.durationMinutes ?? 0;
+    const newDuration = Math.max(0, currentDuration + minutes);
+    return this.prisma.session.update({
+      where: { id: sessionId },
+      data: { durationMinutes: newDuration },
+    });
+  }
+
+  async stop(sessionId: string) {
+    await this.findOne(sessionId);
+    return this.prisma.session.update({
+      where: { id: sessionId },
+      data: { status: SessionStatus.FINISHED, endedAt: new Date() },
+    });
+  }
 }

@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.2.14 — Télémétrie, page "En cours", et lancement POD personnalisé
+
+### Ajouté
+
+- Nouvelle page **En cours** (`/en-cours`) remplaçant la télémétrie :
+  - Affiche les PODs actuellement en session avec temps restant, client, voiture, circuit, difficulté.
+  - Mini widget télémétrie en temps réel (vitesse, RPM, tours, position, progression).
+  - Boutons `+5 min`, `+15 min`, `-5 min` et `Stop` pour gérer la session.
+- Lancement personnalisé des PODs depuis **Serveurs dédiés** :
+  - Nom du client par POD (affiché en jeu via l’app Lua).
+  - Difficulté par POD (`EASY` / `PRO` / `CUSTOM`) → écrit les assists côté agent.
+  - Voiture différente par POD.
+- Backend :
+  - Nouveaux champs sur `Session` : `type`, `serverId`, `clientName`, `difficulty`, `carAcId`, `track`, `trackLayout`, `durationMinutes`.
+  - Endpoints `GET /api/sessions/active`, `POST /api/sessions/:id/extend`, `POST /api/sessions/:id/stop`.
+  - Écoute `agent:status` pour mettre à jour immédiatement le statut d’un POD.
+  - Événements WebSocket `session:updated` et `session:extend`.
+- Agent :
+  - Émission immédiate de `agent:status` `in_game` au join et `online` au stop / fin de durée.
+  - Timer de session extensible via `session:extend`.
+  - Écriture du nom client dans `client.txt` pour l’app Lua.
+  - Application des assists selon la difficulté reçue.
+- App Lua :
+  - Affichage du nom du client en overlay en haut à gauche pendant une course en ligne.
+
+### Corrigé
+
+- La télémétrie n’apparaissait pas car le statut `in_game` n’était pas mis à jour immédiatement lors d’un join sur serveur dédié.
+
 ## v2.2.13 — Envoi des previews sans compression
 
 ### Corrigé

@@ -7,6 +7,7 @@ export interface AgentToServerEvents {
   'agent:log': (payload: LogPayload) => void;
   'agent:results': (payload: ResultsPayload) => void;
   'agent:status': (payload: StatusPayload) => void;
+  'agent:session:ended': (payload: { sessionId: string }) => void;
   'agent:content': (payload: { stationId: string; content: Record<string, unknown> }) => void;
   'agent:telemetry': (payload: TelemetrySnapshot) => void;
   'server:started': (payload: {
@@ -24,6 +25,7 @@ export interface ServerToAgentEvents {
   'agent:unauthorized': (payload: { reason: string }) => void;
   'session:launch': (payload: LaunchSessionPayload) => void;
   'session:stop': () => void;
+  'session:extend': (payload: { sessionId: string; minutes: number }) => void;
   'ac:idealLine': () => void;
   'ac:autoShifter': () => void;
   'ac:teleportToPits': () => void;
@@ -43,6 +45,9 @@ export interface ServerToAgentEvents {
     trackLayout?: string;
     serverName?: string;
     durationMinutes?: number;
+    clientName?: string;
+    difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
+    sessionId?: string;
   }) => void;
   'server:launch': (payload: LaunchDedicatedServerPayload) => void;
   'server:stop': (payload: { serverId: string }) => void;
@@ -54,6 +59,13 @@ export interface ServerToAgentEvents {
 export interface ServerToClientEvents {
   'station:updated': (payload: { stationId: string; status: string }) => void;
   'station:telemetry': (payload: TelemetrySnapshot) => void;
+  'session:updated': (payload: {
+    sessionId: string;
+    stationId: string;
+    durationMinutes?: number;
+    remainingSeconds?: number;
+    status: string;
+  }) => void;
 }
 
 export interface HeartbeatPayload {

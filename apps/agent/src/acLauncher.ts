@@ -17,6 +17,9 @@ export interface JoinServerConfig {
   trackLayout?: string;
   serverName?: string;
   durationMinutes?: number;
+  clientName?: string;
+  difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
+  sessionId?: string;
 }
 
 export class AcLauncher {
@@ -85,7 +88,10 @@ export class AcLauncher {
     });
 
     await this.configureVideoIni(documentsPath);
-    await this.configureAssistsIni(documentsPath);
+    await this.configureAssistsIni(documentsPath, joinConfig.difficulty);
+    if (joinConfig.clientName) {
+      await this.luaBridge.setClientName(joinConfig.clientName);
+    }
 
     await this.launchAcs();
 
@@ -388,20 +394,25 @@ export class AcLauncher {
     }
   }
 
-  private async configureAssistsIni(documentsPath: string): Promise<void> {
+  private async configureAssistsIni(
+    documentsPath: string,
+    difficulty?: 'EASY' | 'PRO' | 'CUSTOM',
+  ): Promise<void> {
     const assistsIniPath = path.join(documentsPath, 'cfg', 'assists.ini');
-    const isEasy = config.ASSIST_PRESET === 'easy';
+    const preset = difficulty ?? (config.ASSIST_PRESET.toUpperCase() as 'EASY' | 'PRO' | 'CUSTOM');
+    const isEasy = preset === 'EASY';
+    const isPro = preset === 'PRO';
 
     const lines = [
       '[ASSISTS]',
       `IDEAL_LINE=${isEasy ? 1 : 0}`,
       'AUTO_BLIP=1',
-      `STABILITY_CONTROL=${isEasy ? 100 : 0}`,
+      `STABILITY_CONTROL=${isEasy ? 100 : isPro ? 50 : 0}`,
       'AUTO_BRAKE=0',
       `AUTO_SHIFTER=${isEasy ? 1 : 0}`,
-      'ABS=1',
-      'TRACTION_CONTROL=1',
-      'AUTO_CLUTCH=1',
+      `ABS=${isEasy ? 1 : isPro ? 1 : 0}`,
+      `TRACTION_CONTROL=${isEasy ? 1 : isPro ? 1 : 0}`,
+      `AUTO_CLUTCH=${isEasy ? 1 : isPro ? 1 : 0}`,
       'VISUALDAMAGE=1',
       'DAMAGE=0',
       'FUEL_RATE=1',
@@ -413,10 +424,7 @@ export class AcLauncher {
 
     try {
       await fs.writeFile(assistsIniPath, lines.join('\n'), 'utf-8');
-      this.logger.info(
-        { path: assistsIniPath, preset: config.ASSIST_PRESET },
-        'assists.ini written',
-      );
+      this.logger.info({ path: assistsIniPath, preset }, 'assists.ini written');
     } catch (err) {
       this.logger.warn({ err }, 'Failed to write assists.ini');
     }

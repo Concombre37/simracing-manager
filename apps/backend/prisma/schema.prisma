@@ -43,15 +43,23 @@ model Station {
 }
 
 model Session {
-  id        String    @id @default(uuid()) @db.Uuid
-  stationId String    @map("station_id") @db.Uuid
-  config    Json
-  status    String    @default("pending")
-  startedAt DateTime? @map("started_at")
-  endedAt   DateTime? @map("ended_at")
-  result    Json?
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id              String    @id @default(uuid()) @db.Uuid
+  stationId       String    @map("station_id") @db.Uuid
+  type            String    @default("direct_launch") @map("type")
+  serverId        String?   @map("server_id") @db.Uuid
+  clientName      String?   @map("client_name")
+  difficulty      String?   @map("difficulty")
+  carAcId         String?   @map("car_ac_id")
+  track           String?
+  trackLayout     String?   @map("track_layout")
+  durationMinutes Int?      @map("duration_minutes")
+  config          Json
+  status          String    @default("pending")
+  startedAt       DateTime? @map("started_at")
+  endedAt         DateTime? @map("ended_at")
+  result          Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
 

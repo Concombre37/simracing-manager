@@ -9,7 +9,7 @@ import { TelemetryModule } from '../telemetry/telemetry.module';
 @Module({
   imports: [
     forwardRef(() => StationsModule),
-    SessionsModule,
+    forwardRef(() => SessionsModule),
     DashboardModule,
     TelemetryModule,
     forwardRef(() => DedicatedServersModule),

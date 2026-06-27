@@ -33,3 +33,9 @@ export enum SessionStatus {
   FINISHED = 'finished',
   CANCELLED = 'cancelled',
 }
+
+export enum Difficulty {
+  EASY = 'EASY',
+  PRO = 'PRO',
+  CUSTOM = 'CUSTOM',
+}

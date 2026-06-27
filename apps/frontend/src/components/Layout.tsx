@@ -9,7 +9,7 @@ import {
   Trophy,
   Settings,
   Image,
-  Activity,
+  Clock,
   MonitorPlay,
 } from 'lucide-react';
 
@@ -18,7 +18,7 @@ const navItems = [
   { path: '/stations', label: 'Postes', icon: Monitor },
   { path: '/dedicated-servers', label: 'Serveurs', icon: Server },
   { path: '/leaderboard', label: 'Classement', icon: Trophy },
-  { path: '/telemetry', label: 'Télémétrie', icon: Activity },
+  { path: '/en-cours', label: 'En cours', icon: Clock },
 ];
 
 const adminNavItems = [

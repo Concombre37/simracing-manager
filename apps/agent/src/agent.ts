@@ -48,6 +48,12 @@ export class SimRacingAgent {
   private isProvisioning = false;
   private lastContentHash = '';
   private joinTimeout: NodeJS.Timeout | null = null;
+  private currentSession: {
+    sessionId: string;
+    durationMinutes: number;
+    startedAt: number;
+    timeout: NodeJS.Timeout | null;
+  } | null = null;
   private acLauncher: AcLauncher;
   private luaBridge: LuaBridge;
   private contentSync: ContentSync;
@@ -285,6 +291,7 @@ export class SimRacingAgent {
 
     this.socket.on('session:launch', (payload) => this.handleLaunch(payload));
     this.socket.on('session:stop', () => this.handleStop());
+    this.socket.on('session:extend', (payload) => this.handleSessionExtend(payload));
     this.socket.on('ac:idealLine', () => this.handleIdealLine());
     this.socket.on('ac:autoShifter', () => this.handleAutoShifter());
     this.socket.on('ac:teleportToPits', () => this.handleTeleportToPits());
@@ -464,10 +471,54 @@ export class SimRacingAgent {
     await this.luaBridge.quit();
     await this.acLauncher.stop();
     this.acRunning = false;
+    this.clearCurrentSession();
     this.socket?.emit('agent:status', {
       stationId: config.STATION_ID,
       status: StationStatus.ONLINE,
     });
+  }
+
+  private clearCurrentSession(): void {
+    if (this.currentSession?.timeout) {
+      clearTimeout(this.currentSession.timeout);
+    }
+    this.currentSession = null;
+  }
+
+  private async handleSessionExtend(payload: {
+    sessionId: string;
+    minutes: number;
+  }): Promise<void> {
+    this.logger.info(payload, 'Received session extend command');
+    if (!this.currentSession || this.currentSession.sessionId !== payload.sessionId) {
+      this.logger.warn('No matching active session to extend');
+      return;
+    }
+    const newDuration = Math.max(0, this.currentSession.durationMinutes + payload.minutes);
+    this.currentSession.durationMinutes = newDuration;
+    this.scheduleSessionEnd();
+  }
+
+  private scheduleSessionEnd(): void {
+    if (!this.currentSession) return;
+    if (this.currentSession.timeout) {
+      clearTimeout(this.currentSession.timeout);
+      this.currentSession.timeout = null;
+    }
+    const elapsedMs = Date.now() - this.currentSession.startedAt;
+    const totalMs = this.currentSession.durationMinutes * 60 * 1000;
+    const remainingMs = Math.max(0, totalMs - elapsedMs);
+    this.logger.info(
+      { remainingMinutes: Math.round(remainingMs / 60000) },
+      'Session end rescheduled',
+    );
+    if (remainingMs > 0) {
+      this.currentSession.timeout = setTimeout(() => {
+        void this.returnToPaddockAfterDuration();
+      }, remainingMs);
+    } else {
+      void this.returnToPaddockAfterDuration();
+    }
   }
 
   private async handleIdealLine(): Promise<void> {
@@ -572,25 +623,29 @@ export class SimRacingAgent {
     trackLayout?: string;
     serverName?: string;
     durationMinutes?: number;
+    clientName?: string;
+    difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
+    sessionId?: string;
   }): Promise<void> {
     this.logger.info(payload, 'Received join server command');
-    if (this.joinTimeout) {
-      clearTimeout(this.joinTimeout);
-      this.joinTimeout = null;
-    }
+    this.clearCurrentSession();
     try {
       await this.acLauncher.joinServer(payload);
       this.acRunning = true;
+      this.socket?.emit('agent:status', {
+        stationId: config.STATION_ID,
+        status: StationStatus.IN_GAME,
+      });
       this.logger.info('Join server command completed');
-      if (payload.durationMinutes && payload.durationMinutes > 0) {
-        const ms = payload.durationMinutes * 60 * 1000;
-        this.logger.info(
-          { durationMinutes: payload.durationMinutes, ms },
-          'Scheduled auto-return after duration',
-        );
-        this.joinTimeout = setTimeout(() => {
-          void this.returnToPaddockAfterDuration();
-        }, ms);
+
+      if (payload.sessionId && payload.durationMinutes && payload.durationMinutes > 0) {
+        this.currentSession = {
+          sessionId: payload.sessionId,
+          durationMinutes: payload.durationMinutes,
+          startedAt: Date.now(),
+          timeout: null,
+        };
+        this.scheduleSessionEnd();
       }
     } catch (err) {
       this.logger.error({ err }, 'Failed to execute join server command');
@@ -599,10 +654,19 @@ export class SimRacingAgent {
 
   private async returnToPaddockAfterDuration(): Promise<void> {
     this.logger.info('Duration expired, returning POD to paddock');
+    const sessionId = this.currentSession?.sessionId;
+    this.clearCurrentSession();
     try {
       await this.acLauncher.quit();
       this.acRunning = false;
       this.blankingManager.show();
+      this.socket?.emit('agent:status', {
+        stationId: config.STATION_ID,
+        status: StationStatus.ONLINE,
+      });
+      if (sessionId) {
+        this.socket?.emit('agent:session:ended', { sessionId });
+      }
       this.logger.info('POD returned to paddock (blanking shown)');
     } catch (err) {
       this.logger.error({ err }, 'Failed to return POD to paddock');

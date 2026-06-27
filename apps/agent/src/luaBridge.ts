@@ -72,4 +72,10 @@ export class LuaBridge {
       // ignore
     }
   }
+
+  async setClientName(name: string): Promise<void> {
+    const clientFile = path.join(path.dirname(this.commandFile), 'client.txt');
+    await fs.writeFile(clientFile, name, 'utf-8');
+    this.logger.info({ clientName: name }, 'Client name written for Lua app');
+  }
 }

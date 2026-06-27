@@ -21,6 +21,7 @@ import {
   ResultsPayload,
   LaunchSessionPayload,
   StationStatus,
+  StatusPayload,
 } from '@simracing/shared';
 import { DashboardGateway } from '../dashboard/dashboard.gateway';
 import { TelemetryService } from '../telemetry/telemetry.service';
@@ -229,6 +230,44 @@ export class AgentGateway
     this.dashboardGateway.emitStationTelemetry(payload);
   }
 
+  @SubscribeMessage('agent:status')
+  async handleStatus(
+    client: AuthenticatedSocket,
+    payload: StatusPayload,
+  ): Promise<void> {
+    client.stationId = payload.stationId;
+    const room = `station:${payload.stationId}`;
+    if (!client.rooms.has(room)) {
+      await client.join(room);
+      this.connectedStationIds.add(payload.stationId);
+    }
+    const station = await this.stationsService.updateStatus(
+      payload.stationId,
+      payload.status,
+    );
+    this.dashboardGateway.emitStationUpdated(station.stationId, station.status);
+  }
+
+  @SubscribeMessage('agent:session:ended')
+  async handleSessionEnded(
+    _client: AuthenticatedSocket,
+    payload: { sessionId: string },
+  ): Promise<void> {
+    try {
+      await this.sessionsService.finish(payload.sessionId, {});
+      this.dashboardGateway.server.emit('session:updated', {
+        sessionId: payload.sessionId,
+        stationId: '',
+        status: 'finished',
+      });
+    } catch (err) {
+      this.logger.warn(
+        { err, sessionId: payload.sessionId },
+        'Failed to finish session',
+      );
+    }
+  }
+
   @SubscribeMessage('server:started')
   async handleServerStarted(
     _client: AuthenticatedSocket,
@@ -338,6 +377,9 @@ export class AgentGateway
       trackLayout?: string;
       serverName?: string;
       durationMinutes?: number;
+      clientName?: string;
+      difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
+      sessionId?: string;
     },
   ): Promise<void> {
     const room = `station:${stationId}`;
@@ -393,5 +435,9 @@ export class AgentGateway
     payload: { serverId: string },
   ): Promise<void> {
     this.server.to(`station:${stationId}`).emit('server:stop', payload);
+  }
+
+  async emitStopSession(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('session:stop');
   }
 }

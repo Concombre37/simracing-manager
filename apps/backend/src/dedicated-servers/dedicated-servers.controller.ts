@@ -19,6 +19,7 @@ import {
   UpdateDedicatedServerDto,
 } from './dto/update-dedicated-server.dto';
 import { joinServerSchema, JoinServerDto } from './dto/join-server.dto';
+import { PrismaService } from '../prisma/prisma.service';
 import { AgentGateway } from '../agent/agent.gateway';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -34,6 +35,7 @@ export class DedicatedServersController {
   constructor(
     private readonly dedicatedServersService: DedicatedServersService,
     private readonly agentGateway: AgentGateway,
+    private readonly prisma: PrismaService,
   ) {}
 
   @Post()
@@ -116,20 +118,53 @@ export class DedicatedServersController {
     const port = server.tcpPort ?? 9600;
     const httpPort = server.httpPort ?? 8081;
 
-    for (const stationId of dto.stationIds) {
-      this.logger.log(`Emitting server:join to station:${stationId}`);
-      await this.agentGateway.emitJoinServer(stationId, {
+    const sessions: { sessionId: string; stationId: string }[] = [];
+
+    for (const pod of dto.pods) {
+      const station = await this.prisma.station.findUnique({
+        where: { stationId: pod.stationId },
+      });
+      if (!station) {
+        this.logger.warn(`Station ${pod.stationId} not found, skipping`);
+        continue;
+      }
+
+      const session = await this.prisma.session.create({
+        data: {
+          stationId: station.id,
+          type: 'dedicated_join',
+          serverId: id,
+          clientName: pod.clientName ?? null,
+          difficulty: pod.difficulty ?? null,
+          carAcId: pod.carAcId,
+          track: server.track,
+          trackLayout: server.trackLayout,
+          durationMinutes: dto.durationMinutes ?? null,
+          config: {},
+          status: 'running',
+          startedAt: new Date(),
+        },
+      });
+
+      sessions.push({ sessionId: session.id, stationId: pod.stationId });
+
+      this.logger.log(`Emitting server:join to station:${pod.stationId}`);
+      await this.agentGateway.emitJoinServer(pod.stationId, {
         host,
         port,
         httpPort,
         password: server.password ?? undefined,
-        carAcId: dto.carAcId,
+        carAcId: pod.carAcId,
         track: server.track,
         trackLayout: server.trackLayout ?? undefined,
         serverName: server.name,
         durationMinutes: dto.durationMinutes,
+        clientName: pod.clientName,
+        difficulty: pod.difficulty,
+        sessionId: session.id,
       });
     }
-    return { success: true };
+
+    return { success: true, sessions };
   }
 }

@@ -17,6 +17,8 @@ local telemetryUdp = nil
 local telemetryHost = "127.0.0.1"
 local telemetryPort = 19900
 local cachedStationId = nil
+local cachedClientName = nil
+local lastClientReadAt = 0
 local updateCount = 0
 local lastMarkerAt = 0
 
@@ -304,10 +306,46 @@ local function scriptUpdate(dt)
   })
 end
 
+local function readClientName()
+  local now = os.time()
+  if now - lastClientReadAt < 5 and cachedClientName ~= nil then
+    return cachedClientName
+  end
+  lastClientReadAt = now
+  local file = io.open(commandsDir .. "/client.txt", "r")
+  if file then
+    local name = file:read("*l") or ""
+    file:close()
+    name = name:gsub("^%s+", ""):gsub("%s+$", "")
+    cachedClientName = name ~= "" and name or nil
+  else
+    cachedClientName = nil
+  end
+  return cachedClientName
+end
+
 function script.update(dt)
   local ok, err = pcall(scriptUpdate, dt)
   if not ok then
     ac.log("[SimCenterManager] ERROR in script.update: " .. tostring(err))
     writeMarkerFile("lua_error.txt", tostring(err))
   end
+end
+
+function script.drawUI()
+  local sim = ac.getSim()
+  if not sim.isOnlineRace then return end
+  local name = readClientName()
+  if not name then return end
+
+  local size = ui.imageSize()
+  local x = 20
+  local y = 20
+
+  ui.pushFont(ui.Font.Title)
+  ui.setCursor(vec2(x, y))
+  ui.beginOutline()
+  ui.text(name)
+  ui.endOutlineRGB(0, 0, 0, 1)
+  ui.popFont()
 end
