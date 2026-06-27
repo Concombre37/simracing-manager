@@ -18,6 +18,7 @@ local telemetryHost = "127.0.0.1"
 local telemetryPort = 19900
 local cachedStationId = nil
 local cachedClientName = nil
+local cachedSessionId = nil
 local lastClientReadAt = 0
 local updateCount = 0
 local lastMarkerAt = 0
@@ -141,6 +142,7 @@ local function ensureTelemetryUdp()
     return false
   end
   telemetryUdp = socket
+  ac.log("[SimCenterManager] UDP socket created")
   return true
 end
 
@@ -153,8 +155,10 @@ local function sendTelemetry(sim, car)
   if not ensureTelemetryUdp() then return end
 
   local pos = car.position or { x = 0, y = 0, z = 0 }
+  local sessionId = readSessionId()
   local payload = {
     stationId = stationId,
+    sessionId = sessionId,
     timestamp = math.floor(sim.timestampMs or (os.time() * 1000)),
     isInMainMenu = sim.isInMainMenu == true,
     isSessionStarted = sim.isSessionStarted == true,
@@ -191,6 +195,22 @@ local function sendTelemetry(sim, car)
   local sent, err = pcall(function() telemetryUdp:sendto(json, telemetryHost, telemetryPort) end)
   if not sent then
     ac.log("[SimCenterManager] Telemetry UDP send error: " .. tostring(err))
+  end
+
+  -- HTTP fallback in case UDP is blocked or fails.
+  sendHttpTelemetry(json)
+end
+
+local function sendHttpTelemetry(json)
+  local ok, http = pcall(function() return require("socket.http") end)
+  if not ok or not http then
+    return
+  end
+  local bodyOk, httpErr = pcall(function()
+    http.request("http://127.0.0.1:19901/telemetry", json)
+  end)
+  if not bodyOk then
+    ac.log("[SimCenterManager] Telemetry HTTP fallback error: " .. tostring(httpErr))
   end
 end
 
@@ -325,6 +345,17 @@ local function readClientName()
     cachedClientName = nil
   end
   return cachedClientName
+end
+
+local function readSessionId()
+  if cachedSessionId then return cachedSessionId end
+  local file = io.open(commandsDir .. "/session.txt", "r")
+  if not file then return nil end
+  cachedSessionId = file:read("*l") or ""
+  file:close()
+  cachedSessionId = cachedSessionId:gsub("^%s+", ""):gsub("%s+$", "")
+  if cachedSessionId == "" then cachedSessionId = nil end
+  return cachedSessionId
 end
 
 function script.update(dt)

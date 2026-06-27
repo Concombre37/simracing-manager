@@ -6,6 +6,7 @@ import { config } from './config';
 import { LaunchSessionPayload } from '@simracing/shared';
 import { LuaBridge } from './luaBridge';
 import { findContentManagerExe } from './cmLocator';
+import { ProcessMonitor } from './processMonitor';
 
 export interface JoinServerConfig {
   host: string;
@@ -25,9 +26,11 @@ export interface JoinServerConfig {
 export class AcLauncher {
   private currentProcess: ChildProcess | null = null;
   private readonly luaBridge: LuaBridge;
+  private readonly processMonitor: ProcessMonitor;
 
   constructor(private readonly logger: Logger) {
     this.luaBridge = new LuaBridge(logger);
+    this.processMonitor = new ProcessMonitor(logger);
   }
 
   async launch(payload: LaunchSessionPayload): Promise<void> {
@@ -92,6 +95,9 @@ export class AcLauncher {
     if (joinConfig.clientName) {
       await this.luaBridge.setClientName(joinConfig.clientName);
     }
+    if (joinConfig.sessionId) {
+      await this.luaBridge.setSessionId(joinConfig.sessionId);
+    }
 
     await this.launchAcs();
 
@@ -106,14 +112,42 @@ export class AcLauncher {
       this.currentProcess.kill('SIGTERM');
     }
     if (process.platform === 'win32') {
-      spawn('taskkill', ['/F', '/IM', 'acs.exe'], { stdio: 'ignore' });
-      spawn('taskkill', ['/F', '/IM', 'ContentManager.exe'], { stdio: 'ignore' });
+      await this.killProcess('acs.exe');
+      await this.killProcess('acShowroom.exe');
+      await this.killProcess('ContentManager.exe');
     }
   }
 
   async quit(): Promise<void> {
     this.logger.info('Sending quit command to Assetto Corsa');
     await this.luaBridge.quit();
+    // Give AC a few seconds to shut down gracefully, then force kill if still running.
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    if (await this.processMonitor.isAcRunning()) {
+      this.logger.warn('AC still running after quit command, forcing stop');
+      await this.stop();
+    } else {
+      this.logger.info('AC quit confirmed');
+    }
+  }
+
+  private async killProcess(imageName: string): Promise<void> {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const proc = spawn('taskkill', ['/F', '/IM', imageName], { stdio: 'ignore' });
+        proc.on('exit', (code) => {
+          if (code === 0 || code === 128) {
+            resolve();
+          } else {
+            reject(new Error(`taskkill exited with code ${code}`));
+          }
+        });
+        proc.on('error', (err) => reject(err));
+      });
+      this.logger.info({ imageName }, 'Process killed');
+    } catch {
+      // Process may not be running; this is fine.
+    }
   }
 
   private getDocumentsPath(): string {

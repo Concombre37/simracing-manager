@@ -78,4 +78,10 @@ export class LuaBridge {
     await fs.writeFile(clientFile, name, 'utf-8');
     this.logger.info({ clientName: name }, 'Client name written for Lua app');
   }
+
+  async setSessionId(sessionId: string): Promise<void> {
+    const sessionFile = path.join(path.dirname(this.commandFile), 'session.txt');
+    await fs.writeFile(sessionFile, sessionId, 'utf-8');
+    this.logger.info({ sessionId }, 'Session ID written for Lua app');
+  }
 }
