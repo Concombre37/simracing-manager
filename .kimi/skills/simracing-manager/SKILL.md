@@ -8,7 +8,7 @@ Project-scope knowledge for working on the `simracing-manager` monorepo.
 - **GitHub**: `Concombre37/simracing-manager`
 - **Production**: `https://simracing.hytlabs.com`
 - **Architecture**: NestJS backend + React/Vite frontend + Node.js Windows agent, all in npm workspaces.
-- **Current version**: `2.2.18` (agent version is the source of truth; root `package.json` may lag).
+- **Current version**: `2.2.19` (agent version is the source of truth; root `package.json` may lag).
 
 There are **two agent implementations** in the repo. Always confirm which one is being changed/released:
 
