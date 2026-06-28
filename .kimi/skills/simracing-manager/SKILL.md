@@ -8,14 +8,14 @@ Project-scope knowledge for working on the `simracing-manager` monorepo.
 - **GitHub**: `Concombre37/simracing-manager`
 - **Production**: `https://simracing.hytlabs.com`
 - **Architecture**: NestJS backend + React/Vite frontend + Node.js Windows agent, all in npm workspaces.
-- **Current version**: matches root `package.json` (e.g. `2.0.x`).
+- **Current version**: `2.2.18` (agent version is the source of truth; root `package.json` may lag).
 
 There are **two agent implementations** in the repo. Always confirm which one is being changed/released:
 
-| Path          | Role                                                                                                 | Version  | Released?                      |
-| ------------- | ---------------------------------------------------------------------------------------------------- | -------- | ------------------------------ |
-| `apps/agent/` | New monorepo agent, uses `@simracing/shared`, auto-provisioning + API-key auth                       | `2.0.x`  | **Yes** (manual release asset) |
-| `agent/`      | Legacy standalone agent, includes `PressDriveKey.exe`, `ViGEmBus`, richer dedicated-server/POD logic | `1.3.23` | Legacy, do not release         |
+| Path          | Role                                                                                                          | Version  | Released?                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------- | -------- | ----------------------------- |
+| `apps/agent/` | New monorepo agent, uses `@simracing/shared`, auto-provisioning + API-key auth, koffi shared-memory telemetry | `2.2.18` | **Yes** (GitHub release + CI) |
+| `agent/`      | Legacy standalone agent, includes `PressDriveKey.exe`, `ViGEmBus`, richer dedicated-server/POD logic          | `1.3.23` | Legacy, do not release        |
 
 ## 2. Monorepo Layout
 
@@ -88,6 +88,19 @@ sim-center-manager/
   - `serverLauncher.ts` — launches `acServer.exe`.
   - `acLauncher.ts` — launches AC/CM sessions.
   - `luaBridge.ts` — writes command files for the in-game Lua app.
+  - `acSharedMemoryReader.ts` — reads Assetto Corsa shared memory (`Local\acpmf_physics`, `Local\acpmf_graphics`, `Local\acpmf_static`) via koffi and emits live telemetry snapshots.
+  - `telemetryReceiver.ts` — legacy UDP/HTTP telemetry fallback from the CSP Lua app.
+  - `telemetryFileReader.ts` — legacy telemetry fallback from a JSON file written by the CSP Lua app.
+
+### Telemetry
+
+The agent has three telemetry sources, all feeding the same `onTelemetrySnapshot()` handler:
+
+1. **Shared memory (primary, Windows-only)** — `AcSharedMemoryReader` polls AC at 10 Hz using koffi. It does not depend on CSP/Lua UDP.
+2. **UDP/HTTP receiver (fallback)** — `TelemetryReceiver` listens on `127.0.0.1:19900` (UDP) and `127.0.0.1:19901` (HTTP) for the CSP Lua app.
+3. **File reader (fallback)** — `TelemetryFileReader` reads `Documents/Assetto Corsa/cfg/SimCenterManager/telemetry.json`.
+
+`onTelemetrySnapshot()` forwards to the backend via `agent:telemetry` and updates the blanking manager / best-lap tracking.
 
 ### Agent gotchas
 
@@ -107,7 +120,9 @@ sim-center-manager/
 - **v2.1.0+**: kiosk / blanking screen mode. The agent shows a full-screen WPF window via an embedded PowerShell script whenever the player is not actively driving. By default it starts in **auto** mode. It hides automatically as soon as Assetto Corsa's shared memory is detected (`Local\acpmf_physics/graphics/static`), meaning the game has finished loading. A legacy fallback also hides the screen when `acs.exe` is running and telemetry indicates real driving. Manual `blanking:hide` and `blanking:show` commands remain available from the Stations page.
 - **v2.2.0+**: customizable blanking screen media. Each station can have a playlist of images (PNG/JPG/WEBP) and muted videos (MP4/WEBM) uploaded from the Stations page (`Écran d'attente`). The backend stores files under `uploads/blanking-media/` and notifies the agent via the `blanking:mediaUpdated` WebSocket event. The agent downloads missing media into `%TEMP%\simracing-manager\blanking-media\` and the PowerShell blanking script cycles through them with cross-fade transitions.
 - The agent does **not** scan running `acServer.exe` processes; server status relies on `server:started` / `server:stopped`.
-- `pkg` config only bundles `lua_app/**/*`; native helpers (`PressDriveKey.exe`, `ViGEmBus`) are not included in the new agent.
+- `pkg` config bundles `lua_app/**/*`, `assets/**/*`, and `node_modules/koffi/**/*`. koffi native binaries (`.node`/`.lib`) are copied next to the executable by `postpackage:win` and loaded at runtime via a patched koffi loader.
+- koffi is **Windows-only**. On Linux/macOS the shared-memory reader no-ops gracefully; telemetry falls back to Lua UDP/HTTP or file.
+- Native helpers (`PressDriveKey.exe`, `ViGEmBus`) are not included in the new agent.
 
 ## 6. Shared Contracts (`packages/shared`)
 
@@ -142,23 +157,37 @@ The backend image copies pre-built `dist/` and `node_modules` from the host. Do 
 
 ```bash
 cd apps/agent
-npm run package:win      # outputs exe/agent.exe, rename to sim-center-agent-win.exe
+npm run package:win      # outputs exe/agent.exe + exe/build/koffi/win32_x64/*.node
+```
+
+`package:win` runs:
+
+- `prepackage:win` → build + patch koffi for `pkg`.
+- `package:win` → `pkg . --targets node18-win-x64 --out-path exe`.
+- `postpackage:win` → copy `koffi.node` / `koffi.lib` / `koffi.exp` to `exe/build/koffi/win32_x64/`.
+
+For distribution, zip the executable together with the `build/` folder so the native module is found at runtime:
+
+```bash
+cd apps/agent/exe
+7z a -tzip sim-center-agent-win-vX.Y.Z.zip sim-center-agent-win-vX.Y.Z.exe build
 ```
 
 ## 8. Release Process
 
-1. Bump version in root + all workspace `package.json` files.
+1. Bump version in `apps/agent/package.json` (agent is the source of truth).
 2. Build shared → backend → frontend → agent.
-3. Package agent: `cd apps/agent && npm run package:win && mv exe/agent.exe exe/sim-center-agent-win.exe`.
-4. Commit, tag `vX.Y.Z`, push.
-5. Create GitHub release and upload `apps/agent/exe/sim-center-agent-win.exe`. Prefer a versioned asset name (e.g. `sim-center-agent-win-v2.0.14.exe`) to avoid GitHub CDN serving a stale build.
-6. Redeploy backend Docker image.
+3. Package agent: `cd apps/agent && npm run package:win`.
+4. Commit, tag `vX.Y.Z`, push: `git push origin main --tags`.
+5. The `Release SimCenter Agent` workflow builds Windows + Linux assets and publishes them to the GitHub release automatically.
+6. Redeploy backend Docker image if backend changes were made.
 
 ### Release gotchas
 
-- `npm run package:win` produces `apps/agent/exe/agent.exe`. **Always rename it** to the final asset name (`sim-center-agent-win.exe` or `sim-center-agent-win-vX.Y.Z.exe`) before uploading.
-- Before uploading, double-check the local exe version: `strings apps/agent/exe/sim-center-agent-win.exe | grep '"version":'` should show the new version.
-- GitHub `releases/download` URLs are heavily cached. Reusing the same filename on a release can cause users to download an old build even after a re-upload. Prefer a versioned filename (`sim-center-agent-win-v2.0.14.exe`) or delete the old asset before re-uploading.
+- `npm run package:win` produces `apps/agent/exe/agent.exe` plus `exe/build/koffi/win32_x64/` native binaries.
+- The Windows release asset is a **zip** (`sim-center-agent-win.zip`) containing the executable **and** `build/koffi/win32_x64/` native binaries. Do not distribute the bare `.exe` alone.
+- Before uploading, double-check the local exe version: `strings apps/agent/exe/agent.exe | grep '"version":'` should show the new version.
+- GitHub `releases/download` URLs are heavily cached. Reusing the same filename on a release can cause users to download an old build even after a re-upload. The CI uses fixed names (`sim-center-agent-win.zip`, `sim-center-agent-linux-x64.tar.gz`) but each release has its own tag URL, avoiding cache issues.
 - After uploading, **download the asset from the release URL** and verify its version string/hashes match the local file.
 - Do **not** release the legacy `agent/exe/sim-center-agent-win.exe`.
 
@@ -166,17 +195,14 @@ npm run package:win      # outputs exe/agent.exe, rename to sim-center-agent-win
 
 Dedicated-server and POD commands (`server:launch`, `server:join`, `server:stop`) were added in agent **v2.0.5** and improved in **v2.0.6**. Content previews are stored in the `content_previews` table since **v2.0.7**. If an agent logs `"version":"2.0.4"` (or older), it will stay silent when receiving these commands even though it is online and other commands (e.g. `ac:autoShifter`) may work.
 
-Release asset expected SHA-256 for v2.2.2 (manual release build):
+Release assets are built automatically by the `Release SimCenter Agent` workflow. Download the latest assets from:
+https://github.com/Concombre37/simracing-manager/releases/latest
 
-```
-4f6c2a0445c52eeaac1e12b6cd1319092ed5a49541d30e4ed0a275bfea8f67d2
-```
-
-To fix a stuck station, replace its local `sim-center-agent-win.exe` with the latest release asset (or re-run the updater) and restart the agent.
+To fix a stuck station, replace its local `sim-center-agent-win.exe` (and the `build/koffi/win32_x64/` folder if present) with the latest release asset, or re-run the updater and restart the agent.
 
 ### Release token
 
-A GitHub personal access token for pushing releases is stored in `.kimi/skills/simracing-manager/.github-token` (gitignored). Use it with `git remote set-url origin https://<token>@github.com/Concombre37/simracing-manager.git` before pushing tags, or reset the URL afterward.
+A GitHub personal access token for pushing releases is stored in `.kimi/skills/simracing-manager/.github-token` (gitignored). Use it with `git remote set-url origin https://<token>@github.com/Concombre37/simracing-manager.git` before pushing tags, then reset the URL afterward. The `Release SimCenter Agent` workflow uses `secrets.GITHUB_TOKEN` to upload assets.
 
 ## 10. Testing Checklist
 
@@ -191,7 +217,8 @@ After agent/backend changes, verify:
 - [x] Tracks without a layout use an empty `CONFIG_TRACK` (not `random`).
 - [ ] Stop server terminates only the correct process.
 - [ ] Agent update (`system:update`) downloads and restarts from latest release.
-- [ ] In-game telemetry appears on `/telemetry` when a POD is `in_game` (UDP `127.0.0.1:19900` or fallback `telemetry.json`).
+- [ ] Shared-memory telemetry appears live on `/en-cours` when a POD is `in_game` on Windows.
+- [ ] Legacy in-game telemetry appears on `/telemetry` when shared memory is unavailable (UDP `127.0.0.1:19900` or fallback `telemetry.json`).
 - [ ] Blanking screen hides as soon as AC shared memory is available and reappears on exit.
 - [ ] Manual blanking hide/show buttons work from the Stations page even when AC is closed.
 - [ ] Custom blanking images/videos uploaded from the Stations page appear on the POD.
