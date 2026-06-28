@@ -166,7 +166,7 @@ npm run package:win      # outputs exe/agent.exe + exe/build/koffi/win32_x64/*.n
 - `package:win` → `pkg . --targets node18-win-x64 --out-path exe`.
 - `postpackage:win` → copy `koffi.node` / `koffi.lib` / `koffi.exp` to `exe/build/koffi/win32_x64/`.
 
-For distribution, zip the executable together with the `build/` folder so the native module is found at runtime:
+For distribution you can either create a self-extracting installer with 7-Zip SFX, or zip the executable together with the `build/` folder:
 
 ```bash
 cd apps/agent/exe
