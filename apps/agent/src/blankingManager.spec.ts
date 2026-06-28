@@ -184,6 +184,19 @@ describe('BlankingManager', () => {
     expect(manager.isBlankingActive()).toBe(true);
   });
 
+  it('switches to hide override when blanking process is closed manually', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    expect(manager.isBlankingActive()).toBe(true);
+    const calls = vi.mocked(spawn).mock.calls;
+    const proc = vi.mocked(spawn).mock.results[calls.length - 1].value as ReturnType<
+      typeof createFakeProcess
+    >;
+    proc.emit('exit', 0);
+    expect((manager as unknown as { override: string }).override).toBe('hide');
+    expect(manager.isBlankingActive()).toBe(false);
+  });
+
   it('passes an empty playlist when no media is configured', () => {
     manager.setAuto();
     manager.setAcRunning(false);

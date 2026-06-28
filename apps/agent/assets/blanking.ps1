@@ -135,9 +135,37 @@ function Show-CurrentSlide {
   }
 }
 
-$videoPlayer.Add_MediaEnded({
+$videoPlayer.Add_MediaFailed({
+  $errorMessage = $_.Exception
+  if (-not $errorMessage -and $args.Count -gt 1) {
+    $errorMessage = $args[1].ErrorException
+  }
+  Write-Warning "Video playback failed for $($items[$script:currentIndex].Path): $errorMessage"
   $script:currentIndex = ($script:currentIndex + 1) % $items.Count
   Show-CurrentSlide
+})
+
+$videoPlayer.Add_MediaEnded({
+  if ($items.Count -eq 1) {
+    $videoPlayer.Position = [System.TimeSpan]::Zero
+    $videoPlayer.Play()
+  } else {
+    $script:currentIndex = ($script:currentIndex + 1) % $items.Count
+    Show-CurrentSlide
+  }
+})
+
+$window.Add_KeyDown({
+  if ($_.Key -eq 'Escape') {
+    Write-Host 'Escape pressed, closing blanking screen'
+    $window.Close()
+  }
+})
+
+$window.Add_Closed({
+  if ($timer -ne $null) { $timer.Stop() }
+  $videoPlayer.Stop()
+  $videoPlayer.Close()
 })
 
 $window.Add_Loaded({
@@ -151,6 +179,3 @@ $window.Add_Loaded({
 })
 
 [void]$window.ShowDialog()
-
-if ($timer -ne $null) { $timer.Stop() }
-$videoPlayer.Stop()

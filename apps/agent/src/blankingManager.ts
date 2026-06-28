@@ -41,6 +41,7 @@ export class BlankingManager {
   private readyTimeout: NodeJS.Timeout | null = null;
   private readyConfirmed = false;
   private readonly readyDelayMs = 5000;
+  private stoppingIntentionally = false;
   private scriptPath: string | null = null;
   private playlistPath: string | null = null;
   private mediaPaths: string[] = [];
@@ -332,7 +333,15 @@ export class BlankingManager {
     });
 
     this.process.on('exit', (code) => {
-      this.logger.debug({ code }, 'Blanking screen process exited');
+      this.logger.debug(
+        { code, intentional: this.stoppingIntentionally },
+        'Blanking screen process exited',
+      );
+      if (!this.stoppingIntentionally) {
+        this.logger.info('Blanking screen was closed manually, switching to hide override');
+        this.override = 'hide';
+      }
+      this.stoppingIntentionally = false;
       this.process = null;
     });
     this.process.on('error', (err) => {
@@ -345,6 +354,7 @@ export class BlankingManager {
     if (!this.process || this.process.killed) return;
 
     this.logger.info('Stopping blanking screen');
+    this.stoppingIntentionally = true;
     const proc = this.process;
     proc.kill('SIGTERM');
 
