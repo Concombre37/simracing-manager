@@ -31,3 +31,13 @@ for (const file of files) {
     console.warn(`Skipped missing file: ${file}`);
   }
 }
+
+// Copy the hidden launcher script next to the executable.
+const launcherSrc = path.join(__dirname, '..', 'assets', 'start-agent.vbs');
+const launcherDest = path.join(__dirname, '..', 'exe', 'start-agent.vbs');
+if (fs.existsSync(launcherSrc)) {
+  fs.copyFileSync(launcherSrc, launcherDest);
+  console.log(`Copied start-agent.vbs to exe/`);
+} else {
+  console.warn(`Skipped missing file: start-agent.vbs`);
+}

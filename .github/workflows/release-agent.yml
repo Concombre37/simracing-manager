@@ -52,9 +52,9 @@ jobs:
           $sfx = "C:\Program Files\7-Zip\7zCon.sfx"
           if (-not (Test-Path $7z)) { $7z = "7z.exe"; $sfx = "7zCon.sfx" }
           if (-not (Test-Path $sfx)) { throw "SFX module not found at $sfx" }
-          & $7z a -sfx"$sfx" -r -y exe\sim-center-agent-win-setup.exe exe\config.txt exe\sim-center-agent-win.exe exe\build
+          & $7z a -sfx"$sfx" -r -y exe\sim-center-agent-win-setup.exe exe\config.txt exe\sim-center-agent-win.exe exe\start-agent.vbs exe\build
           if (-not (Test-Path exe\sim-center-agent-win-setup.exe)) { throw "SFX not created" }
-          & $7z a -tzip -r -y exe\sim-center-agent-win.zip exe\sim-center-agent-win.exe exe\build
+          & $7z a -tzip -r -y exe\sim-center-agent-win.zip exe\sim-center-agent-win.exe exe\start-agent.vbs exe\build
           if (-not (Test-Path exe\sim-center-agent-win.zip)) { throw "ZIP not created" }
 
       - name: Upload release assets

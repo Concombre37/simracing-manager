@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.28 — Auto-start silencieux Windows
+
+### Ajouté
+
+- **Lanceur invisible Windows** : `start-agent.vbs` est fourni avec l’agent. Il démarre `sim-center-agent-win.exe` sans afficher de fenêtre console.
+- **Auto-start avec vérification** : quand `AUTO_START=1`, l’agent écrit/verrouille une entrée dans `HKCU\Software\Microsoft\CurrentVersion\Run` pointant vers `start-agent.vbs`. À chaque démarrage, il vérifie que l’entrée existe et la recrée si nécessaire.
+- Le setup SFX et le zip incluent désormais `start-agent.vbs`.
+
 ## v2.2.27 — Portage de fonctionnalités RS Launcher
 
 ### Ajouté
