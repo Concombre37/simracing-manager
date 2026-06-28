@@ -31,17 +31,33 @@ jobs:
       - name: Build agent
         run: npm run build --workspace=@simracing/agent
 
+      - name: Install 7zip
+        run: choco install 7zip -y
+
       - name: Package Windows agent
         run: |
           cd apps/agent
           npm run package:win
           Move-Item -Path "exe/agent.exe" -Destination "exe/sim-center-agent-win.exe" -Force
-          Compress-Archive -Path "exe/sim-center-agent-win.exe","exe/build" -DestinationPath "exe/sim-center-agent-win.zip" -Force
+          @'
+          ;!@Install@!UTF-8!
+          Title="SimCenter Agent"
+          ExtractDialogText="Extracting SimCenter Agent..."
+          ExtractPathText="Choose extraction folder:"
+          GUIMode="1"
+          RunProgram=""%%T\sim-center-agent-win.exe""
+          ;!@InstallEnd@!
+          '@ | Out-File -Encoding utf8 exe\config.txt
+          $7z = "C:\Program Files\7-Zip\7z.exe"
+          $sfx = "C:\Program Files\7-Zip\7zCon.sfx"
+          if (-not (Test-Path $7z)) { $7z = "7z.exe"; $sfx = "7zCon.sfx" }
+          & $7z a -sfx$sfx -r -y exe\sim-center-agent-win-setup.exe exe\config.txt exe\sim-center-agent-win.exe exe\build
+          if (-not (Test-Path exe\sim-center-agent-win-setup.exe)) { throw "SFX not created" }
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/agent/exe/sim-center-agent-win.zip
+          files: apps/agent/exe/sim-center-agent-win-setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
