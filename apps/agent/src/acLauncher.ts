@@ -121,20 +121,26 @@ export class AcLauncher {
   async quit(): Promise<void> {
     this.logger.info('Sending quit command to Assetto Corsa');
     await this.luaBridge.quit();
-    // Give AC a few seconds to shut down gracefully, then force kill if still running.
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    if (await this.processMonitor.isAcRunning()) {
-      this.logger.warn('AC still running after quit command, forcing stop');
-      await this.stop();
-    } else {
-      this.logger.info('AC quit confirmed');
+    // Wait up to 15 seconds for AC to shut down gracefully, polling every second.
+    const checkIntervalMs = 1000;
+    const timeoutMs = 15000;
+    let elapsed = 0;
+    while (elapsed < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, checkIntervalMs));
+      elapsed += checkIntervalMs;
+      if (!(await this.processMonitor.isAcRunning())) {
+        this.logger.info('AC quit confirmed');
+        return;
+      }
     }
+    this.logger.warn('AC still running after quit command, forcing stop');
+    await this.stop();
   }
 
   private async killProcess(imageName: string): Promise<void> {
     try {
       await new Promise<void>((resolve, reject) => {
-        const proc = spawn('taskkill', ['/F', '/IM', imageName], { stdio: 'ignore' });
+        const proc = spawn('taskkill', ['/F', '/T', '/IM', imageName], { stdio: 'ignore' });
         proc.on('exit', (code) => {
           if (code === 0 || code === 128) {
             resolve();
