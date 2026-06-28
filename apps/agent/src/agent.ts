@@ -29,6 +29,7 @@ import { resolveAcPath } from './acPathResolver';
 import { TelemetryReceiver } from './telemetryReceiver';
 import { TelemetryFileReader } from './telemetryFileReader';
 import { AcSharedMemoryReader } from './acSharedMemoryReader';
+import { RaceResultReader } from './raceResultReader';
 import { ProcessMonitor } from './processMonitor';
 import { BlankingManager } from './blankingManager';
 import { AcSharedMemoryChecker } from './acSharedMemory';
@@ -69,6 +70,7 @@ export class SimRacingAgent {
   private telemetryReceiver: TelemetryReceiver | null = null;
   private telemetryFileReader: TelemetryFileReader | null = null;
   private acSharedMemoryReader: AcSharedMemoryReader | null = null;
+  private raceResultReader: RaceResultReader;
   private processMonitor: ProcessMonitor;
   private blankingManager: BlankingManager;
   private acSharedMemory: AcSharedMemoryChecker;
@@ -82,6 +84,7 @@ export class SimRacingAgent {
     this.serverLauncher = new ServerLauncher(logger);
     this.updater = new Updater(logger);
     this.processMonitor = new ProcessMonitor(logger);
+    this.raceResultReader = new RaceResultReader(logger);
     this.blankingManager = new BlankingManager(logger);
     this.acSharedMemory = new AcSharedMemoryChecker(logger);
     this.blankingMediaSync = new BlankingMediaSync(logger, this.blankingManager);
@@ -761,6 +764,17 @@ export class SimRacingAgent {
         status: StationStatus.ONLINE,
       });
       if (session) {
+        // Wait for Assetto Corsa to write race_out.json, then read and push results.
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const result = await this.raceResultReader.readLatest(session.startedAt);
+        if (result) {
+          this.socket?.emit('agent:results', {
+            stationId: config.STATION_ID,
+            sessionId: session.sessionId,
+            result,
+          });
+          this.logger.info({ sessionId: session.sessionId }, 'Session results pushed to backend');
+        }
         this.blankingManager.showResults({
           clientName: session.clientName,
           carAcId: session.carAcId,
