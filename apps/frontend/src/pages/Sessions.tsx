@@ -239,6 +239,14 @@ function SessionCard({
         <Button
           size="sm"
           variant="secondary"
+          onClick={() => extendMutation.mutate(1)}
+          disabled={extendMutation.isPending}
+        >
+          <Plus className="w-4 h-4" />1 min
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
           onClick={() => extendMutation.mutate(5)}
           disabled={extendMutation.isPending}
         >
@@ -252,6 +260,14 @@ function SessionCard({
         >
           <Plus className="w-4 h-4" />
           15 min
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => extendMutation.mutate(-1)}
+          disabled={extendMutation.isPending || (remainingSeconds ?? 0) <= 60}
+        >
+          <Minus className="w-4 h-4" />1 min
         </Button>
         <Button
           size="sm"
