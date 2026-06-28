@@ -6,6 +6,7 @@ import type { TelemetrySnapshot } from '@simracing/shared';
 describe('TelemetryReceiver', () => {
   let receiver: TelemetryReceiver;
   const emit = vi.fn();
+  const onSnapshot = vi.fn();
   const mockSocket = {
     connected: true,
     emit,
@@ -25,7 +26,7 @@ describe('TelemetryReceiver', () => {
 
   beforeEach(() => {
     emit.mockClear();
-    receiver = new TelemetryReceiver(mockLogger, mockSocket, undefined, udpPort, httpPort);
+    receiver = new TelemetryReceiver(mockLogger, mockSocket, onSnapshot, udpPort, httpPort);
   });
 
   afterEach(() => {
@@ -65,6 +66,6 @@ describe('TelemetryReceiver', () => {
       req.end();
     });
 
-    expect(emit).toHaveBeenCalledWith('agent:telemetry', payload);
+    expect(onSnapshot).toHaveBeenCalledWith(payload);
   });
 });

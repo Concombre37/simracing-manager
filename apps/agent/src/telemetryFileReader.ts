@@ -52,7 +52,6 @@ export class TelemetryFileReader {
       const payload: TelemetrySnapshot = JSON.parse(raw);
       if (!payload.stationId) return;
       this.onSnapshot?.(payload);
-      if (!this.socket?.connected) return;
       if (!this.fileFoundLogged) {
         this.logger.info(
           { filePath, stationId: payload.stationId },
@@ -60,7 +59,6 @@ export class TelemetryFileReader {
         );
         this.fileFoundLogged = true;
       }
-      this.socket.emit('agent:telemetry', payload);
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code !== 'ENOENT') {

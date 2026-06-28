@@ -79,8 +79,6 @@ export class TelemetryReceiver {
 
   private forward(payload: TelemetrySnapshot): void {
     this.onSnapshot?.(payload);
-    if (!this.socket?.connected) return;
-    this.socket.emit('agent:telemetry', payload);
   }
 
   private logProgress(): void {

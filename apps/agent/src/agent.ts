@@ -28,6 +28,7 @@ import { promptForContentManagerPath, validateFilePath } from './dialogs';
 import { resolveAcPath } from './acPathResolver';
 import { TelemetryReceiver } from './telemetryReceiver';
 import { TelemetryFileReader } from './telemetryFileReader';
+import { AcSharedMemoryReader } from './acSharedMemoryReader';
 import { ProcessMonitor } from './processMonitor';
 import { BlankingManager } from './blankingManager';
 import { AcSharedMemoryChecker } from './acSharedMemory';
@@ -67,6 +68,7 @@ export class SimRacingAgent {
   private updater: Updater;
   private telemetryReceiver: TelemetryReceiver | null = null;
   private telemetryFileReader: TelemetryFileReader | null = null;
+  private acSharedMemoryReader: AcSharedMemoryReader | null = null;
   private processMonitor: ProcessMonitor;
   private blankingManager: BlankingManager;
   private acSharedMemory: AcSharedMemoryChecker;
@@ -98,6 +100,7 @@ export class SimRacingAgent {
     });
     this.trackBestLap(snapshot);
     this.blankingManager.onTelemetry(snapshot);
+    this.socket?.emit('agent:telemetry', snapshot);
   }
 
   private trackBestLap(snapshot: TelemetrySnapshot): void {
@@ -292,6 +295,13 @@ export class SimRacingAgent {
       void this.sendContent();
       this.startContentSync();
       void this.blankingMediaSync.sync(config.STATION_ID, this.apiKey);
+
+      this.acSharedMemoryReader = new AcSharedMemoryReader(
+        this.logger,
+        config.STATION_ID,
+        this.currentSession?.sessionId,
+        (snapshot) => this.onTelemetrySnapshot(snapshot),
+      );
     });
 
     this.socket.on('connect_error', (err) => {
@@ -302,7 +312,7 @@ export class SimRacingAgent {
       }
     });
 
-    (this.socket as any).on('error', (err: Error | string) => {
+    (this.socket as unknown as import('events').EventEmitter).on('error', (err: Error | string) => {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error({ message }, 'Socket error');
       if (this.isApiKeyError(message)) {
@@ -505,6 +515,7 @@ export class SimRacingAgent {
     try {
       await this.acLauncher.launch(payload);
       this.acRunning = true;
+      this.acSharedMemoryReader?.start();
       await this.luaBridge.autoStart();
       this.socket?.emit('agent:status', {
         stationId: config.STATION_ID,
@@ -517,6 +528,7 @@ export class SimRacingAgent {
 
   private async handleStop(): Promise<void> {
     this.logger.info('Received stop command');
+    this.acSharedMemoryReader?.stop();
     await this.luaBridge.quit();
     await this.acLauncher.stop();
     this.acRunning = false;
@@ -704,6 +716,8 @@ export class SimRacingAgent {
           track: payload.track,
           trackLayout: payload.trackLayout,
         };
+        this.acSharedMemoryReader?.setSessionId(payload.sessionId);
+        this.acSharedMemoryReader?.start();
         this.scheduleSessionEnd();
       }
     } catch (err) {
@@ -715,6 +729,7 @@ export class SimRacingAgent {
     this.logger.info('Duration expired, returning POD to paddock');
     const session = this.currentSession;
     this.clearCurrentSession();
+    this.acSharedMemoryReader?.stop();
     try {
       await this.acLauncher.quit();
       this.acRunning = false;
