@@ -10,6 +10,7 @@ export interface AgentToServerEvents {
   'agent:session:ended': (payload: { sessionId: string }) => void;
   'agent:content': (payload: { stationId: string; content: Record<string, unknown> }) => void;
   'agent:telemetry': (payload: TelemetrySnapshot) => void;
+  'agent:telemetry:csv': (payload: TelemetryCsvPayload) => void;
   'server:started': (payload: {
     serverId: string;
     serverDir?: string;
@@ -96,6 +97,12 @@ export interface ResultsPayload {
   stationId: string;
   sessionId: string;
   result: Record<string, unknown>;
+}
+
+export interface TelemetryCsvPayload {
+  stationId: string;
+  sessionId: string;
+  csv: string;
 }
 
 export interface StatusPayload {

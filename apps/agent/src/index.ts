@@ -1,4 +1,6 @@
 import pino from 'pino';
+import { acquireSingleInstance } from './singleInstance';
+import { ensureAutoStart } from './autoStart';
 
 // pino-pretty uses worker threads that may fail inside a pkg executable.
 // Use a simple pretty-like formatter when packaged.
@@ -65,8 +67,14 @@ async function main(): Promise<void> {
 
   scopedLogger.info(`SimRacing Manager Agent v${config.VERSION} starting`);
   scopedLogger.info({ envPath, acPath: config.AC_PATH ?? null }, 'Loaded configuration from .env');
+  const releaseLock = await acquireSingleInstance(scopedLogger);
+  await ensureAutoStart(scopedLogger);
   const agent = new SimRacingAgent(scopedLogger);
-  await agent.start();
+  try {
+    await agent.start();
+  } finally {
+    releaseLock();
+  }
 }
 
 main().catch((err: unknown) => {

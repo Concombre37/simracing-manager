@@ -19,6 +19,7 @@ import {
   HeartbeatPayload,
   LogPayload,
   ResultsPayload,
+  TelemetryCsvPayload,
   LaunchSessionPayload,
   StationStatus,
   StatusPayload,
@@ -27,6 +28,8 @@ import {
 import { DashboardGateway } from '../dashboard/dashboard.gateway';
 import { TelemetryService } from '../telemetry/telemetry.service';
 import { TelemetrySnapshot } from '@simracing/shared';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 interface AuthenticatedSocket extends Socket {
   stationId?: string;
@@ -199,6 +202,32 @@ export class AgentGateway
     payload: ResultsPayload,
   ): Promise<void> {
     await this.sessionsService.finish(payload.sessionId, payload.result);
+  }
+
+  @SubscribeMessage('agent:telemetry:csv')
+  async handleTelemetryCsv(
+    _client: AuthenticatedSocket,
+    payload: TelemetryCsvPayload,
+  ): Promise<void> {
+    try {
+      const uploadDir = path.join(process.cwd(), 'uploads', 'telemetry');
+      await fs.mkdir(uploadDir, { recursive: true });
+      const filePath = path.join(uploadDir, `${payload.sessionId}.csv`);
+      await fs.writeFile(filePath, payload.csv, 'utf-8');
+      this.logger.log(
+        {
+          stationId: payload.stationId,
+          sessionId: payload.sessionId,
+          filePath,
+        },
+        'Lap telemetry CSV saved',
+      );
+    } catch (err) {
+      this.logger.error(
+        { err, stationId: payload.stationId, sessionId: payload.sessionId },
+        'Failed to save lap telemetry CSV',
+      );
+    }
   }
 
   @SubscribeMessage('agent:content')

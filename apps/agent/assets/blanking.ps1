@@ -2,7 +2,8 @@ param(
   [string]$PlaylistPath = '',
   [int]$SlideIntervalMs = 10000,
   [string]$Message = 'SimRacing Manager',
-  [string]$ResultsHtmlPath = ''
+  [string]$ResultsHtmlPath = '',
+  [int]$MonitorIndex = 1
 )
 
 Add-Type -AssemblyName PresentationFramework
@@ -34,11 +35,20 @@ $window = New-Object System.Windows.Window
 $window.WindowStyle = 'None'
 $window.ResizeMode = 'NoResize'
 $window.WindowState = 'Maximized'
-$window.WindowStartupLocation = 'CenterScreen'
+$window.WindowStartupLocation = 'Manual'
 $window.Topmost = $true
 $window.ShowInTaskbar = $false
 $window.Background = 'Black'
 $window.Cursor = [System.Windows.Input.Cursors]::None
+
+$screens = [System.Windows.Forms.Screen]::AllScreens
+$targetScreen = if ($MonitorIndex -gt 0 -and $MonitorIndex -le $screens.Count) {
+  $screens[$MonitorIndex - 1]
+} else {
+  $screens[0]
+}
+$window.Left = $targetScreen.Bounds.Left
+$window.Top = $targetScreen.Bounds.Top
 
 $grid = New-Object System.Windows.Controls.Grid
 $window.Content = $grid

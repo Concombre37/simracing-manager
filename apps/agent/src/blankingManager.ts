@@ -4,6 +4,8 @@ import { writeFileSync } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
 import { TelemetrySnapshot } from '@simracing/shared';
+import { RaceResultData, getLeaderboard } from './raceResultCleaner';
+import { config } from './config';
 
 export type BlankingOverride = 'auto' | 'hide' | 'show';
 
@@ -13,6 +15,7 @@ interface SessionResultsSummary {
   track?: string;
   trackLayout?: string;
   bestLapMs?: number;
+  result?: RaceResultData;
 }
 
 function formatLapTime(ms: number): string {
@@ -148,6 +151,7 @@ export class BlankingManager {
     const trackDisplay = summary.trackLayout
       ? `${summary.track} (${summary.trackLayout})`
       : (summary.track ?? '-');
+    const leaderboard = summary.result ? this.renderLeaderboard(summary.result) : '';
 
     const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -165,31 +169,39 @@ export class BlankingManager {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
+      padding: clamp(24px, 4vw, 64px);
       text-align: center;
     }
     h1 {
       font-size: clamp(32px, 5vw, 96px);
-      margin: 0 0 0.6em;
+      margin: 0 0 0.5em;
       color: #00d4ff;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-    .grid {
+    .summary {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: clamp(16px, 3vw, 48px);
-      width: min(90%, 1200px);
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: clamp(12px, 2vw, 32px);
+      width: min(95%, 1400px);
+      margin-bottom: clamp(24px, 3vw, 48px);
     }
-    .item { background: rgba(255,255,255,0.06); border-radius: 16px; padding: clamp(16px, 2vw, 32px); }
-    .label { color: #888; font-size: clamp(12px, 1.4vw, 20px); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4em; }
-    .value { font-size: clamp(20px, 2.6vw, 48px); font-weight: 600; }
+    .item { background: rgba(255,255,255,0.06); border-radius: 16px; padding: clamp(12px, 1.5vw, 24px); }
+    .label { color: #888; font-size: clamp(12px, 1.2vw, 18px); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4em; }
+    .value { font-size: clamp(18px, 2.2vw, 40px); font-weight: 600; }
     .best-lap .value { color: #00d4ff; }
+    .leaderboard { width: min(95%, 1400px); background: rgba(255,255,255,0.04); border-radius: 16px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; font-size: clamp(14px, 1.6vw, 26px); }
+    th { background: rgba(0,212,255,0.15); color: #00d4ff; padding: clamp(8px, 1vw, 16px); text-transform: uppercase; letter-spacing: 0.05em; }
+    td { padding: clamp(8px, 1vw, 16px); border-bottom: 1px solid rgba(255,255,255,0.06); }
+    tr:last-child td { border-bottom: none; }
+    .pos { font-weight: 700; color: #00d4ff; }
   </style>
 </head>
 <body>
   <h1>Session terminée</h1>
-  <div class="grid">
+  <div class="summary">
     <div class="item">
       <div class="label">Pilote</div>
       <div class="value">${this.escapeHtml(summary.clientName ?? '-')}</div>
@@ -207,11 +219,42 @@ export class BlankingManager {
       <div class="value">${bestLap}</div>
     </div>
   </div>
+  ${leaderboard}
 </body>
 </html>`;
 
     writeFileSync(htmlPath, html, 'utf-8');
     this.resultsHtmlPath = htmlPath;
+  }
+
+  private renderLeaderboard(result: RaceResultData): string {
+    const entries = getLeaderboard(result);
+    if (entries.length === 0) return '';
+    const rows = entries
+      .map(
+        (entry) => `<tr>
+      <td class="pos">${entry.position}</td>
+      <td>${this.escapeHtml(entry.name)}</td>
+      <td>${this.escapeHtml(entry.car)}</td>
+      <td>${entry.laps}</td>
+      <td>${formatLapTime(entry.bestLapMs)}</td>
+    </tr>`,
+      )
+      .join('');
+    return `<div class="leaderboard">
+  <table>
+    <thead>
+      <tr>
+        <th>Pos</th>
+        <th>Pilote</th>
+        <th>Voiture</th>
+        <th>Tours</th>
+        <th>Meilleur tour</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+</div>`;
   }
 
   private escapeHtml(value: string): string {
@@ -326,6 +369,8 @@ export class BlankingManager {
     if (this.resultsHtmlPath) {
       args.push('-ResultsHtmlPath', this.resultsHtmlPath);
     }
+
+    args.push('-MonitorIndex', String(config.BLANKING_MONITOR));
 
     this.process = spawn('powershell.exe', args, {
       detached: false,

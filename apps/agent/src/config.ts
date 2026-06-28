@@ -33,12 +33,21 @@ if (!existsSync(envPath)) {
     '# Écran : single, triple, vr',
     'SCREEN_MODE=single',
     '',
+    "# Moniteur de l'écran d'attente (1 = principal, 2 = secondaire, ...)",
+    'BLANKING_MONITOR=1',
+    '',
     '# Assists : easy, pro, custom',
     'ASSIST_PRESET=pro',
     '',
     '# Helpers',
     'AUTO_MAP_AC_CONTROLS=1',
     'AUTO_DRIVE_HELPER=1',
+    '',
+    '# Démarrage automatique avec Windows (1 = activer, 0 = désactiver)',
+    'AUTO_START=0',
+    '',
+    '# Icône dans la barre des tâches Windows (1 = activer, 0 = désactiver)',
+    'TRAY_ICON=0',
     '',
   ].join('\n');
 
@@ -91,9 +100,12 @@ const configSchema = z.object({
     .transform((v) => normalizePath(v) ?? undefined),
   LAUNCH_MODE: z.nativeEnum(LaunchMode).default(LaunchMode.CONTENT_MANAGER),
   SCREEN_MODE: z.nativeEnum(ScreenMode).default(ScreenMode.SINGLE),
+  BLANKING_MONITOR: z.coerce.number().int().min(1).default(1),
   ASSIST_PRESET: z.nativeEnum(AssistPreset).default(AssistPreset.PRO),
   AUTO_MAP_AC_CONTROLS: z.coerce.boolean().default(true),
   AUTO_DRIVE_HELPER: z.coerce.boolean().default(true),
+  AUTO_START: z.coerce.boolean().default(false),
+  TRAY_ICON: z.coerce.boolean().default(false),
 });
 
 const parsed = configSchema.safeParse(process.env);

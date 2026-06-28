@@ -30,6 +30,10 @@ import { TelemetryReceiver } from './telemetryReceiver';
 import { TelemetryFileReader } from './telemetryFileReader';
 import { AcSharedMemoryReader } from './acSharedMemoryReader';
 import { RaceResultReader } from './raceResultReader';
+import { cleanupRaceResult, RaceResultData } from './raceResultCleaner';
+import { waitForServerReachable } from './serverReachability';
+import { LapTelemetryRecorder } from './lapTelemetryRecorder';
+import { TrayManager } from './trayManager';
 import { ProcessMonitor } from './processMonitor';
 import { BlankingManager } from './blankingManager';
 import { AcSharedMemoryChecker } from './acSharedMemory';
@@ -75,6 +79,8 @@ export class SimRacingAgent {
   private processMonitor: ProcessMonitor;
   private blankingManager: BlankingManager;
   private acSharedMemory: AcSharedMemoryChecker;
+  private lapTelemetryRecorder: LapTelemetryRecorder;
+  private trayManager: TrayManager;
   private blankingMediaSync: BlankingMediaSync;
 
   constructor(private readonly logger: Logger) {
@@ -88,6 +94,20 @@ export class SimRacingAgent {
     this.raceResultReader = new RaceResultReader(logger);
     this.blankingManager = new BlankingManager(logger);
     this.acSharedMemory = new AcSharedMemoryChecker(logger);
+    this.lapTelemetryRecorder = new LapTelemetryRecorder(logger);
+    this.trayManager = new TrayManager(logger, {
+      onToggleBlanking: () => {
+        if (this.blankingManager.isBlankingActive()) {
+          this.blankingManager.hide();
+        } else {
+          this.blankingManager.show();
+        }
+      },
+      onQuit: () => {
+        this.logger.info('Quit requested from tray icon');
+        void this.stop().then(() => process.exit(0));
+      },
+    });
     this.blankingMediaSync = new BlankingMediaSync(logger, this.blankingManager);
   }
 
@@ -104,6 +124,7 @@ export class SimRacingAgent {
     });
     this.trackBestLap(snapshot);
     this.blankingManager.onTelemetry(snapshot);
+    this.lapTelemetryRecorder.record(snapshot);
     this.socket?.emit('agent:telemetry', snapshot);
   }
 
@@ -156,6 +177,7 @@ export class SimRacingAgent {
     await this.ensureContentManagerPath();
     await this.blankingManager.init();
     await this.acSharedMemory.init();
+    await this.trayManager.init();
     this.blankingManager.setAuto();
 
     if (!this.apiKey) {
@@ -281,6 +303,14 @@ export class SimRacingAgent {
   private async connectWithApiKey(apiKey: string): Promise<void> {
     this.logger.info({ stationId: config.STATION_ID }, 'Connecting to backend');
 
+    const reachable = await waitForServerReachable(config.SERVER_URL, this.logger);
+    if (!reachable) {
+      this.logger.warn(
+        { serverUrl: config.SERVER_URL },
+        'Backend server is not reachable; WebSocket connection may fail. Check network and SERVER_URL.',
+      );
+    }
+
     this.socket = io(`${config.SERVER_URL}/agent`, {
       auth: { token: apiKey },
       transports: ['websocket'],
@@ -397,6 +427,8 @@ export class SimRacingAgent {
     this.stopHeartbeat();
     this.stopContentSync();
     this.stopTelemetry();
+    this.acSharedMemoryReader?.stop();
+    this.trayManager.stop();
     await this.acLauncher.stop();
     this.socket?.disconnect();
   }
@@ -521,6 +553,7 @@ export class SimRacingAgent {
       await this.acLauncher.launch(payload);
       this.acRunning = true;
       this.acSharedMemoryReader?.start();
+      this.lapTelemetryRecorder.start(payload.sessionId);
       await this.luaBridge.autoStart();
       this.socket?.emit('agent:status', {
         stationId: config.STATION_ID,
@@ -539,6 +572,11 @@ export class SimRacingAgent {
     this.acRunning = false;
     this.clearCurrentSession();
     this.clearResultsTimeout();
+    const csvPath = await this.lapTelemetryRecorder.finish();
+    if (csvPath) {
+      this.logger.info({ csvPath }, 'Lap telemetry CSV saved');
+      await this.uploadLapTelemetryCsv(csvPath);
+    }
     this.blankingManager.clearResults();
     this.blankingManager.setAuto();
     this.socket?.emit('agent:status', {
@@ -691,6 +729,23 @@ export class SimRacingAgent {
     }
   }
 
+  private async uploadLapTelemetryCsv(csvPath: string | null): Promise<void> {
+    if (!csvPath) return;
+    try {
+      const csv = await fs.readFile(csvPath, 'utf-8');
+      const sessionId = this.lapTelemetryRecorder.getSessionId();
+      if (!sessionId) return;
+      this.socket?.emit('agent:telemetry:csv', {
+        stationId: config.STATION_ID,
+        sessionId,
+        csv,
+      });
+      this.logger.info({ sessionId }, 'Lap telemetry CSV uploaded');
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to upload lap telemetry CSV');
+    }
+  }
+
   private async runStartupDiagnostics(): Promise<void> {
     try {
       const diagnostics = await runWolDiagnostics(this.logger);
@@ -756,6 +811,7 @@ export class SimRacingAgent {
         this.acSharedMemoryReader?.setSessionId(payload.sessionId);
         this.acSharedMemoryReader?.start();
         this.scheduleSessionEnd();
+        this.lapTelemetryRecorder.start(payload.sessionId);
       }
     } catch (err) {
       this.logger.error({ err }, 'Failed to execute join server command');
@@ -766,6 +822,11 @@ export class SimRacingAgent {
     this.logger.info('Duration expired, returning POD to paddock');
     const session = this.currentSession;
     this.clearCurrentSession();
+    const csvPath = await this.lapTelemetryRecorder.finish();
+    if (csvPath) {
+      this.logger.info({ csvPath }, 'Lap telemetry CSV saved');
+      await this.uploadLapTelemetryCsv(csvPath);
+    }
     this.acSharedMemoryReader?.stop();
     try {
       await this.acLauncher.quit();
@@ -777,14 +838,19 @@ export class SimRacingAgent {
       if (session) {
         // Wait for Assetto Corsa to write race_out.json, then read and push results.
         await new Promise((resolve) => setTimeout(resolve, 3000));
-        const result = await this.raceResultReader.readLatest(session.startedAt);
-        if (result) {
-          this.socket?.emit('agent:results', {
-            stationId: config.STATION_ID,
-            sessionId: session.sessionId,
-            result,
-          });
-          this.logger.info({ sessionId: session.sessionId }, 'Session results pushed to backend');
+        const rawResult = await this.raceResultReader.readLatest(session.startedAt);
+        let raceResult: RaceResultData | undefined;
+        if (rawResult) {
+          const cleaned = cleanupRaceResult(rawResult);
+          if (cleaned.valid && cleaned.resultData) {
+            raceResult = cleaned.resultData;
+            this.socket?.emit('agent:results', {
+              stationId: config.STATION_ID,
+              sessionId: session.sessionId,
+              result: raceResult as unknown as Record<string, unknown>,
+            });
+            this.logger.info({ sessionId: session.sessionId }, 'Session results pushed to backend');
+          }
         }
         this.blankingManager.showResults({
           clientName: session.clientName,
@@ -792,6 +858,7 @@ export class SimRacingAgent {
           track: session.track,
           trackLayout: session.trackLayout,
           bestLapMs: session.bestLapMs,
+          result: raceResult,
         });
         this.socket?.emit('agent:session:ended', { sessionId: session.sessionId });
         this.resultsTimeout = setTimeout(() => {
