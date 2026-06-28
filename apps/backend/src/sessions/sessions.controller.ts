@@ -53,7 +53,7 @@ export class SessionsController {
   }
 
   @Post(':id/extend')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
   async extend(
     @Param('id') id: string,
     @Body('minutes', ParseIntPipe) minutes: number,
@@ -83,7 +83,7 @@ export class SessionsController {
   }
 
   @Post(':id/stop')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
   async stop(@Param('id') id: string) {
     const session = await this.sessionsService.stop(id);
     await this.agentGateway.emitStopSession(session.stationId);

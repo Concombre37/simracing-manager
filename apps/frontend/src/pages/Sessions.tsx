@@ -3,13 +3,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
   Clock,
-  Gauge,
   Timer,
   Flag,
   MapPin,
   Monitor,
-  CircleDot,
-  Navigation,
   User,
   Car,
   AlertCircle,
@@ -23,6 +20,7 @@ import { useSocket } from '../hooks/useSocket';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
+import { CircularGauge } from '../components/ui/CircularGauge';
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { formatDuration } from '../utils/time';
 
@@ -140,16 +138,21 @@ function SessionCard({
 
   const stale = !telemetry || Date.now() - telemetry.timestamp > STALE_MS;
   const waiting = stale && session.station.status === 'in_game';
+  const expired = remainingSeconds !== undefined && remainingSeconds <= 0;
+  const progressPct =
+    remainingSeconds !== undefined && session.durationMinutes
+      ? Math.max(0, Math.min(100, (remainingSeconds / (session.durationMinutes * 60)) * 100))
+      : 0;
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col overflow-hidden">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-accent-orange/10 rounded-lg">
+          <div className="p-2.5 bg-accent-orange/10 rounded-xl border border-accent-orange/20">
             <Play className="w-5 h-5 text-accent-orange" />
           </div>
           <div>
-            <h3 className="font-semibold text-white">{session.station.name}</h3>
+            <h3 className="font-bold text-white text-lg leading-tight">{session.station.name}</h3>
             <p className="text-xs text-gray-500 font-mono">{session.station.stationId}</p>
           </div>
         </div>
@@ -158,7 +161,7 @@ function SessionCard({
         </Badge>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="grid grid-cols-2 gap-3 mb-5">
         <InfoPill icon={User} label="Client" value={session.clientName ?? '—'} />
         <InfoPill icon={Car} label="Voiture" value={session.carAcId ?? '—'} />
         <InfoPill icon={MapPin} label="Circuit" value={session.track ?? '—'} />
@@ -166,72 +169,94 @@ function SessionCard({
       </div>
 
       {remainingSeconds !== undefined && (
-        <div className="mb-4 p-3 bg-dark-900 rounded-lg border border-dark-600">
-          <div className="flex items-center justify-between mb-2">
+        <div className="mb-5 p-4 bg-dark-900/80 rounded-xl border border-dark-600">
+          <div className="flex items-end justify-between mb-3">
             <span className="text-sm text-gray-400 flex items-center gap-2">
               <Clock className="w-4 h-4" />
               Temps restant
             </span>
-            <span className="text-white font-mono font-semibold">
-              {formatRemaining(remainingSeconds)}
+            <span
+              className={`font-mono font-bold text-3xl tracking-tight ${
+                expired ? 'text-red-500' : remainingSeconds <= 60 ? 'text-yellow-400' : 'text-white'
+              }`}
+            >
+              {expired ? '00:00' : formatRemaining(remainingSeconds)}
             </span>
           </div>
-          <div className="w-full h-2 bg-dark-700 rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-dark-700 rounded-full overflow-hidden">
             <div
-              className="h-full bg-accent-orange transition-all duration-1000"
-              style={{
-                width: `${Math.max(
-                  0,
-                  Math.min(100, (remainingSeconds / ((session.durationMinutes ?? 1) * 60)) * 100),
-                )}%`,
-              }}
+              className={`h-full transition-all duration-1000 ${
+                expired
+                  ? 'bg-red-500'
+                  : progressPct <= 10
+                    ? 'bg-yellow-400'
+                    : 'bg-gradient-to-r from-accent-orange to-accent-yellow'
+              }`}
+              style={{ width: `${progressPct}%` }}
             />
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <Metric
-          icon={Gauge}
-          label="Vitesse"
-          value={telemetry ? `${Math.round(telemetry.speedKmh)} km/h` : '—'}
-        />
-        <Metric
-          icon={Activity}
+      <div className="flex items-center justify-around mb-6">
+        <CircularGauge
+          value={telemetry ? telemetry.rpm : 0}
+          max={10000}
           label="RPM"
-          value={telemetry ? String(Math.round(telemetry.rpm)) : '—'}
+          unit="/min"
+          color="#00d4ff"
         />
-        <Metric icon={Timer} label="Meilleur tour" value={formatDuration(telemetry?.bestLapMs)} />
-        <Metric icon={Flag} label="Dernier tour" value={formatDuration(telemetry?.lastLapMs)} />
+        <CircularGauge
+          value={telemetry ? telemetry.speedKmh : 0}
+          max={320}
+          label="Vitesse"
+          unit="km/h"
+          color="#f59e0b"
+        />
       </div>
 
-      <div className="space-y-3 mb-4">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-400 flex items-center gap-2">
-            <CircleDot className="w-4 h-4" />
-            Rapport
-          </span>
-          <span className="text-white font-medium">
+      <div className="grid grid-cols-3 gap-3 mb-5">
+        <div className="flex flex-col items-center p-3 bg-dark-900 rounded-xl border border-dark-600">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Rapport</span>
+          <span className="text-2xl font-bold text-white">
             {telemetry ? gearLabel(telemetry.gear) : '—'}
           </span>
         </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-400 flex items-center gap-2">
-            <MapPin className="w-4 h-4" />
-            Position
-          </span>
-          <span className="text-white font-medium">{telemetry?.position ?? '—'}</span>
+        <div className="flex flex-col items-center p-3 bg-dark-900 rounded-xl border border-dark-600">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Position</span>
+          <span className="text-2xl font-bold text-white">{telemetry?.position ?? '—'}</span>
         </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-400 flex items-center gap-2">
-            <Navigation className="w-4 h-4" />
-            Progression
-          </span>
-          <span className="text-white font-medium">
+        <div className="flex flex-col items-center p-3 bg-dark-900 rounded-xl border border-dark-600">
+          <span className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Piste</span>
+          <span className="text-2xl font-bold text-white">
             {telemetry?.trackPosition !== undefined
-              ? `${Math.round(telemetry.trackPosition * 100)} %`
+              ? `${Math.round(telemetry.trackPosition * 100)}%`
               : '—'}
           </span>
+        </div>
+      </div>
+
+      {telemetry && (
+        <div className="space-y-2 mb-5">
+          <PedalBar label="Accélérateur" value={telemetry.throttle} color="#22c55e" />
+          <PedalBar label="Frein" value={telemetry.brake} color="#ef4444" />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 mb-5">
+        <div className="p-3 bg-dark-900 rounded-xl border border-dark-600">
+          <div className="flex items-center gap-2 text-gray-500 mb-1">
+            <Timer className="w-3.5 h-3.5" />
+            <span className="text-[10px] uppercase tracking-wider">Meilleur tour</span>
+          </div>
+          <p className="text-lg font-semibold text-white">{formatDuration(telemetry?.bestLapMs)}</p>
+        </div>
+        <div className="p-3 bg-dark-900 rounded-xl border border-dark-600">
+          <div className="flex items-center gap-2 text-gray-500 mb-1">
+            <Flag className="w-3.5 h-3.5" />
+            <span className="text-[10px] uppercase tracking-wider">Dernier tour</span>
+          </div>
+          <p className="text-lg font-semibold text-white">{formatDuration(telemetry?.lastLapMs)}</p>
         </div>
       </div>
 
@@ -240,7 +265,7 @@ function SessionCard({
           size="sm"
           variant="secondary"
           onClick={() => extendMutation.mutate(1)}
-          disabled={extendMutation.isPending}
+          disabled={extendMutation.isPending || expired}
         >
           <Plus className="w-4 h-4" />1 min
         </Button>
@@ -248,7 +273,7 @@ function SessionCard({
           size="sm"
           variant="secondary"
           onClick={() => extendMutation.mutate(5)}
-          disabled={extendMutation.isPending}
+          disabled={extendMutation.isPending || expired}
         >
           <Plus className="w-4 h-4" />5 min
         </Button>
@@ -256,7 +281,7 @@ function SessionCard({
           size="sm"
           variant="secondary"
           onClick={() => extendMutation.mutate(15)}
-          disabled={extendMutation.isPending}
+          disabled={extendMutation.isPending || expired}
         >
           <Plus className="w-4 h-4" />
           15 min
@@ -265,7 +290,7 @@ function SessionCard({
           size="sm"
           variant="secondary"
           onClick={() => extendMutation.mutate(-1)}
-          disabled={extendMutation.isPending || (remainingSeconds ?? 0) <= 60}
+          disabled={extendMutation.isPending || (remainingSeconds ?? 0) <= 60 || expired}
         >
           <Minus className="w-4 h-4" />1 min
         </Button>
@@ -273,7 +298,7 @@ function SessionCard({
           size="sm"
           variant="secondary"
           onClick={() => extendMutation.mutate(-5)}
-          disabled={extendMutation.isPending || (remainingSeconds ?? 0) <= 300}
+          disabled={extendMutation.isPending || (remainingSeconds ?? 0) <= 300 || expired}
         >
           <Minus className="w-4 h-4" />5 min
         </Button>
@@ -289,6 +314,22 @@ function SessionCard({
         </Button>
       </div>
     </Card>
+  );
+}
+
+function PedalBar({ label, value, color }: { label: string; value: number; color: string }) {
+  const pct = Math.max(0, Math.min(100, value * 100));
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-[10px] uppercase tracking-wider text-gray-500 w-20">{label}</span>
+      <div className="flex-1 h-2 bg-dark-700 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-150"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
+      </div>
+      <span className="text-xs font-mono text-white w-8 text-right">{Math.round(pct)}%</span>
+    </div>
   );
 }
 
@@ -310,26 +351,6 @@ function InfoPill({
       <p className="text-sm font-medium text-white truncate" title={value}>
         {value}
       </p>
-    </div>
-  );
-}
-
-function Metric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="p-3 bg-dark-900 rounded-lg border border-dark-600">
-      <div className="flex items-center gap-2 text-gray-500 mb-1">
-        <Icon className="w-4 h-4" />
-        <span className="text-xs">{label}</span>
-      </div>
-      <p className="text-lg font-semibold text-white">{value}</p>
     </div>
   );
 }

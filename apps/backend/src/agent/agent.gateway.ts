@@ -22,6 +22,7 @@ import {
   LaunchSessionPayload,
   StationStatus,
   StatusPayload,
+  SessionStatus,
 } from '@simracing/shared';
 import { DashboardGateway } from '../dashboard/dashboard.gateway';
 import { TelemetryService } from '../telemetry/telemetry.service';
@@ -263,11 +264,19 @@ export class AgentGateway
     payload: { sessionId: string },
   ): Promise<void> {
     try {
+      const session = await this.sessionsService.findOne(payload.sessionId);
+      if (!session || session.status === SessionStatus.FINISHED) {
+        this.logger.debug(
+          { sessionId: payload.sessionId, status: session?.status },
+          'Session already finished or not found; skipping finish on session ended',
+        );
+        return;
+      }
       await this.sessionsService.finish(payload.sessionId, {});
       this.dashboardGateway.server.emit('session:updated', {
         sessionId: payload.sessionId,
-        stationId: '',
-        status: 'finished',
+        stationId: session.stationId,
+        status: session.status,
       });
     } catch (err) {
       this.logger.warn(

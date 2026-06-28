@@ -61,6 +61,7 @@ export class SimRacingAgent {
     trackLayout?: string;
     bestLapMs?: number;
   } | null = null;
+  private resultsTimeout: NodeJS.Timeout | null = null;
   private acLauncher: AcLauncher;
   private luaBridge: LuaBridge;
   private contentSync: ContentSync;
@@ -515,6 +516,7 @@ export class SimRacingAgent {
 
   private async handleLaunch(payload: LaunchSessionPayload): Promise<void> {
     this.logger.info({ sessionId: payload.sessionId }, 'Received launch command');
+    this.clearResultsTimeout();
     try {
       await this.acLauncher.launch(payload);
       this.acRunning = true;
@@ -536,7 +538,9 @@ export class SimRacingAgent {
     await this.acLauncher.stop();
     this.acRunning = false;
     this.clearCurrentSession();
+    this.clearResultsTimeout();
     this.blankingManager.clearResults();
+    this.blankingManager.setAuto();
     this.socket?.emit('agent:status', {
       stationId: config.STATION_ID,
       status: StationStatus.ONLINE,
@@ -548,6 +552,13 @@ export class SimRacingAgent {
       clearTimeout(this.currentSession.timeout);
     }
     this.currentSession = null;
+  }
+
+  private clearResultsTimeout(): void {
+    if (this.resultsTimeout) {
+      clearTimeout(this.resultsTimeout);
+      this.resultsTimeout = null;
+    }
   }
 
   private async handleSessionExtend(payload: {
@@ -783,6 +794,11 @@ export class SimRacingAgent {
           bestLapMs: session.bestLapMs,
         });
         this.socket?.emit('agent:session:ended', { sessionId: session.sessionId });
+        this.resultsTimeout = setTimeout(() => {
+          this.logger.info('Results display timeout expired, returning to auto blanking');
+          this.blankingManager.setAuto();
+          this.resultsTimeout = null;
+        }, 60000);
       } else {
         this.blankingManager.show();
       }
