@@ -70,11 +70,13 @@ jobs:
       - name: Package Linux agent
         run: |
           cd apps/agent
-          npx pkg . --targets node18-linux-x64 --out-path ./exe/sim-center-agent-linux
+          npx pkg . --targets node18-linux-x64 --out-path ./exe
+          mv ./exe/agent ./exe/sim-center-agent-linux-x64
+          tar czf ./exe/sim-center-agent-linux-x64.tar.gz -C ./exe sim-center-agent-linux-x64
 
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/agent/exe/sim-center-agent-linux
+          files: apps/agent/exe/sim-center-agent-linux-x64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
