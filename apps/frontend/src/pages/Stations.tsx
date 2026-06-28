@@ -32,7 +32,7 @@ import {
 
 export function Stations() {
   const queryClient = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { isAdmin, isTechnician } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [apiKeyStation, setApiKeyStation] = useState<{
@@ -235,6 +235,17 @@ export function Stations() {
                 )}
                 Détails
               </Button>
+              {(isAdmin || isTechnician) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => updateAgentMutation.mutate(station.id)}
+                  isLoading={updateAgentMutation.isPending}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  MAJ agent
+                </Button>
+              )}
               {isAdmin && (
                 <>
                   <Button
@@ -245,15 +256,6 @@ export function Stations() {
                   >
                     <Key className="w-4 h-4" />
                     Clé API
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => updateAgentMutation.mutate(station.id)}
-                    isLoading={updateAgentMutation.isPending}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    MAJ agent
                   </Button>
                   <Button
                     variant="ghost"

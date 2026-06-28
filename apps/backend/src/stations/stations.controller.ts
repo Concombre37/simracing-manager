@@ -114,7 +114,7 @@ export class StationsController {
   }
 
   @Post(':id/update-agent')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
   async updateAgent(@Param('id') id: string) {
     const station = await this.stationsService.findOne(id);
     await this.agentGateway.emitUpdateAgent(station.stationId);

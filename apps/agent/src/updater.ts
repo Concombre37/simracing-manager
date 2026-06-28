@@ -7,7 +7,7 @@ import axios from 'axios';
 import { VERSION } from './version';
 
 const REPO = 'Concombre37/simracing-manager';
-const ASSET_NAME = 'sim-center-agent-win.exe';
+const ASSET_NAME = 'sim-center-agent-win.zip';
 
 interface GitHubRelease {
   tag_name: string;
@@ -42,24 +42,28 @@ export class Updater {
 
     const currentExe = process.execPath;
     const baseDir = path.dirname(currentExe);
-    const newExePath = path.join(baseDir, 'sim-center-agent-win-new.exe');
-    const finalExePath = path.join(baseDir, ASSET_NAME);
+    const zipPath = path.join(baseDir, 'update.zip');
     const batPath = path.join(baseDir, 'update-agent.bat');
+    const finalExePath = path.join(baseDir, 'sim-center-agent-win.exe');
 
-    await this.downloadFile(asset.browser_download_url, newExePath);
-    this.logger.info({ path: newExePath }, 'New agent downloaded');
+    await this.downloadFile(asset.browser_download_url, zipPath);
+    this.logger.info({ path: zipPath }, 'New agent archive downloaded');
 
     const batContent = [
       '@echo off',
       'echo Mise a jour de SimRacing Manager Agent...',
+      'set /a waitTime=0',
       ':wait',
       `tasklist /FI "PID eq ${process.pid}" /FO CSV | find "${process.pid}" >nul`,
       'if %errorlevel% == 0 (',
       '  timeout /t 1 /nobreak >nul',
+      '  set /a waitTime+=1',
+      '  if %waitTime% GTR 30 goto force',
       '  goto wait',
       ')',
-      `if exist "${currentExe}" del /f "${currentExe}"`,
-      `if exist "${newExePath}" ren "${newExePath}" "${ASSET_NAME}"`,
+      ':force',
+      `powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${baseDir}' -Force"`,
+      `if exist "${zipPath}" del /f "${zipPath}"`,
       `if exist "${batPath}" del /f "${batPath}"`,
       `start "" "${finalExePath}"`,
       'exit',

@@ -54,11 +54,15 @@ jobs:
           if (-not (Test-Path $sfx)) { throw "SFX module not found at $sfx" }
           & $7z a -sfx"$sfx" -r -y exe\sim-center-agent-win-setup.exe exe\config.txt exe\sim-center-agent-win.exe exe\build
           if (-not (Test-Path exe\sim-center-agent-win-setup.exe)) { throw "SFX not created" }
+          & $7z a -tzip -r -y exe\sim-center-agent-win.zip exe\sim-center-agent-win.exe exe\build
+          if (-not (Test-Path exe\sim-center-agent-win.zip)) { throw "ZIP not created" }
 
-      - name: Upload release asset
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          files: apps/agent/exe/sim-center-agent-win-setup.exe
+          files: |
+            apps/agent/exe/sim-center-agent-win-setup.exe
+            apps/agent/exe/sim-center-agent-win.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
