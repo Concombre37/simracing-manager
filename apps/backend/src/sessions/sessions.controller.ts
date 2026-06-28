@@ -6,6 +6,7 @@ import {
   Param,
   UseGuards,
   ParseIntPipe,
+  Logger,
 } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import {
@@ -23,6 +24,8 @@ import { DashboardGateway } from '../dashboard/dashboard.gateway';
 @Controller('sessions')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SessionsController {
+  private readonly logger = new Logger(SessionsController.name);
+
   constructor(
     private readonly sessionsService: SessionsService,
     private readonly agentGateway: AgentGateway,
@@ -56,9 +59,19 @@ export class SessionsController {
     @Body('minutes', ParseIntPipe) minutes: number,
   ) {
     const session = await this.sessionsService.extend(id, minutes);
-    await this.agentGateway.emitSessionExtend(session.station.stationId, {
+    this.logger.log(
+      {
+        sessionId: session.id,
+        stationId: session.stationId,
+        minutes,
+        newDurationMinutes: session.durationMinutes,
+      },
+      'Session extended; notifying agent',
+    );
+    await this.agentGateway.emitSessionExtend(session.stationId, {
       sessionId: session.id,
       minutes,
+      newDurationMinutes: session.durationMinutes ?? 0,
     });
     this.dashboardGateway.server.emit('session:updated', {
       sessionId: session.id,

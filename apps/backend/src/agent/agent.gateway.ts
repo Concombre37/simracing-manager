@@ -452,7 +452,7 @@ export class AgentGateway
 
   async emitSessionExtend(
     stationId: string,
-    payload: { sessionId: string; minutes: number },
+    payload: { sessionId: string; minutes: number; newDurationMinutes: number },
   ): Promise<void> {
     this.server.to(`station:${stationId}`).emit('session:extend', payload);
   }

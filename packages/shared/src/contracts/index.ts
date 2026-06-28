@@ -25,7 +25,11 @@ export interface ServerToAgentEvents {
   'agent:unauthorized': (payload: { reason: string }) => void;
   'session:launch': (payload: LaunchSessionPayload) => void;
   'session:stop': () => void;
-  'session:extend': (payload: { sessionId: string; minutes: number }) => void;
+  'session:extend': (payload: {
+    sessionId: string;
+    minutes: number;
+    newDurationMinutes: number;
+  }) => void;
   'ac:idealLine': () => void;
   'ac:autoShifter': () => void;
   'ac:teleportToPits': () => void;

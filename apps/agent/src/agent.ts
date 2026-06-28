@@ -550,14 +550,28 @@ export class SimRacingAgent {
   private async handleSessionExtend(payload: {
     sessionId: string;
     minutes: number;
+    newDurationMinutes: number;
   }): Promise<void> {
     this.logger.info(payload, 'Received session extend command');
     if (!this.currentSession || this.currentSession.sessionId !== payload.sessionId) {
-      this.logger.warn('No matching active session to extend');
+      this.logger.warn(
+        { currentSessionId: this.currentSession?.sessionId, payloadSessionId: payload.sessionId },
+        'No matching active session to extend',
+      );
       return;
     }
-    const newDuration = Math.max(0, this.currentSession.durationMinutes + payload.minutes);
+    const newDuration =
+      typeof payload.newDurationMinutes === 'number' && payload.newDurationMinutes >= 0
+        ? payload.newDurationMinutes
+        : Math.max(0, this.currentSession.durationMinutes + payload.minutes);
     this.currentSession.durationMinutes = newDuration;
+    this.logger.info(
+      {
+        oldDurationMinutes: this.currentSession.durationMinutes - payload.minutes,
+        newDurationMinutes: newDuration,
+      },
+      'Session duration updated',
+    );
     if (newDuration === 0) {
       this.logger.info('Session duration reduced to zero, ending immediately');
       void this.returnToPaddockAfterDuration();
@@ -576,7 +590,12 @@ export class SimRacingAgent {
     const totalMs = this.currentSession.durationMinutes * 60 * 1000;
     const remainingMs = Math.max(0, totalMs - elapsedMs);
     this.logger.info(
-      { remainingMinutes: Math.round(remainingMs / 60000) },
+      {
+        sessionId: this.currentSession.sessionId,
+        durationMinutes: this.currentSession.durationMinutes,
+        elapsedMinutes: Math.round(elapsedMs / 60000),
+        remainingMinutes: Math.round(remainingMs / 60000),
+      },
       'Session end rescheduled',
     );
     if (remainingMs > 0) {
@@ -716,6 +735,10 @@ export class SimRacingAgent {
           track: payload.track,
           trackLayout: payload.trackLayout,
         };
+        this.logger.info(
+          { sessionId: payload.sessionId, durationMinutes: payload.durationMinutes },
+          'Session tracking started',
+        );
         this.acSharedMemoryReader?.setSessionId(payload.sessionId);
         this.acSharedMemoryReader?.start();
         this.scheduleSessionEnd();
