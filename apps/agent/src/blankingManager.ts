@@ -37,6 +37,10 @@ export class BlankingManager {
   private driving = false;
   private lastTelemetryAt = 0;
   private readonly telemetryTimeoutMs = 5000;
+  private readySince: number | null = null;
+  private readyTimeout: NodeJS.Timeout | null = null;
+  private readyConfirmed = false;
+  private readonly readyDelayMs = 5000;
   private scriptPath: string | null = null;
   private playlistPath: string | null = null;
   private mediaPaths: string[] = [];
@@ -65,6 +69,7 @@ export class BlankingManager {
 
   setAcRunning(running: boolean): void {
     this.acRunning = running;
+    if (!running) this.clearReady();
     this.evaluate();
   }
 
@@ -79,6 +84,7 @@ export class BlankingManager {
   onTelemetry(snapshot: TelemetrySnapshot): void {
     this.lastTelemetryAt = Date.now();
     this.driving = this.isDriving(snapshot);
+    this.updateReadyState(snapshot);
     this.evaluate();
   }
 
@@ -239,16 +245,44 @@ export class BlankingManager {
       return;
     }
 
-    const telemetryRecent = Date.now() - this.lastTelemetryAt < this.telemetryTimeoutMs;
     // Hide blanking when AC shared memory is loaded (game fully initialized).
-    // Keep legacy fallback: also hide when acs.exe is running AND telemetry shows driving.
-    const shouldHide = this.acLoaded || (this.acRunning && this.driving && telemetryRecent);
+    // Otherwise, wait for the car to be ready for a short delay before removing blanking.
+    const shouldHide = this.acLoaded || (this.acRunning && this.readyConfirmed);
 
     if (shouldHide) {
       this.stopBlanking();
     } else {
       this.startBlanking();
     }
+  }
+
+  private updateReadyState(snapshot: TelemetrySnapshot): void {
+    const ready = this.isReady(snapshot);
+    if (ready && this.readySince === null) {
+      this.readySince = Date.now();
+      this.logger.info('Car ready detected, blanking will be removed in 5s');
+      this.readyTimeout = setTimeout(() => {
+        this.readyConfirmed = true;
+        this.evaluate();
+      }, this.readyDelayMs);
+    } else if (!ready && this.readySince !== null) {
+      this.clearReady();
+      this.logger.info('Car ready state lost, blanking delay reset');
+    }
+  }
+
+  private isReady(snapshot: TelemetrySnapshot): boolean {
+    if (snapshot.isInMainMenu === true) return false;
+    return snapshot.isSessionStarted === true;
+  }
+
+  private clearReady(): void {
+    if (this.readyTimeout) {
+      clearTimeout(this.readyTimeout);
+      this.readyTimeout = null;
+    }
+    this.readySince = null;
+    this.readyConfirmed = false;
   }
 
   private buildPlaylist(): PlaylistItem[] {

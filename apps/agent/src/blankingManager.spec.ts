@@ -82,7 +82,7 @@ describe('BlankingManager', () => {
   } as unknown as import('pino').Logger;
 
   beforeEach(() => {
-    vi.mocked(spawn).mockReturnValue(createFakeProcess() as never);
+    vi.mocked(spawn).mockImplementation(() => createFakeProcess() as never);
     manager = new BlankingManager(mockLogger);
     const tmpDir = os.tmpdir();
     (manager as unknown as { scriptPath: string }).scriptPath = path.join(tmpDir, 'blanking.ps1');
@@ -109,11 +109,15 @@ describe('BlankingManager', () => {
     expect(manager.isBlankingActive()).toBe(false);
   });
 
-  it('hides blanking when driving telemetry arrives and AC is running (legacy fallback)', () => {
+  it('hides blanking 5s after car ready telemetry arrives and AC is running', () => {
+    vi.useFakeTimers();
     manager.setAuto();
     manager.setAcRunning(true);
     manager.onTelemetry(makeSnapshot({ speedKmh: 120, rpm: 6000, gear: 4 }));
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(5000);
     expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
   });
 
   it('keeps blanking when in main menu even if car data exists', () => {
@@ -135,6 +139,32 @@ describe('BlankingManager', () => {
     manager.setAcRunning(false);
     manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
     expect(manager.isBlankingActive()).toBe(true);
+  });
+
+  it('keeps blanking active if car ready state is lost before 5s', () => {
+    vi.useFakeTimers();
+    manager.setAuto();
+    manager.setAcRunning(true);
+    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(3000);
+    manager.onTelemetry(makeSnapshot({ isInMainMenu: true, speedKmh: 0 }));
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(5000);
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('restores blanking when car ready state is lost after confirmation', () => {
+    vi.useFakeTimers();
+    manager.setAuto();
+    manager.setAcRunning(true);
+    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
+    vi.advanceTimersByTime(5000);
+    expect(manager.isBlankingActive()).toBe(false);
+    manager.onTelemetry(makeSnapshot({ isInMainMenu: true, speedKmh: 0 }));
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.useRealTimers();
   });
 
   it('manual hide overrides auto and keeps screen off', () => {
