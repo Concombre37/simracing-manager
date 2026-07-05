@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ImageIcon, Trash2, RefreshCw, Search, Monitor } from 'lucide-react';
 import { contentPreviewsApi } from '../services/contentPreviews';
 import { stationsApi } from '../services/stations';
+import { PageShell } from '../components/ui/PageShell';
+import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Input } from '../components/ui/Input';
@@ -54,25 +56,19 @@ export function ContentPreviews() {
   }, [previews]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <ImageIcon className="w-6 h-6 text-accent-orange" />
-            Images reçues
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Visualise et gère les previews de circuits et voitures envoyées par les agents.
-          </p>
-        </div>
+    <PageShell
+      title="Images"
+      accent="reçues"
+      subtitle="Visualise et gère les previews de circuits et voitures envoyées par les agents"
+      actions={
         <div className="flex items-center gap-2">
           <Badge variant="gray">Total {stats.total}</Badge>
           <Badge variant="blue">Voitures {stats.cars}</Badge>
           <Badge variant="green">Circuits {stats.tracks}</Badge>
         </div>
-      </div>
-
-      <div className="bg-dark-800 border border-dark-600 rounded-lg p-4 space-y-4">
+      }
+    >
+      <Card padding="sm" className="space-y-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <label className="block text-xs font-medium text-gray-400 mb-1">Recherche</label>
@@ -133,26 +129,26 @@ export function ContentPreviews() {
             ))}
           </div>
         </div>
-      </div>
+      </Card>
 
       {previewsLoading ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-8 h-8 border-2 border-accent-orange/30 border-t-accent-orange rounded-full animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-dark-800 border border-dark-600 rounded-lg p-12 text-center">
+        <Card className="p-12 text-center">
           <ImageIcon className="w-12 h-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400">Aucune image reçue pour le moment.</p>
           <p className="text-sm text-gray-500 mt-2">
             Vérifie que l’agent est en v2.0.11+ et clique sur “Forcer l’envoi du contenu”.
           </p>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
           {filtered.map((preview) => (
             <div
               key={preview.id}
-              className="bg-dark-800 border border-dark-600 rounded-lg overflow-hidden group hover:border-accent-orange/50 transition-colors"
+              className="bg-dark-800/70 border border-dark-600 rounded-xl overflow-hidden group hover:border-accent-orange/50 transition-colors"
             >
               <div className="aspect-video bg-dark-900 flex items-center justify-center relative">
                 <img
@@ -188,6 +184,6 @@ export function ContentPreviews() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi, type User } from '../services/users';
+import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
@@ -40,22 +41,20 @@ export function Users() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-white mb-1">Utilisateurs</h2>
-          <p className="text-gray-400">Gestion des comptes et des rôles</p>
-        </div>
+    <PageShell
+      title="Utilisateurs"
+      subtitle="Gestion des comptes et des rôles"
+      actions={
         <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
           <Plus className="w-4 h-4" />
           Créer un compte
         </Button>
-      </div>
-
+      }
+    >
       <Card padding="none" className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-dark-900 border-b border-dark-600">
+            <thead className="bg-dark-900/70 border-b border-dark-600">
               <tr>
                 <th className="px-6 py-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   Utilisateur
@@ -146,7 +145,7 @@ export function Users() {
           isEdit
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 
@@ -228,7 +227,7 @@ function UserFormModal({
             id="role"
             value={role}
             onChange={(e) => setRole(e.target.value as 'admin' | 'technician')}
-            className="w-full bg-dark-900 border border-dark-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-accent-blue"
+            className="w-full bg-dark-900 border border-dark-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-accent-orange"
           >
             <option value="technician">Technicien</option>
             <option value="admin">Administrateur</option>

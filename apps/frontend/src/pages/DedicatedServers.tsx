@@ -1,17 +1,18 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   dedicatedServersApi,
   type DedicatedServer,
   type Car as AcCar,
 } from '../services/dedicatedServers';
 import { stationsApi, type Station } from '../services/stations';
-import { Card } from '../components/ui/Card';
+import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input, Label } from '../components/ui/Input';
-import { CreateServerModal } from '../components/CreateServerModal';
 import { findTrackName } from '../utils/track';
 import {
   Server,
@@ -28,6 +29,7 @@ import {
   Car,
   MapPin,
   User,
+  Users,
   Zap,
 } from 'lucide-react';
 const DIFFICULTY_OPTIONS = {
@@ -35,6 +37,11 @@ const DIFFICULTY_OPTIONS = {
   PRO: 'PRO' as const,
   CUSTOM: 'CUSTOM' as const,
 };
+
+function findTrackPreview(trackAcId: string, content: unknown): string | undefined {
+  const tracks = (content as { tracks?: { acId: string; preview?: string }[] } | undefined)?.tracks;
+  return tracks?.find((t) => t.acId === trackAcId)?.preview;
+}
 
 export function DedicatedServers() {
   const queryClient = useQueryClient();
@@ -47,17 +54,8 @@ export function DedicatedServers() {
     queryFn: stationsApi.getAll,
   });
 
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingServer, setEditingServer] = useState<DedicatedServer | null>(null);
   const [joiningServer, setJoiningServer] = useState<DedicatedServer | null>(null);
-
-  const createMutation = useMutation({
-    mutationFn: dedicatedServersApi.create,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['dedicated-servers'] });
-      setIsCreateOpen(false);
-    },
-  });
 
   const updateMutation = useMutation({
     mutationFn: ({
@@ -84,140 +82,176 @@ export function DedicatedServers() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-white mb-1">Serveurs dédiés</h2>
-          <p className="text-gray-400">
-            Créer et gérer les serveurs Assetto Corsa depuis les agents détectés
-          </p>
-        </div>
-        <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
-          <Plus className="w-4 h-4" />
-          Nouveau serveur
-        </Button>
-      </div>
-
+    <PageShell
+      title="Serveurs"
+      accent="dédiés"
+      subtitle="Créer et gérer les serveurs Assetto Corsa depuis les agents détectés"
+      actions={
+        <Link to="/dedicated-servers/create">
+          <Button variant="primary" size="lg" className="shadow-glow-orange">
+            <Plus className="h-4 w-4" />
+            Nouveau serveur
+          </Button>
+        </Link>
+      }
+    >
       {isLoading ? (
         <p className="text-gray-500">Chargement...</p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {servers?.map((server) => (
-            <Card key={server.id} className="flex flex-col">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-accent-orange/10 rounded-lg">
-                    <Server className="w-5 h-5 text-accent-orange" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-white">{server.name}</h3>
-                    <p className="text-xs text-gray-500 font-mono">
-                      {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
-                      {server.httpPort && server.httpPort !== 8081
-                        ? ` (http ${server.httpPort})`
-                        : ''}
-                    </p>
-                  </div>
-                </div>
-                <StatusBadge status={server.status} />
-              </div>
-
-              <div className="space-y-2 text-sm mb-4">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <Cpu className="w-4 h-4 text-gray-500" />
-                  <span>Agent : {server.station.name}</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-400">
-                  <MapPin className="w-4 h-4 text-gray-500" />
-                  <span>
-                    Circuit :{' '}
-                    {findTrackName(
-                      server.track,
-                      server.station.content as
-                        | { tracks?: { acId: string; name: string }[] }
-                        | undefined,
-                    )}
-                    {server.trackLayout ? ` (${server.trackLayout})` : ''}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-400">
-                  <Car className="w-4 h-4 text-gray-500" />
-                  <span>Voitures : {server.cars.length}</span>
-                </div>
-                {server.password && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Lock className="w-4 h-4 text-gray-500" />
-                    <span>Mot de passe : {server.password}</span>
-                  </div>
-                )}
-                {server.rconPassword && (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <Radio className="w-4 h-4 text-gray-500" />
-                    <span>RCON : {server.rconPassword}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-auto pt-4 border-t border-dark-600 flex flex-wrap gap-2">
-                <Button variant="success" size="sm" onClick={() => setJoiningServer(server)}>
-                  <Send className="w-4 h-4" />
-                  Envoyer les POD
-                </Button>
-                {server.status === 'running' ? (
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => stopMutation.mutate(server.id)}
-                    isLoading={stopMutation.isPending}
-                  >
-                    <Square className="w-4 h-4" />
-                    Arrêter
-                  </Button>
-                ) : null}
-                <Button variant="secondary" size="sm" onClick={() => setEditingServer(server)}>
-                  <Pencil className="w-4 h-4" />
-                  Modifier
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                  onClick={() => {
-                    if (confirm('Supprimer ce serveur ?')) {
-                      deleteMutation.mutate(server.id);
-                    }
-                  }}
+        <div className="space-y-4">
+          <AnimatePresence mode="popLayout">
+            {servers?.map((server) => {
+              const preview = findTrackPreview(server.track, server.station.content);
+              const trackName = findTrackName(
+                server.track,
+                server.station.content as { tracks?: { acId: string; name: string }[] } | undefined,
+              );
+              return (
+                <motion.div
+                  key={server.id}
+                  layout
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -16 }}
+                  transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] as const }}
                 >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </Card>
-          ))}
+                  <div className="relative overflow-hidden rounded-xl border border-dark-600 bg-dark-800/70 backdrop-blur-sm transition-colors hover:border-dark-500">
+                    <span
+                      className={`absolute bottom-0 left-0 top-0 w-1 ${getStripe(server.status)}`}
+                    />
+
+                    <div className="flex flex-col gap-4 p-4 pl-6 md:flex-row md:items-center">
+                      {/* Vignette circuit */}
+                      {preview ? (
+                        <img
+                          src={preview}
+                          alt={trackName}
+                          className="hidden aspect-video w-36 shrink-0 rounded-lg border border-dark-700 object-cover sm:block"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="hidden aspect-video w-36 shrink-0 items-center justify-center rounded-lg border border-dark-700 bg-dark-900/70 sm:flex">
+                          <Server className="h-7 w-7 text-gray-600" />
+                        </div>
+                      )}
+
+                      {/* Informations essentielles */}
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="truncate text-lg font-bold text-white">{server.name}</h3>
+                          <StatusBadge status={server.status} />
+                        </div>
+                        <p className="font-mono text-xs text-gray-500">
+                          {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
+                        </p>
+                        <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-400">
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 text-gray-500" />
+                            {trackName}
+                            {server.trackLayout ? ` (${server.trackLayout})` : ''}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Cpu className="h-3.5 w-3.5 text-gray-500" />
+                            {server.station.name}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Car className="h-3.5 w-3.5 text-gray-500" />
+                            {server.cars.length} voiture{server.cars.length > 1 ? 's' : ''}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-gray-500" />
+                            {server.maxClients} slots
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <PortChip label="TCP" value={server.tcpPort ?? 9600} />
+                          {server.udpPort != null && (
+                            <PortChip label="UDP" value={server.udpPort} />
+                          )}
+                          {server.httpPort != null && (
+                            <PortChip label="HTTP" value={server.httpPort} />
+                          )}
+                          {server.password && (
+                            <span className="inline-flex items-center gap-1 rounded border border-dark-600 bg-dark-900/70 px-2 py-0.5 font-mono text-[10px] text-gray-400">
+                              <Lock className="h-3 w-3 text-gray-600" />
+                              {server.password}
+                            </span>
+                          )}
+                          {server.rconPassword && (
+                            <span className="inline-flex items-center gap-1 rounded border border-dark-600 bg-dark-900/70 px-2 py-0.5 font-mono text-[10px] text-gray-400">
+                              <Radio className="h-3 w-3 text-gray-600" />
+                              {server.rconPassword}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Actions : envoi / arrêt / gestion clairement séparés */}
+                      <div className="flex shrink-0 flex-wrap items-center gap-2 md:flex-col md:items-stretch">
+                        <Button
+                          variant="success"
+                          size="sm"
+                          onClick={() => setJoiningServer(server)}
+                        >
+                          <Send className="h-4 w-4" />
+                          Envoyer les POD
+                        </Button>
+                        {server.status === 'running' && (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => stopMutation.mutate(server.id)}
+                            isLoading={stopMutation.isPending}
+                          >
+                            <Square className="h-4 w-4" />
+                            Arrêter
+                          </Button>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setEditingServer(server)}
+                            className="flex-1 rounded-lg border border-dark-600 bg-dark-900/60 p-2 text-gray-400 transition-colors hover:border-dark-500 hover:text-white active:scale-95"
+                            title="Modifier"
+                          >
+                            <Pencil className="mx-auto h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Supprimer ce serveur ?')) {
+                                deleteMutation.mutate(server.id);
+                              }
+                            }}
+                            className="flex-1 rounded-lg border border-red-900/60 bg-red-900/20 p-2 text-red-400 transition-colors hover:bg-red-900/40 hover:text-red-300 active:scale-95"
+                            title="Supprimer"
+                          >
+                            <Trash2 className="mx-auto h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
 
       {servers?.length === 0 && !isLoading && (
-        <Card className="flex flex-col items-center justify-center py-16">
-          <Globe className="w-16 h-16 text-gray-600 mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">Aucun serveur</h3>
-          <p className="text-gray-400 text-center max-w-md mb-6">
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dark-600 bg-dark-800/70 py-16">
+          <Globe className="mb-4 h-14 w-14 text-gray-600" />
+          <h3 className="mb-2 text-lg font-semibold text-white">Aucun serveur</h3>
+          <p className="mb-6 max-w-md text-center text-sm text-gray-400">
             Crée ton premier serveur dédié en sélectionnant un agent détecté et son contenu Assetto
             Corsa.
           </p>
-          <Button variant="primary" onClick={() => setIsCreateOpen(true)}>
-            <Plus className="w-4 h-4" />
-            Créer un serveur
-          </Button>
-        </Card>
-      )}
-
-      {isCreateOpen && stations && (
-        <CreateServerModal
-          stations={stations}
-          onClose={() => setIsCreateOpen(false)}
-          onSubmit={(data) => createMutation.mutate(data)}
-          isSubmitting={createMutation.isPending}
-        />
+          <Link to="/dedicated-servers/create">
+            <Button variant="primary">
+              <Plus className="h-4 w-4" />
+              Créer un serveur
+            </Button>
+          </Link>
+        </div>
       )}
 
       {editingServer && (
@@ -236,18 +270,21 @@ export function DedicatedServers() {
           stations={stations}
           onClose={() => setJoiningServer(null)}
           onJoin={async (pods, durationMinutes) => {
-            // eslint-disable-next-line no-console
-            console.log('[POD] sending join', {
-              serverId: joiningServer.id,
-              pods,
-              durationMinutes,
-            });
             await dedicatedServersApi.join(joiningServer.id, pods, durationMinutes);
             setJoiningServer(null);
           }}
         />
       )}
-    </div>
+    </PageShell>
+  );
+}
+
+function PortChip({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded border border-dark-600 bg-dark-900/70 px-2 py-0.5 font-mono text-[10px] text-gray-400">
+      <span className="text-gray-600">{label}</span>
+      {value}
+    </span>
   );
 }
 
@@ -261,6 +298,19 @@ function StatusBadge({ status }: { status: DedicatedServer['status'] }) {
       return <Badge variant="red">Erreur</Badge>;
     default:
       return <Badge variant="gray">Arrêté</Badge>;
+  }
+}
+
+function getStripe(status: DedicatedServer['status']): string {
+  switch (status) {
+    case 'running':
+      return 'bg-green-500/70';
+    case 'starting':
+      return 'bg-yellow-500/70';
+    case 'error':
+      return 'bg-red-500/70';
+    default:
+      return 'bg-dark-600';
   }
 }
 
@@ -437,12 +487,12 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
   return (
     <Modal title={`Envoyer les POD sur ${server.name}`} onClose={onClose} size="lg">
       {joined ? (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Check className="w-8 h-8 text-green-400" />
+        <div className="py-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-900/30">
+            <Check className="h-8 w-8 text-green-400" />
           </div>
-          <h3 className="text-xl font-semibold text-white mb-2">Commande envoyée</h3>
-          <p className="text-gray-400 mb-6">
+          <h3 className="mb-2 text-xl font-semibold text-white">Commande envoyée</h3>
+          <p className="mb-6 text-gray-400">
             {selectedPods.length} POD ont reçu l'ordre de rejoindre{' '}
             {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
           </p>
@@ -454,20 +504,20 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
         <div className="space-y-5">
           <p className="text-sm text-gray-400">
             Configure chaque POD à envoyer sur{' '}
-            <span className="text-accent-orange font-mono">
+            <span className="font-mono text-accent-orange">
               {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
             </span>
           </p>
 
           <div>
             <Label>Durée sur le serveur</Label>
-            <div className="flex flex-wrap gap-2 mt-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               {durationOptions.map((option) => (
                 <button
                   key={option.label}
                   type="button"
                   onClick={() => setDurationMinutes(option.value)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
                     durationMinutes === option.value
                       ? 'bg-accent-orange text-dark-900 shadow-lg shadow-accent-orange/30'
                       : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
@@ -479,9 +529,9 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
             </div>
           </div>
 
-          <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-1">
+          <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
             {onlineStations.length === 0 && (
-              <p className="text-gray-500 text-center py-4">Aucun POD en ligne</p>
+              <p className="py-4 text-center text-gray-500">Aucun POD en ligne</p>
             )}
             {onlineStations.map((station) => {
               const config = podConfigs[station.stationId];
@@ -489,18 +539,18 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
               return (
                 <div
                   key={station.stationId}
-                  className={`p-4 rounded-xl border transition-colors ${
+                  className={`rounded-xl border p-4 transition-colors ${
                     config.selected
-                      ? 'bg-dark-900 border-accent-orange ring-1 ring-accent-orange'
-                      : 'bg-dark-800 border-dark-600 hover:border-dark-500'
+                      ? 'border-accent-orange bg-dark-900 ring-1 ring-accent-orange'
+                      : 'border-dark-600 bg-dark-800 hover:border-dark-500'
                   }`}
                 >
-                  <div className="flex items-start gap-3 mb-3">
+                  <div className="mb-3 flex items-start gap-3">
                     <input
                       type="checkbox"
                       checked={config.selected}
                       onChange={(e) => updatePod(station.stationId, { selected: e.target.checked })}
-                      className="mt-1 w-5 h-5 rounded border-dark-600 text-accent-orange focus:ring-accent-orange bg-dark-900"
+                      className="mt-1 h-5 w-5 rounded border-dark-600 bg-dark-900 text-accent-orange focus:ring-accent-orange"
                     />
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
@@ -509,16 +559,16 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
                           {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
                         </Badge>
                       </div>
-                      <p className="text-xs text-gray-500 font-mono">{station.stationId}</p>
+                      <p className="font-mono text-xs text-gray-500">{station.stationId}</p>
                     </div>
                   </div>
 
                   {config.selected && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pl-8">
+                    <div className="grid grid-cols-1 gap-3 pl-8 sm:grid-cols-3">
                       <div>
                         <Label className="text-xs">Nom du client</Label>
                         <div className="relative">
-                          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <input
                             type="text"
                             value={config.clientName}
@@ -526,7 +576,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
                               updatePod(station.stationId, { clientName: e.target.value })
                             }
                             placeholder="Client"
-                            className="w-full pl-9 pr-3 py-2 bg-dark-900 border border-dark-600 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-accent-orange"
+                            className="w-full rounded-lg border border-dark-600 bg-dark-900 py-2 pl-9 pr-3 text-white placeholder-gray-600 focus:border-accent-orange focus:outline-none"
                           />
                         </div>
                       </div>
@@ -534,7 +584,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
                       <div>
                         <Label className="text-xs">Difficulté</Label>
                         <div className="relative">
-                          <Zap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <Zap className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <select
                             value={config.difficulty}
                             onChange={(e) =>
@@ -542,7 +592,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
                                 difficulty: e.target.value as 'EASY' | 'PRO' | 'CUSTOM',
                               })
                             }
-                            className="w-full pl-9 pr-3 py-2 bg-dark-900 border border-dark-600 rounded-lg text-white focus:outline-none focus:border-accent-orange appearance-none"
+                            className="w-full appearance-none rounded-lg border border-dark-600 bg-dark-900 py-2 pl-9 pr-3 text-white focus:border-accent-orange focus:outline-none"
                           >
                             <option value={DIFFICULTY_OPTIONS.EASY}>Easy</option>
                             <option value={DIFFICULTY_OPTIONS.PRO}>Pro</option>
@@ -554,13 +604,13 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
                       <div>
                         <Label className="text-xs">Voiture</Label>
                         <div className="relative">
-                          <Car className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                          <Car className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <select
                             value={config.carAcId}
                             onChange={(e) =>
                               updatePod(station.stationId, { carAcId: e.target.value })
                             }
-                            className="w-full pl-9 pr-3 py-2 bg-dark-900 border border-dark-600 rounded-lg text-white focus:outline-none focus:border-accent-orange appearance-none"
+                            className="w-full appearance-none rounded-lg border border-dark-600 bg-dark-900 py-2 pl-9 pr-3 text-white focus:border-accent-orange focus:outline-none"
                           >
                             {server.cars.map((id) => {
                               const car = carMap.get(id);
@@ -581,7 +631,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm bg-red-900/20 border border-red-900/40 rounded-lg p-2">
+            <p className="rounded-lg border border-red-900/40 bg-red-900/20 p-2 text-sm text-red-400">
               {error}
             </p>
           )}
@@ -596,7 +646,7 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
               disabled={selectedPods.length === 0 || isJoining}
               isLoading={isJoining}
             >
-              <Send className="w-4 h-4" />
+              <Send className="h-4 w-4" />
               Envoyer {selectedPods.length > 0 && `(${selectedPods.length})`}
             </Button>
           </div>

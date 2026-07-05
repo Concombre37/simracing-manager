@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stationsApi } from '../services/stations';
+import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -64,14 +65,11 @@ export function BlankingMedia() {
   const offlineStations = stations?.filter((s) => s.status === 'offline') ?? [];
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-white mb-1">Écrans d’attente</h2>
-        <p className="text-gray-400">
-          Envoie une image ou une vidéo vers plusieurs postes en une seule fois.
-        </p>
-      </div>
-
+    <PageShell
+      title="Écrans"
+      accent="d'attente"
+      subtitle="Envoie une image ou une vidéo vers plusieurs postes en une seule fois"
+    >
       {isLoading && <p className="text-gray-500">Chargement des postes...</p>}
 
       {!isLoading && stations && (
@@ -209,7 +207,7 @@ export function BlankingMedia() {
           </Card>
         </>
       )}
-    </div>
+    </PageShell>
   );
 }
 

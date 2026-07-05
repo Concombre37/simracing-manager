@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stationsApi, type Station } from '../services/stations';
+import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -53,12 +54,7 @@ export function Settings() {
   });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-white mb-1">Paramètres</h2>
-        <p className="text-gray-400">Réseau des PODs, Wake-on-LAN et arrêt distant</p>
-      </div>
-
+    <PageShell title="Paramètres" subtitle="Réseau des PODs, Wake-on-LAN et arrêt distant">
       {feedback && (
         <div
           className={`p-4 rounded-lg border flex items-start gap-3 ${
@@ -101,7 +97,7 @@ export function Settings() {
           />
         ))}
       </div>
-    </div>
+    </PageShell>
   );
 }
 

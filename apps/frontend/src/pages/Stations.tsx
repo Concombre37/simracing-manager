@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
 import { stationsApi, type Station } from '../services/stations';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import { downloadEnvFile } from '../utils/downloadEnv';
-import { Card } from '../components/ui/Card';
+import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
@@ -21,20 +22,29 @@ import {
   Key,
   Trash2,
   ChevronDown,
-  ChevronUp,
   Monitor,
-  Wifi,
   Download,
   Eye,
   EyeOff,
   ImageIcon,
 } from 'lucide-react';
 
+type StatusFilter = 'all' | Station['status'];
+
+const FILTERS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'Tous' },
+  { value: 'online', label: 'En ligne' },
+  { value: 'in_game', label: 'En jeu' },
+  { value: 'updating', label: 'Mise à jour' },
+  { value: 'offline', label: 'Hors ligne' },
+];
+
 export function Stations() {
   const queryClient = useQueryClient();
   const { isAdmin, isTechnician } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [apiKeyStation, setApiKeyStation] = useState<{
     stationId: string;
     name: string;
@@ -90,203 +100,275 @@ export function Stations() {
     socket?.emit('station:command', { stationId, command });
   }
 
+  const filtered = useMemo(
+    () => data?.filter((s) => statusFilter === 'all' || s.status === statusFilter) ?? [],
+    [data, statusFilter],
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-white mb-1">Contrôle des postes</h2>
-          <p className="text-gray-400">Gestion des POD et commandes temps réel</p>
-        </div>
-        {isAdmin && (
+    <PageShell
+      title="Contrôle des"
+      accent="postes"
+      subtitle="Gestion des POD et commandes temps réel"
+      actions={
+        isAdmin ? (
           <Button variant="primary" onClick={() => setShowModal(true)}>
-            <Monitor className="w-4 h-4" />
+            <Monitor className="h-4 w-4" />
             Nouveau poste
           </Button>
-        )}
+        ) : undefined
+      }
+    >
+      <div className="flex flex-wrap gap-2">
+        {FILTERS.map((f) => {
+          const active = statusFilter === f.value;
+          const count =
+            f.value === 'all'
+              ? (data?.length ?? 0)
+              : (data?.filter((s) => s.status === f.value).length ?? 0);
+          return (
+            <button
+              key={f.value}
+              onClick={() => setStatusFilter(f.value)}
+              className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                active
+                  ? 'text-dark-900'
+                  : 'border border-dark-600 bg-dark-800/70 text-gray-400 hover:text-white'
+              }`}
+            >
+              {active && (
+                <motion.span
+                  layoutId="station-filter-pill"
+                  className="absolute inset-0 rounded-full bg-accent-orange shadow-glow-orange"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              )}
+              <span className="relative flex items-center gap-1.5">
+                {f.label}
+                <span className={active ? 'opacity-80' : 'opacity-50'}>{count}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {isLoading && <p className="text-gray-500">Chargement des stations...</p>}
       {error && (
-        <div className="p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-300">
+        <div className="rounded-lg border border-red-800 bg-red-900/30 p-4 text-red-300">
           Erreur lors du chargement des stations
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        {data?.map((station) => (
-          <Card key={station.id} className="flex flex-col">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${getStatusBg(station.status)}`}>
-                  <Monitor className={`w-5 h-5 ${getStatusColor(station.status)}`} />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-white">{station.name}</h3>
-                  <p className="text-xs text-gray-500 font-mono">{station.stationId}</p>
-                </div>
-              </div>
-              <StatusBadge status={station.status} />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm mb-4">
-              <InfoItem icon={Wifi} label="IP locale" value={station.localIp ?? '—'} />
-              <InfoItem
-                icon={RefreshCw}
-                label="Version agent"
-                value={station.version ? `v${station.version}` : '—'}
-              />
-              <InfoItem
-                icon={Wifi}
-                label="Vu à"
-                value={
-                  station.lastSeenAt
-                    ? new Date(station.lastSeenAt).toLocaleTimeString('fr-FR')
-                    : '—'
-                }
-              />
-              <InfoItem icon={MapPin} label="Config" value={station.config ? 'Oui' : 'Défaut'} />
-            </div>
-
-            {isAdmin && (
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <Button
-                  variant="success"
-                  size="sm"
-                  onClick={() => launchMutation.mutate(station.id)}
-                  isLoading={launchMutation.isPending}
-                >
-                  <Play className="w-4 h-4" />
-                  Lancer
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => stopMutation.mutate(station.id)}
-                  isLoading={stopMutation.isPending}
-                >
-                  <Square className="w-4 h-4" />
-                  Arrêter
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => sendCommand(station.stationId, 'idealLine')}
-                >
-                  <LineChart className="w-4 h-4" />
-                  Ideal Line
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => sendCommand(station.stationId, 'autoShifter')}
-                >
-                  <Cog className="w-4 h-4" />
-                  Auto Shifter
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => sendCommand(station.stationId, 'teleportToPits')}
-                >
-                  <MapPin className="w-4 h-4" />
-                  Pits
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => sendCommand(station.stationId, 'recenterVR')}
-                >
-                  <Glasses className="w-4 h-4" />
-                  Recenter VR
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => sendCommand(station.stationId, 'blankingHide')}
-                >
-                  <Eye className="w-4 h-4" />
-                  Masquer écran
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => sendCommand(station.stationId, 'blankingShow')}
-                >
-                  <EyeOff className="w-4 h-4" />
-                  Afficher écran
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => setBlankingStation(station)}>
-                  <ImageIcon className="w-4 h-4" />
-                  Écran d'attente
-                </Button>
-              </div>
-            )}
-
-            <div className="mt-auto pt-4 border-t border-dark-600 flex flex-wrap gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setExpandedId(expandedId === station.id ? null : station.id)}
+      <motion.div layout className="space-y-3">
+        <AnimatePresence mode="popLayout">
+          {filtered.map((station) => {
+            const expanded = expandedId === station.id;
+            return (
+              <motion.div
+                key={station.id}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] as const }}
               >
-                {expandedId === station.id ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-                Détails
-              </Button>
-              {(isAdmin || isTechnician) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => updateAgentMutation.mutate(station.id)}
-                  isLoading={updateAgentMutation.isPending}
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  MAJ agent
-                </Button>
-              )}
-              {isAdmin && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => regenerateKeyMutation.mutate(station.id)}
-                    isLoading={regenerateKeyMutation.isPending}
-                  >
-                    <Key className="w-4 h-4" />
-                    Clé API
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                    onClick={() => {
-                      if (confirm('Supprimer cette station ?')) {
-                        deleteMutation.mutate(station.id);
-                      }
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Supprimer
-                  </Button>
-                </>
-              )}
-            </div>
+                <div className="relative overflow-hidden rounded-xl border border-dark-600 bg-dark-800/70 backdrop-blur-sm transition-colors hover:border-dark-500">
+                  <span
+                    className={`absolute bottom-0 left-0 top-0 w-1 ${getStripe(station.status)}`}
+                  />
 
-            {expandedId === station.id && (
-              <div className="mt-4 p-3 bg-dark-900 rounded-lg border border-dark-600">
-                <p className="text-xs text-gray-500 mb-2">Configuration brute</p>
-                <pre className="text-xs text-gray-300 whitespace-pre-wrap overflow-auto max-h-48">
-                  {station.config
-                    ? JSON.stringify(station.config, null, 2)
-                    : 'Aucune configuration'}
-                </pre>
-              </div>
-            )}
-          </Card>
-        ))}
-      </div>
+                  {/* Ligne principale */}
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-3 py-4 pl-6 pr-4">
+                    <div className="flex min-w-[200px] items-center gap-3">
+                      <div className={`rounded-lg p-2 ${getStatusBg(station.status)}`}>
+                        <Monitor className={`h-5 w-5 ${getStatusColor(station.status)}`} />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white">{station.name}</h3>
+                        <p className="font-mono text-xs text-gray-500">{station.stationId}</p>
+                      </div>
+                    </div>
+
+                    <StatusBadge status={station.status} />
+
+                    <div className="ml-auto mr-2 hidden grid-cols-3 gap-6 xl:grid">
+                      <Cell label="IP locale" value={station.localIp ?? '—'} />
+                      <Cell label="Agent" value={station.version ? `v${station.version}` : '—'} />
+                      <Cell
+                        label="Vu à"
+                        value={
+                          station.lastSeenAt
+                            ? new Date(station.lastSeenAt).toLocaleTimeString('fr-FR')
+                            : '—'
+                        }
+                      />
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2 xl:ml-0">
+                      {isAdmin && (
+                        <>
+                          <Button
+                            variant="success"
+                            size="sm"
+                            onClick={() => launchMutation.mutate(station.id)}
+                            isLoading={launchMutation.isPending}
+                          >
+                            <Play className="h-4 w-4" />
+                            Lancer
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => stopMutation.mutate(station.id)}
+                            isLoading={stopMutation.isPending}
+                          >
+                            <Square className="h-4 w-4" />
+                            Arrêter
+                          </Button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => setExpandedId(expanded ? null : station.id)}
+                        className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-dark-700 hover:text-white"
+                        title="Détails et commandes"
+                      >
+                        <motion.span
+                          animate={{ rotate: expanded ? 180 : 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="block"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </motion.span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Panneau déplié : commandes groupées */}
+                  <AnimatePresence initial={false}>
+                    {expanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] as const }}
+                        className="overflow-hidden"
+                      >
+                        <div className="space-y-4 border-t border-dark-700 px-6 py-4">
+                          {isAdmin && (
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <CommandGroup title="Commandes en jeu">
+                                <Chip
+                                  icon={LineChart}
+                                  onClick={() => sendCommand(station.stationId, 'idealLine')}
+                                >
+                                  Ideal Line
+                                </Chip>
+                                <Chip
+                                  icon={Cog}
+                                  onClick={() => sendCommand(station.stationId, 'autoShifter')}
+                                >
+                                  Auto Shifter
+                                </Chip>
+                                <Chip
+                                  icon={MapPin}
+                                  onClick={() => sendCommand(station.stationId, 'teleportToPits')}
+                                >
+                                  Pits
+                                </Chip>
+                                <Chip
+                                  icon={Glasses}
+                                  onClick={() => sendCommand(station.stationId, 'recenterVR')}
+                                >
+                                  Recenter VR
+                                </Chip>
+                              </CommandGroup>
+
+                              <CommandGroup title="Écran">
+                                <Chip
+                                  icon={Eye}
+                                  onClick={() => sendCommand(station.stationId, 'blankingHide')}
+                                >
+                                  Masquer
+                                </Chip>
+                                <Chip
+                                  icon={EyeOff}
+                                  onClick={() => sendCommand(station.stationId, 'blankingShow')}
+                                >
+                                  Afficher
+                                </Chip>
+                                <Chip icon={ImageIcon} onClick={() => setBlankingStation(station)}>
+                                  Écran d'attente
+                                </Chip>
+                              </CommandGroup>
+                            </div>
+                          )}
+
+                          {(isAdmin || isTechnician) && (
+                            <CommandGroup title="Maintenance">
+                              <Chip
+                                icon={RefreshCw}
+                                onClick={() => updateAgentMutation.mutate(station.id)}
+                                isLoading={updateAgentMutation.isPending}
+                              >
+                                MAJ agent
+                              </Chip>
+                              {isAdmin && (
+                                <>
+                                  <Chip
+                                    icon={Key}
+                                    onClick={() => regenerateKeyMutation.mutate(station.id)}
+                                    isLoading={regenerateKeyMutation.isPending}
+                                  >
+                                    Clé API
+                                  </Chip>
+                                  <Chip
+                                    icon={Trash2}
+                                    danger
+                                    onClick={() => {
+                                      if (confirm('Supprimer cette station ?')) {
+                                        deleteMutation.mutate(station.id);
+                                      }
+                                    }}
+                                  >
+                                    Supprimer
+                                  </Chip>
+                                </>
+                              )}
+                            </CommandGroup>
+                          )}
+
+                          <div>
+                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                              Configuration
+                            </p>
+                            <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-dark-700 bg-dark-900/70 p-3 text-xs text-gray-400">
+                              {station.config
+                                ? JSON.stringify(station.config, null, 2)
+                                : 'Aucune configuration'}
+                            </pre>
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </motion.div>
+
+      {filtered.length === 0 && !isLoading && (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dark-600 bg-dark-800/70 py-16">
+          <Monitor className="mb-4 h-14 w-14 text-gray-600" />
+          <h3 className="mb-2 text-lg font-semibold text-white">Aucun poste</h3>
+          <p className="max-w-md text-center text-sm text-gray-400">
+            {data?.length
+              ? 'Aucun poste ne correspond à ce filtre.'
+              : 'Ajoute un poste pour commencer à piloter tes simulateurs.'}
+          </p>
+        </div>
+      )}
 
       {showModal && (
         <CreateStationModal
@@ -306,7 +388,7 @@ export function Stations() {
               Télécharge la configuration et place le fichier à côté de{' '}
               <code>sim-center-agent-win.exe</code>, puis renomme-le en <code>.env</code>.
             </p>
-            <code className="block p-4 bg-dark-900 border border-dark-600 text-accent-blue rounded-lg text-sm break-all font-mono">
+            <code className="block break-all rounded-lg border border-dark-600 bg-dark-900 p-4 font-mono text-sm text-accent-blue">
               API_KEY={apiKeyStation.apiKey}
             </code>
             <Button
@@ -314,7 +396,7 @@ export function Stations() {
               onClick={() => downloadEnvFile(apiKeyStation)}
               className="w-full"
             >
-              <Download className="w-4 h-4" />
+              <Download className="h-4 w-4" />
               Télécharger la config (.env)
             </Button>
             <Button variant="secondary" onClick={() => setApiKeyStation(null)} className="w-full">
@@ -323,27 +405,61 @@ export function Stations() {
           </div>
         </Modal>
       )}
+    </PageShell>
+  );
+}
+
+function Cell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-[90px]">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-500">{label}</p>
+      <p className="font-mono text-sm text-gray-200">{value}</p>
     </div>
   );
 }
 
-function InfoItem({
+function CommandGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+        {title}
+      </p>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+
+function Chip({
   icon: Icon,
-  label,
-  value,
+  children,
+  onClick,
+  danger,
+  isLoading,
 }: {
   icon: React.ElementType;
-  label: string;
-  value: string;
+  children: ReactNode;
+  onClick: () => void;
+  danger?: boolean;
+  isLoading?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-2 text-gray-400">
-      <Icon className="w-4 h-4 text-gray-500" />
-      <div>
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-sm text-gray-200">{value}</p>
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={isLoading}
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all active:scale-95 disabled:opacity-50 ${
+        danger
+          ? 'border-red-900/60 bg-red-900/20 text-red-300 hover:bg-red-900/40'
+          : 'border-dark-600 bg-dark-900/60 text-gray-300 hover:border-accent-orange/50 hover:text-white'
+      }`}
+    >
+      {isLoading ? (
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+      ) : (
+        <Icon className="h-3.5 w-3.5" />
+      )}
+      {children}
+    </button>
   );
 }
 
@@ -384,5 +500,18 @@ function getStatusBg(status: string): string {
       return 'bg-purple-400/10';
     default:
       return 'bg-gray-400/10';
+  }
+}
+
+function getStripe(status: string): string {
+  switch (status) {
+    case 'online':
+      return 'bg-green-500/70';
+    case 'in_game':
+      return 'bg-blue-500/70';
+    case 'updating':
+      return 'bg-purple-500/70';
+    default:
+      return 'bg-dark-600';
   }
 }

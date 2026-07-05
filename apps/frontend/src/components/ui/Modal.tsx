@@ -25,13 +25,16 @@ export function Modal({ title, children, onClose, size = 'md' }: ModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-up"
+      style={{ animationDuration: '0.15s' }}
+    >
       <div
-        className={`bg-dark-800 rounded-2xl shadow-2xl w-full ${sizes[size]} border border-dark-600 overflow-hidden max-h-[90vh] flex flex-col`}
+        className={`bg-dark-800 rounded-2xl shadow-2xl shadow-black/50 w-full ${sizes[size]} border border-dark-600 overflow-hidden max-h-[90vh] flex flex-col animate-fade-in-up`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b border-dark-600 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <div className="px-6 py-4 border-b border-dark-600 flex items-center justify-between bg-gradient-to-r from-dark-700/50 to-transparent">
+          <h3 className="text-lg font-semibold text-white tracking-tight">{title}</h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white p-1 hover:bg-dark-700 rounded-lg transition-colors"

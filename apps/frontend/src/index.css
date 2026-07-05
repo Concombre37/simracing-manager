@@ -4,13 +4,34 @@
 
 @layer base {
   html {
-    @apply bg-dark-900 text-gray-100;
+    @apply bg-dark-950 text-gray-100;
   }
   body {
-    @apply min-h-screen antialiased;
+    @apply min-h-screen antialiased bg-dark-950;
   }
   #root {
     @apply min-h-screen;
+  }
+  ::selection {
+    @apply bg-accent-orange/30 text-white;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 107, 53, 0.45) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full;
+    background: rgba(255, 107, 53, 0.45);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 107, 53, 0.75);
   }
 }
 
