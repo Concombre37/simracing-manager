@@ -559,6 +559,9 @@ export class SimRacingAgent {
         stationId: config.STATION_ID,
         status: StationStatus.IN_GAME,
       });
+      // Keep the blanking screen up until telemetry confirms the game has
+      // really started (mirrors the in_game status just reported).
+      this.blankingManager.setPodInGame(true);
     } catch (err) {
       this.logger.error({ err }, 'Failed to launch Assetto Corsa');
     }
@@ -577,6 +580,7 @@ export class SimRacingAgent {
       this.logger.info({ csvPath }, 'Lap telemetry CSV saved');
       await this.uploadLapTelemetryCsv(csvPath);
     }
+    this.blankingManager.setPodInGame(false);
     this.blankingManager.clearResults();
     this.blankingManager.setAuto();
     this.socket?.emit('agent:status', {
@@ -612,15 +616,24 @@ export class SimRacingAgent {
       );
       return;
     }
-    const newDuration =
-      typeof payload.newDurationMinutes === 'number' && payload.newDurationMinutes >= 0
-        ? payload.newDurationMinutes
-        : Math.max(0, this.currentSession.durationMinutes + payload.minutes);
+    const oldDuration = this.currentSession.durationMinutes;
+    // The backend sends the absolute new duration; use it as the source of
+    // truth so the agent timer stays in sync even if a relative update is
+    // lost or delivered twice. Fall back to relative math only if the
+    // absolute value is missing or invalid.
+    const hasAbsolute =
+      typeof payload.newDurationMinutes === 'number' &&
+      Number.isFinite(payload.newDurationMinutes) &&
+      payload.newDurationMinutes >= 0;
+    const newDuration = hasAbsolute
+      ? payload.newDurationMinutes
+      : Math.max(0, oldDuration + payload.minutes);
     this.currentSession.durationMinutes = newDuration;
     this.logger.info(
       {
-        oldDurationMinutes: this.currentSession.durationMinutes - payload.minutes,
+        oldDurationMinutes: oldDuration,
         newDurationMinutes: newDuration,
+        usedAbsolute: hasAbsolute,
       },
       'Session duration updated',
     );
@@ -791,6 +804,9 @@ export class SimRacingAgent {
         stationId: config.STATION_ID,
         status: StationStatus.IN_GAME,
       });
+      // Keep the blanking screen up until telemetry confirms the game has
+      // really started (mirrors the in_game status just reported).
+      this.blankingManager.setPodInGame(true);
       this.logger.info('Join server command completed');
 
       if (payload.sessionId && payload.durationMinutes && payload.durationMinutes > 0) {
@@ -835,6 +851,7 @@ export class SimRacingAgent {
         stationId: config.STATION_ID,
         status: StationStatus.ONLINE,
       });
+      this.blankingManager.setPodInGame(false);
       if (session) {
         // Wait for Assetto Corsa to write race_out.json, then read and push results.
         await new Promise((resolve) => setTimeout(resolve, 3000));

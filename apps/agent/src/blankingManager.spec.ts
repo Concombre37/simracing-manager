@@ -197,6 +197,67 @@ describe('BlankingManager', () => {
     expect(manager.isBlankingActive()).toBe(false);
   });
 
+  it('keeps blanking during a session even when AC shared memory is loaded', () => {
+    manager.setAuto();
+    manager.setPodInGame(true);
+    manager.setAcRunning(true);
+    manager.setAcLoaded(true);
+    expect(manager.isBlankingActive()).toBe(true);
+  });
+
+  it('hides blanking during a session only after ready is confirmed for 5s', () => {
+    vi.useFakeTimers();
+    manager.setAuto();
+    manager.setPodInGame(true);
+    manager.setAcRunning(true);
+    manager.setAcLoaded(true);
+    manager.onTelemetry(makeSnapshot({ speedKmh: 80, rpm: 4000, gear: 3 }));
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(5000);
+    expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('requires a fresh ready confirmation when a new session starts', () => {
+    vi.useFakeTimers();
+    manager.setAuto();
+    manager.setAcRunning(true);
+    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
+    vi.advanceTimersByTime(5000);
+    expect(manager.isBlankingActive()).toBe(false);
+
+    // A new session launches: blanking must come back until the game is
+    // confirmed again, even though the previous ready state was confirmed.
+    manager.setPodInGame(true);
+    expect(manager.isBlankingActive()).toBe(true);
+
+    manager.onTelemetry(makeSnapshot({ speedKmh: 50 }));
+    vi.advanceTimersByTime(5000);
+    expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('keeps blanking during a session when telemetry reports the main menu', () => {
+    vi.useFakeTimers();
+    manager.setAuto();
+    manager.setPodInGame(true);
+    manager.setAcRunning(true);
+    manager.setAcLoaded(true);
+    manager.onTelemetry(makeSnapshot({ isInMainMenu: true, speedKmh: 0 }));
+    vi.advanceTimersByTime(10000);
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('falls back to legacy behavior when the session ends', () => {
+    manager.setAuto();
+    manager.setPodInGame(true);
+    manager.setAcLoaded(true);
+    expect(manager.isBlankingActive()).toBe(true);
+    manager.setPodInGame(false);
+    expect(manager.isBlankingActive()).toBe(false);
+  });
+
   it('passes an empty playlist when no media is configured', () => {
     manager.setAuto();
     manager.setAcRunning(false);

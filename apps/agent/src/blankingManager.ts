@@ -37,6 +37,7 @@ export class BlankingManager {
   private override: BlankingOverride = 'auto';
   private acRunning = false;
   private acLoaded = false;
+  private podInGame = false;
   private driving = false;
   private lastTelemetryAt = 0;
   private readonly telemetryTimeoutMs = 5000;
@@ -83,6 +84,23 @@ export class BlankingManager {
       this.logger.info({ acLoaded: loaded }, 'AC shared memory state changed');
       this.evaluate();
     }
+  }
+
+  /**
+   * Mirrors the status reported to the backend via `agent:status`.
+   * While a launched session is in progress (`in_game`), auto blanking must
+   * stay up until telemetry confirms the car is really on track.
+   */
+  setPodInGame(inGame: boolean): void {
+    if (this.podInGame === inGame) return;
+    this.podInGame = inGame;
+    if (inGame) {
+      // Force a fresh ready confirmation for the new session so blanking
+      // cannot be dismissed by stale state from a previous run.
+      this.clearReady();
+    }
+    this.logger.info({ podInGame: inGame }, 'POD in-game status changed');
+    this.evaluate();
   }
 
   onTelemetry(snapshot: TelemetrySnapshot): void {
@@ -289,9 +307,14 @@ export class BlankingManager {
       return;
     }
 
-    // Hide blanking when AC shared memory is loaded (game fully initialized).
-    // Otherwise, wait for the car to be ready for a short delay before removing blanking.
-    const shouldHide = this.acLoaded || (this.acRunning && this.readyConfirmed);
+    // During a launched session (`agent:status` = in_game), blanking must stay
+    // until telemetry confirms the car has been ready for 5s: the shared
+    // memory alone maps too early, while AC is still on its loading screen.
+    // Outside a session, keep the legacy behavior (shared memory loaded, or
+    // AC running with a confirmed ready state).
+    const shouldHide = this.podInGame
+      ? this.readyConfirmed
+      : this.acLoaded || (this.acRunning && this.readyConfirmed);
 
     if (shouldHide) {
       this.stopBlanking();
