@@ -574,11 +574,17 @@ export class SimRacingAgent {
 
   private async handleStop(): Promise<void> {
     this.logger.info('Received stop command');
+    if (this.currentSession) {
+      // A tracked (timed / dedicated-server) session must end the same way
+      // regardless of whether the timer ran out, was reduced to zero, or
+      // was stopped manually: results screen with driver name/best lap.
+      await this.endSession();
+      return;
+    }
     this.acSharedMemoryReader?.stop();
     await this.luaBridge.quit();
     await this.acLauncher.stop();
     this.acRunning = false;
-    this.clearCurrentSession();
     this.clearResultsTimeout();
     const csvPath = await this.lapTelemetryRecorder.finish();
     if (csvPath) {
@@ -644,7 +650,7 @@ export class SimRacingAgent {
     );
     if (newDuration === 0) {
       this.logger.info('Session duration reduced to zero, ending immediately');
-      void this.returnToPaddockAfterDuration();
+      void this.endSession();
       return;
     }
     this.scheduleSessionEnd();
@@ -670,10 +676,10 @@ export class SimRacingAgent {
     );
     if (remainingMs > 0) {
       this.currentSession.timeout = setTimeout(() => {
-        void this.returnToPaddockAfterDuration();
+        void this.endSession();
       }, remainingMs);
     } else {
-      void this.returnToPaddockAfterDuration();
+      void this.endSession();
     }
   }
 
@@ -844,8 +850,13 @@ export class SimRacingAgent {
     }
   }
 
-  private async returnToPaddockAfterDuration(): Promise<void> {
-    this.logger.info('Duration expired, returning POD to paddock');
+  /**
+   * Ends a tracked session and shows the results screen, no matter why it
+   * ended: duration expired naturally, was reduced to zero via extend, or
+   * was stopped manually — all three must behave identically.
+   */
+  private async endSession(): Promise<void> {
+    this.logger.info('Ending session, returning POD to paddock');
     const session = this.currentSession;
     this.clearCurrentSession();
     const csvPath = await this.lapTelemetryRecorder.finish();

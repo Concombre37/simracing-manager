@@ -171,6 +171,10 @@ export class BlankingManager {
       : (summary.track ?? '-');
     const leaderboard = summary.result ? this.renderLeaderboard(summary.result) : '';
 
+    // Rendered inside a WPF WebBrowser control (IE11 engine): no CSS grid,
+    // no clamp()/conic-gradient. Layout uses flexbox/vw units and a
+    // repeating-linear-gradient checkerboard, all supported in IE11 edge
+    // mode (see the FEATURE_BROWSER_EMULATION fix in blanking.ps1).
     const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -181,63 +185,183 @@ export class BlankingManager {
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
     body {
-      background: radial-gradient(circle at center, #111 0%, #000 100%);
+      background:
+        radial-gradient(circle at 50% -10%, rgba(255,51,51,0.16) 0%, transparent 55%),
+        radial-gradient(circle at 50% 110%, rgba(168,85,247,0.12) 0%, transparent 55%),
+        #050508;
       color: #fff;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: flex-start;
-      padding: clamp(24px, 4vw, 64px);
       text-align: center;
+      animation: fadeIn 0.5s ease-out;
     }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .checkers {
+      width: 100%;
+      height: 14px;
+      background-image:
+        linear-gradient(45deg, #0a0a0f 25%, transparent 25%, transparent 75%, #0a0a0f 75%, #0a0a0f),
+        linear-gradient(45deg, #0a0a0f 25%, #e8e8e8 25%, #e8e8e8 75%, #0a0a0f 75%, #0a0a0f);
+      background-size: 14px 14px;
+      background-position: 0 0, 7px 7px;
+      flex-shrink: 0;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.2vw;
+      padding: 2.2vw 4vw 0.6vw;
+    }
+    .flag { font-size: 2.6vw; line-height: 1; }
     h1 {
-      font-size: clamp(32px, 5vw, 96px);
-      margin: 0 0 0.5em;
-      color: #00d4ff;
+      font-size: 3.6vw;
+      margin: 0;
+      color: #fff;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
+      font-weight: 800;
+      text-shadow: 0 0 24px rgba(255,51,51,0.55);
+    }
+    .bar {
+      width: 6vw;
+      height: 5px;
+      background: linear-gradient(90deg, #ff3333, #ff6b35);
+      border-radius: 3px;
+      margin: 0.6vw auto 1.6vw;
+    }
+    .driver-banner { padding: 0 4vw; margin-bottom: 1.8vw; }
+    .driver-name {
+      font-size: 3.1vw;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .driver-meta {
+      margin-top: 0.4vw;
+      font-size: 1.3vw;
+      color: #9a9aa8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
     .summary {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: clamp(12px, 2vw, 32px);
-      width: min(95%, 1400px);
-      margin-bottom: clamp(24px, 3vw, 48px);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 1.4vw;
+      width: 92%;
+      max-width: 1400px;
+      margin-bottom: 2vw;
     }
-    .item { background: rgba(255,255,255,0.06); border-radius: 16px; padding: clamp(12px, 1.5vw, 24px); }
-    .label { color: #888; font-size: clamp(12px, 1.2vw, 18px); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4em; }
-    .value { font-size: clamp(18px, 2.2vw, 40px); font-weight: 600; }
-    .best-lap .value { color: #00d4ff; }
-    .leaderboard { width: min(95%, 1400px); background: rgba(255,255,255,0.04); border-radius: 16px; overflow: hidden; }
-    table { width: 100%; border-collapse: collapse; font-size: clamp(14px, 1.6vw, 26px); }
-    th { background: rgba(0,212,255,0.15); color: #00d4ff; padding: clamp(8px, 1vw, 16px); text-transform: uppercase; letter-spacing: 0.05em; }
-    td { padding: clamp(8px, 1vw, 16px); border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .tile {
+      flex: 1 1 200px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      padding: 1.3vw;
+    }
+    .tile .label {
+      color: #8a8a96;
+      font-size: 1vw;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 0.5vw;
+    }
+    .tile .value { font-size: 2vw; font-weight: 700; }
+    .tile.best-lap {
+      background: linear-gradient(135deg, rgba(168,85,247,0.22), rgba(168,85,247,0.06));
+      border-color: rgba(168,85,247,0.5);
+      box-shadow: 0 0 30px -8px rgba(168,85,247,0.5);
+    }
+    .tile.best-lap .label { color: #c9a3fb; }
+    .tile.best-lap .value {
+      color: #c084fc;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 2.3vw;
+    }
+    .leaderboard {
+      width: 92%;
+      max-width: 1400px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px;
+      overflow: hidden;
+      margin-bottom: 2vw;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 1.35vw; }
+    th {
+      background: rgba(255,51,51,0.14);
+      color: #ff8a7a;
+      padding: 0.9vw 0.8vw;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-size: 0.9vw;
+      text-align: left;
+    }
+    th.num, td.num { text-align: center; }
+    td {
+      padding: 0.8vw;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
     tr:last-child td { border-bottom: none; }
-    .pos { font-weight: 700; color: #00d4ff; }
+    tr.p1 td { background: rgba(255,215,0,0.08); }
+    tr.p2 td { background: rgba(192,192,192,0.06); }
+    tr.p3 td { background: rgba(205,127,50,0.06); }
+    td.pos { text-align: center; }
+    .pos-badge {
+      display: inline-block;
+      min-width: 2.2vw;
+      padding: 0.25vw 0.5vw;
+      border-radius: 6px;
+      font-weight: 800;
+      font-family: 'Consolas', 'Courier New', monospace;
+    }
+    .p1 .pos-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #1a1500; }
+    .p2 .pos-badge { background: linear-gradient(135deg, #d8d8d8, #9a9a9a); color: #1a1a1a; }
+    .p3 .pos-badge { background: linear-gradient(135deg, #cd8a4a, #8a5a26); color: #1a0f00; }
+    .pos-badge.other { background: rgba(255,255,255,0.08); color: #ccc; }
+    td.time { font-family: 'Consolas', 'Courier New', monospace; }
+    footer {
+      margin-top: auto;
+      padding: 1.2vw 0 1.6vw;
+      color: #55555f;
+      font-size: 0.9vw;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+    }
   </style>
 </head>
 <body>
-  <h1>Session terminée</h1>
+  <div class="checkers"></div>
+  <header>
+    <span class="flag">🏁</span>
+    <h1>Session terminée</h1>
+    <span class="flag">🏁</span>
+  </header>
+  <div class="bar"></div>
+  <div class="driver-banner">
+    <div class="driver-name">${this.escapeHtml(summary.clientName ?? 'Pilote')}</div>
+    <div class="driver-meta">${this.escapeHtml(summary.carAcId ?? '-')} · ${this.escapeHtml(trackDisplay)}</div>
+  </div>
   <div class="summary">
-    <div class="item">
-      <div class="label">Pilote</div>
-      <div class="value">${this.escapeHtml(summary.clientName ?? '-')}</div>
-    </div>
-    <div class="item">
-      <div class="label">Voiture</div>
-      <div class="value">${this.escapeHtml(summary.carAcId ?? '-')}</div>
-    </div>
-    <div class="item">
+    <div class="tile">
       <div class="label">Circuit</div>
       <div class="value">${this.escapeHtml(trackDisplay)}</div>
     </div>
-    <div class="item best-lap">
+    <div class="tile">
+      <div class="label">Voiture</div>
+      <div class="value">${this.escapeHtml(summary.carAcId ?? '-')}</div>
+    </div>
+    <div class="tile best-lap">
       <div class="label">Meilleur tour</div>
       <div class="value">${bestLap}</div>
     </div>
   </div>
   ${leaderboard}
+  <footer>SimRacing Manager</footer>
 </body>
 </html>`;
 
@@ -249,24 +373,33 @@ export class BlankingManager {
     const entries = getLeaderboard(result);
     if (entries.length === 0) return '';
     const rows = entries
-      .map(
-        (entry) => `<tr>
-      <td class="pos">${entry.position}</td>
+      .map((entry) => {
+        const posClass =
+          entry.position === 1
+            ? 'p1'
+            : entry.position === 2
+              ? 'p2'
+              : entry.position === 3
+                ? 'p3'
+                : '';
+        const badgeClass = posClass || 'other';
+        return `<tr class="${posClass}">
+      <td class="pos"><span class="pos-badge ${badgeClass}">P${entry.position}</span></td>
       <td>${this.escapeHtml(entry.name)}</td>
       <td>${this.escapeHtml(entry.car)}</td>
-      <td>${entry.laps}</td>
-      <td>${formatLapTime(entry.bestLapMs)}</td>
-    </tr>`,
-      )
+      <td class="num">${entry.laps}</td>
+      <td class="time">${formatLapTime(entry.bestLapMs)}</td>
+    </tr>`;
+      })
       .join('');
     return `<div class="leaderboard">
   <table>
     <thead>
       <tr>
-        <th>Pos</th>
+        <th class="num">Pos</th>
         <th>Pilote</th>
         <th>Voiture</th>
-        <th>Tours</th>
+        <th class="num">Tours</th>
         <th>Meilleur tour</th>
       </tr>
     </thead>

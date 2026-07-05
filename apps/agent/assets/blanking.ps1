@@ -9,6 +9,21 @@ param(
 Add-Type -AssemblyName PresentationFramework
 Add-Type -AssemblyName System.Windows.Forms
 
+# The WPF WebBrowser control hosts the legacy IE engine and defaults to
+# IE7 quirks mode unless the host process is opted into a modern document
+# mode. This makes the results screen (flexbox, gradients, vw units)
+# render correctly instead of falling back to unstyled text.
+try {
+  $hostExe = [System.IO.Path]::GetFileName([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName)
+  $regPath = 'HKCU:\Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION'
+  if (-not (Test-Path $regPath)) {
+    New-Item -Path $regPath -Force | Out-Null
+  }
+  New-ItemProperty -Path $regPath -Name $hostExe -Value 11001 -PropertyType DWord -Force | Out-Null
+} catch {
+  Write-Warning "Failed to set IE emulation mode for results screen: $_"
+}
+
 $playlist = @()
 if ($PlaylistPath -and (Test-Path $PlaylistPath)) {
   try {
