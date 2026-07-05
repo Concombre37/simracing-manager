@@ -559,6 +559,11 @@ export class SimRacingAgent {
         stationId: config.STATION_ID,
         status: StationStatus.IN_GAME,
       });
+      // A new session must always start from a clean auto state: a manual
+      // hide/show left over from maintenance (Escape, "Masquer écran") would
+      // otherwise stick forever and prevent the auto blanking logic from
+      // ever running again for this session.
+      this.blankingManager.setAuto();
       // Keep the blanking screen up until telemetry confirms the game has
       // really started (mirrors the in_game status just reported).
       this.blankingManager.setPodInGame(true);
@@ -804,6 +809,11 @@ export class SimRacingAgent {
         stationId: config.STATION_ID,
         status: StationStatus.IN_GAME,
       });
+      // A new session must always start from a clean auto state: a manual
+      // hide/show left over from maintenance (Escape, "Masquer écran") would
+      // otherwise stick forever and prevent the auto blanking logic from
+      // ever running again for this session.
+      this.blankingManager.setAuto();
       // Keep the blanking screen up until telemetry confirms the game has
       // really started (mirrors the in_game status just reported).
       this.blankingManager.setPodInGame(true);

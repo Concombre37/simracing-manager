@@ -100,6 +100,7 @@ export class SessionsService {
     return this.prisma.session.update({
       where: { id: sessionId },
       data: { status: SessionStatus.FINISHED, endedAt: new Date() },
+      include: { station: true },
     });
   }
 }

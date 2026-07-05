@@ -62,20 +62,23 @@ export class SessionsController {
     this.logger.log(
       {
         sessionId: session.id,
-        stationId: session.stationId,
+        stationId: session.station.stationId,
         minutes,
         newDurationMinutes: session.durationMinutes,
       },
       'Session extended; notifying agent',
     );
-    await this.agentGateway.emitSessionExtend(session.stationId, {
+    // session.stationId is the internal Station UUID (Prisma FK), not the
+    // business stationId the agent's socket room is named after. Using the
+    // wrong one silently drops the event: the agent never joins that room.
+    await this.agentGateway.emitSessionExtend(session.station.stationId, {
       sessionId: session.id,
       minutes,
       newDurationMinutes: session.durationMinutes ?? 0,
     });
     this.dashboardGateway.server.emit('session:updated', {
       sessionId: session.id,
-      stationId: session.stationId,
+      stationId: session.station.stationId,
       durationMinutes: session.durationMinutes ?? undefined,
       status: session.status,
     });
@@ -86,10 +89,12 @@ export class SessionsController {
   @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
   async stop(@Param('id') id: string) {
     const session = await this.sessionsService.stop(id);
-    await this.agentGateway.emitStopSession(session.stationId);
+    // Same pitfall as extend(): must use the business stationId, not the
+    // internal Station UUID, so the event reaches the agent's socket room.
+    await this.agentGateway.emitStopSession(session.station.stationId);
     this.dashboardGateway.server.emit('session:updated', {
       sessionId: session.id,
-      stationId: session.stationId,
+      stationId: session.station.stationId,
       status: session.status,
     });
     return session;
