@@ -46,8 +46,9 @@ if (!existsSync(envPath)) {
     '# Démarrage automatique avec Windows (1 = activer, 0 = désactiver)',
     'AUTO_START=0',
     '',
-    '# Icône dans la barre des tâches Windows (1 = activer, 0 = désactiver)',
-    'TRAY_ICON=0',
+    '# Icône dans la barre des tâches Windows : donne accès à la console',
+    '# locale (statut, logs, actions). 1 = activer, 0 = désactiver.',
+    'TRAY_ICON=1',
     '',
   ].join('\n');
 

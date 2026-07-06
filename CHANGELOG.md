@@ -1,5 +1,35 @@
 # Changelog
 
+## v2.2.47 — Console locale moderne pour l'agent
+
+### Ajouté
+
+- **Nouvelle fenêtre « Console »** accessible depuis l'icône de la barre des
+  tâches (« Ouvrir la console », ou double-clic sur l'icône) : statut en
+  direct (connexion serveur, Assetto Corsa en cours, écran d'attente
+  actif/masqué — mêmes indicateurs que la LED ajoutée sur la page Postes du
+  dashboard en v2.2.45), boutons d'action, et un panneau de logs récents.
+  Construite en HTML/CSS (atomes : LED, bouton ; molécules : ligne de statut,
+  ligne de log ; organismes : en-tête, panneau de statut, panneau d'actions,
+  panneau de logs) rendu dans un contrôle `WebBrowser` WPF — même technique
+  déjà utilisée en production pour l'écran d'attente et de résultats
+  (`blanking.ps1`), pas d'Electron : l'agent reste un exécutable `pkg` léger.
+- **Actions disponibles dans la console** : tout ce qui existait déjà dans le
+  menu du tray (masquer/afficher l'écran d'attente, quitter), plus
+  nouveau : synchroniser le contenu, vérifier les mises à jour, et
+  redémarrer l'agent (relance propre du process, utile sur place sans accès
+  au dashboard).
+- **Logs persistés** : l'agent packagé écrit désormais aussi ses logs dans
+  `%TEMP%\simracing-manager\logs\agent.log` (rotation simple au-delà de
+  5 Mo) — jusqu'ici les logs partaient uniquement sur une sortie standard
+  jetée puisque l'agent est lancé caché (`start-agent.vbs`). Les ~100
+  dernières lignes alimentent aussi le panneau de logs de la console.
+- L'icône de la barre des tâches est maintenant **activée par défaut** dans
+  le `.env` généré pour les nouvelles installations (`TRAY_ICON=1`), puisque
+  c'est désormais la porte d'entrée de la console. Les PODs déjà déployés
+  gardent leur réglage actuel — éditer `TRAY_ICON=1` dans leur `.env` pour y
+  avoir accès.
+
 ## v2.2.46 — Le vrai bug de l'écran d'attente qui se coupe instantanément
 
 ### Corrigé

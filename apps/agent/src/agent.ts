@@ -3,6 +3,7 @@ import { Logger } from 'pino';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
+import { spawn } from 'child_process';
 import {
   AgentToServerEvents,
   ServerToAgentEvents,
@@ -108,6 +109,18 @@ export class SimRacingAgent {
         } else {
           this.blankingManager.show();
         }
+      },
+      onSyncContent: () => {
+        this.logger.info('Content sync requested from local console');
+        void this.handleContentSync();
+      },
+      onCheckUpdate: () => {
+        this.logger.info('Update check requested from local console');
+        void this.handleUpdate();
+      },
+      onRestartAgent: () => {
+        this.logger.info('Restart requested from local console');
+        void this.handleLocalRestart();
       },
       onQuit: () => {
         this.logger.info('Quit requested from tray icon');
@@ -502,6 +515,14 @@ export class SimRacingAgent {
         timestamp: Date.now(),
       };
       this.socket?.emit('agent:heartbeat', payload);
+      this.trayManager.updateStatus({
+        stationId: config.STATION_ID,
+        stationName: config.STATION_NAME,
+        version: VERSION,
+        connected: this.socket?.connected ?? false,
+        acRunning: this.acRunning,
+        blankingActive: this.blankingManager.isBlankingActive(),
+      });
       this.heartbeatTimeout = setTimeout(() => void beat(), 2000);
     };
 
@@ -786,6 +807,54 @@ export class SimRacingAgent {
       await this.updater.update(() => this.blankingManager.shutdown());
     } catch (err) {
       this.logger.error({ err }, 'Agent update failed');
+    }
+  }
+
+  /**
+   * Plain restart requested from the local console (no download/update
+   * involved) — same wait-for-this-PID-then-relaunch technique as
+   * Updater.update(), minus the download/extract steps since it's the same
+   * executable.
+   */
+  private async handleLocalRestart(): Promise<void> {
+    if (process.platform !== 'win32') {
+      this.logger.warn('Local restart is only supported on Windows');
+      return;
+    }
+    try {
+      const currentExe = process.execPath;
+      const baseDir = path.dirname(currentExe);
+      const batPath = path.join(baseDir, 'restart-agent.bat');
+      const batContent = [
+        '@echo off',
+        'set /a waitTime=0',
+        ':wait',
+        `tasklist /FI "PID eq ${process.pid}" /FO CSV | find "${process.pid}" >nul`,
+        'if %errorlevel% == 0 (',
+        '  timeout /t 1 /nobreak >nul',
+        '  set /a waitTime+=1',
+        '  if %waitTime% GTR 30 goto force',
+        '  goto wait',
+        ')',
+        ':force',
+        `if exist "${batPath}" del /f "${batPath}"`,
+        `start "" "${currentExe}"`,
+        'exit',
+      ].join('\r\n');
+      await fs.writeFile(batPath, batContent, 'utf-8');
+
+      spawn('cmd.exe', ['/c', batPath], {
+        cwd: baseDir,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+
+      this.logger.info('Agent restart scheduled, exiting current process');
+      this.blankingManager.shutdown();
+      process.exit(0);
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to schedule agent restart');
     }
   }
 

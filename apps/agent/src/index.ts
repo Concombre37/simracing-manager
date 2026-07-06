@@ -1,6 +1,7 @@
 import pino from 'pino';
 import { acquireSingleInstance } from './singleInstance';
 import { ensureAutoStart } from './autoStart';
+import { LogFileStream } from './logFileStream';
 
 // pino-pretty uses worker threads that may fail inside a pkg executable.
 // Use a simple pretty-like formatter when packaged.
@@ -9,21 +10,24 @@ import { ensureAutoStart } from './autoStart';
 const isPackaged = Boolean((process as any).pkg);
 
 const logger = isPackaged
-  ? pino({
-      timestamp: pino.stdTimeFunctions.isoTime,
-      formatters: {
-        level: (label) => ({ level: label.toUpperCase() }),
-      },
-      hooks: {
-        logMethod(inputArgs, method) {
-          const [msg, ...rest] = inputArgs;
-          if (typeof msg === 'string') {
-            return method.apply(this, [msg, ...rest]);
-          }
-          return method.apply(this, inputArgs);
+  ? pino(
+      {
+        timestamp: pino.stdTimeFunctions.isoTime,
+        formatters: {
+          level: (label) => ({ level: label.toUpperCase() }),
+        },
+        hooks: {
+          logMethod(inputArgs, method) {
+            const [msg, ...rest] = inputArgs;
+            if (typeof msg === 'string') {
+              return method.apply(this, [msg, ...rest]);
+            }
+            return method.apply(this, inputArgs);
+          },
         },
       },
-    })
+      new LogFileStream(),
+    )
   : pino({
       transport: {
         target: 'pino-pretty',
