@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.33 — Mise en page verticale de l'écran de résultats
+
+### Modifié
+
+- Les tuiles Circuit/Voiture/Meilleur tour de l'écran de résultats passent d'une disposition en ligne à une disposition en colonne (label à gauche, valeur à droite sur chaque tuile), pour éviter tout chevauchement de texte avec des noms de circuit/voiture longs.
+
 ## v2.2.32 — Correction : l'écran de résultats ne s'affichait jamais
 
 ### Corrigé

@@ -266,28 +266,38 @@ export class BlankingManager {
     }
     .summary {
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 1.4vw;
-      width: 92%;
-      max-width: 1400px;
-      margin-bottom: 2vw;
+      flex-direction: column;
+      gap: 0.9vw;
+      width: 70%;
+      max-width: 900px;
+      margin: 0 auto 2vw;
     }
     .tile {
-      flex: 1 1 200px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1vw;
       background: rgba(255,255,255,0.05);
       border: 1px solid rgba(255,255,255,0.08);
       border-radius: 14px;
-      padding: 1.3vw;
+      padding: 0.9vw 1.4vw;
+      text-align: left;
     }
     .tile .label {
       color: #8a8a96;
       font-size: 1vw;
       text-transform: uppercase;
       letter-spacing: 0.12em;
-      margin-bottom: 0.5vw;
+      white-space: nowrap;
     }
-    .tile .value { font-size: 2vw; font-weight: 700; }
+    .tile .value {
+      font-size: 1.5vw;
+      font-weight: 700;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .tile.best-lap {
       background: linear-gradient(135deg, rgba(168,85,247,0.22), rgba(168,85,247,0.06));
       border-color: rgba(168,85,247,0.5);
@@ -297,7 +307,7 @@ export class BlankingManager {
     .tile.best-lap .value {
       color: #c084fc;
       font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 2.3vw;
+      font-size: 1.8vw;
     }
     .leaderboard {
       width: 92%;
