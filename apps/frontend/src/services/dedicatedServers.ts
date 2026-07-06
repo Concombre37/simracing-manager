@@ -63,6 +63,8 @@ export interface UpdateDedicatedServerData {
 
 export const dedicatedServersApi = {
   getAll: () => api.get<DedicatedServer[]>('/dedicated-servers').then((res) => res.data),
+  getById: (id: string) =>
+    api.get<DedicatedServer>(`/dedicated-servers/${id}`).then((res) => res.data),
   create: (data: CreateDedicatedServerData) =>
     api.post<DedicatedServer>('/dedicated-servers', data).then((res) => res.data),
   update: (id: string, data: UpdateDedicatedServerData) =>

@@ -9,6 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Stations } from './pages/Stations';
 import { DedicatedServers } from './pages/DedicatedServers';
 import { CreateDedicatedServer } from './pages/CreateDedicatedServer';
+import { JoinServer } from './pages/JoinServer';
 import { Users } from './pages/Users';
 import { Leaderboard } from './pages/Leaderboard';
 import { Sessions } from './pages/Sessions';
@@ -76,6 +77,14 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <CreateDedicatedServer />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dedicated-servers/:id/join"
+          element={
+            <ProtectedRoute>
+              <JoinServer />
             </ProtectedRoute>
           }
         />

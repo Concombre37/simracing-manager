@@ -1,13 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import {
-  dedicatedServersApi,
-  type DedicatedServer,
-  type Car as AcCar,
-} from '../services/dedicatedServers';
-import { stationsApi, type Station } from '../services/stations';
+import { dedicatedServersApi, type DedicatedServer } from '../services/dedicatedServers';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -20,7 +15,6 @@ import {
   Send,
   Pencil,
   Trash2,
-  Check,
   Globe,
   Cpu,
   Lock,
@@ -28,15 +22,8 @@ import {
   Square,
   Car,
   MapPin,
-  User,
   Users,
-  Zap,
 } from 'lucide-react';
-const DIFFICULTY_OPTIONS = {
-  EASY: 'EASY' as const,
-  PRO: 'PRO' as const,
-  CUSTOM: 'CUSTOM' as const,
-};
 
 function findTrackPreview(trackAcId: string, content: unknown): string | undefined {
   const tracks = (content as { tracks?: { acId: string; preview?: string }[] } | undefined)?.tracks;
@@ -49,13 +36,8 @@ export function DedicatedServers() {
     queryKey: ['dedicated-servers'],
     queryFn: dedicatedServersApi.getAll,
   });
-  const { data: stations } = useQuery({
-    queryKey: ['stations'],
-    queryFn: stationsApi.getAll,
-  });
 
   const [editingServer, setEditingServer] = useState<DedicatedServer | null>(null);
-  const [joiningServer, setJoiningServer] = useState<DedicatedServer | null>(null);
 
   const updateMutation = useMutation({
     mutationFn: ({
@@ -188,14 +170,12 @@ export function DedicatedServers() {
 
                       {/* Actions : envoi / arrêt / gestion clairement séparés */}
                       <div className="flex shrink-0 flex-wrap items-center gap-2 md:flex-col md:items-stretch">
-                        <Button
-                          variant="success"
-                          size="sm"
-                          onClick={() => setJoiningServer(server)}
-                        >
-                          <Send className="h-4 w-4" />
-                          Envoyer les POD
-                        </Button>
+                        <Link to={`/dedicated-servers/${server.id}/join`}>
+                          <Button variant="success" size="sm" className="w-full">
+                            <Send className="h-4 w-4" />
+                            Envoyer les POD
+                          </Button>
+                        </Link>
                         {server.status === 'running' && (
                           <Button
                             variant="danger"
@@ -261,18 +241,6 @@ export function DedicatedServers() {
           onClose={() => setEditingServer(null)}
           onSubmit={(data) => updateMutation.mutate({ id: editingServer.id, data })}
           isSubmitting={updateMutation.isPending}
-        />
-      )}
-
-      {joiningServer && stations && (
-        <JoinServerModal
-          server={joiningServer}
-          stations={stations}
-          onClose={() => setJoiningServer(null)}
-          onJoin={async (pods, durationMinutes) => {
-            await dedicatedServersApi.join(joiningServer.id, pods, durationMinutes);
-            setJoiningServer(null);
-          }}
         />
       )}
     </PageShell>
@@ -390,271 +358,6 @@ function ServerFormModal({ title, server, onClose, onSubmit, isSubmitting }: Ser
           </Button>
         </div>
       </form>
-    </Modal>
-  );
-}
-
-interface JoinPodConfig {
-  stationId: string;
-  carAcId: string;
-  clientName: string;
-  difficulty: 'EASY' | 'PRO' | 'CUSTOM';
-  selected: boolean;
-}
-
-interface JoinServerModalProps {
-  server: DedicatedServer;
-  stations: Station[];
-  onClose: () => void;
-  onJoin: (
-    pods: { stationId: string; carAcId: string; clientName?: string; difficulty?: string }[],
-    durationMinutes?: number,
-  ) => void;
-}
-
-function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalProps) {
-  const [durationMinutes, setDurationMinutes] = useState<number | undefined>(undefined);
-  const [joined, setJoined] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const durationOptions = [
-    { value: undefined, label: 'Illimité' },
-    { value: 15, label: '15 min' },
-    { value: 30, label: '30 min' },
-    { value: 45, label: '45 min' },
-    { value: 60, label: '60 min' },
-  ];
-
-  const onlineStations = stations.filter(
-    (s) =>
-      s.id !== server.stationId &&
-      s.role === 'simulator' &&
-      (s.status === 'online' || s.status === 'in_game'),
-  );
-
-  const carMap = useMemo(() => {
-    const cars = (server.station.content as { cars?: AcCar[] } | undefined)?.cars ?? [];
-    return new Map(cars.map((c) => [c.acId, c]));
-  }, [server.station.content]);
-
-  const [podConfigs, setPodConfigs] = useState<Record<string, JoinPodConfig>>(() => {
-    const initial: Record<string, JoinPodConfig> = {};
-    const defaultCar = server.cars[0] ?? '';
-    for (const station of onlineStations) {
-      initial[station.stationId] = {
-        stationId: station.stationId,
-        carAcId: defaultCar,
-        clientName: '',
-        difficulty: DIFFICULTY_OPTIONS.PRO,
-        selected: false,
-      };
-    }
-    return initial;
-  });
-
-  const updatePod = (stationId: string, patch: Partial<JoinPodConfig>) => {
-    setPodConfigs((prev) => ({
-      ...prev,
-      [stationId]: { ...prev[stationId], ...patch },
-    }));
-  };
-
-  const selectedPods = useMemo(
-    () => Object.values(podConfigs).filter((p) => p.selected),
-    [podConfigs],
-  );
-
-  async function handleJoin() {
-    if (selectedPods.length === 0) return;
-    setIsJoining(true);
-    setError(null);
-    try {
-      await onJoin(
-        selectedPods.map((p) => ({
-          stationId: p.stationId,
-          carAcId: p.carAcId,
-          clientName: p.clientName || undefined,
-          difficulty: p.difficulty,
-        })),
-        durationMinutes,
-      );
-      setJoined(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Échec de l’envoi des POD');
-    } finally {
-      setIsJoining(false);
-    }
-  }
-
-  return (
-    <Modal title={`Envoyer les POD sur ${server.name}`} onClose={onClose} size="lg">
-      {joined ? (
-        <div className="py-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-900/30">
-            <Check className="h-8 w-8 text-green-400" />
-          </div>
-          <h3 className="mb-2 text-xl font-semibold text-white">Commande envoyée</h3>
-          <p className="mb-6 text-gray-400">
-            {selectedPods.length} POD ont reçu l'ordre de rejoindre{' '}
-            {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
-          </p>
-          <Button variant="primary" onClick={onClose} className="w-full">
-            Fermer
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-5">
-          <p className="text-sm text-gray-400">
-            Configure chaque POD à envoyer sur{' '}
-            <span className="font-mono text-accent-orange">
-              {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
-            </span>
-          </p>
-
-          <div>
-            <Label>Durée sur le serveur</Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {durationOptions.map((option) => (
-                <button
-                  key={option.label}
-                  type="button"
-                  onClick={() => setDurationMinutes(option.value)}
-                  className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                    durationMinutes === option.value
-                      ? 'bg-accent-orange text-dark-900 shadow-lg shadow-accent-orange/30'
-                      : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="max-h-[50vh] space-y-3 overflow-y-auto pr-1">
-            {onlineStations.length === 0 && (
-              <p className="py-4 text-center text-gray-500">Aucun POD en ligne</p>
-            )}
-            {onlineStations.map((station) => {
-              const config = podConfigs[station.stationId];
-              if (!config) return null;
-              return (
-                <div
-                  key={station.stationId}
-                  className={`rounded-xl border p-4 transition-colors ${
-                    config.selected
-                      ? 'border-accent-orange bg-dark-900 ring-1 ring-accent-orange'
-                      : 'border-dark-600 bg-dark-800 hover:border-dark-500'
-                  }`}
-                >
-                  <div className="mb-3 flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={config.selected}
-                      onChange={(e) => updatePod(station.stationId, { selected: e.target.checked })}
-                      className="mt-1 h-5 w-5 rounded border-dark-600 bg-dark-900 text-accent-orange focus:ring-accent-orange"
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold text-white">{station.name}</p>
-                        <Badge variant={station.status === 'in_game' ? 'blue' : 'green'}>
-                          {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
-                        </Badge>
-                      </div>
-                      <p className="font-mono text-xs text-gray-500">{station.stationId}</p>
-                    </div>
-                  </div>
-
-                  {config.selected && (
-                    <div className="grid grid-cols-1 gap-3 pl-8 sm:grid-cols-3">
-                      <div>
-                        <Label className="text-xs">Nom du client</Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                          <input
-                            type="text"
-                            value={config.clientName}
-                            onChange={(e) =>
-                              updatePod(station.stationId, { clientName: e.target.value })
-                            }
-                            placeholder="Client"
-                            className="w-full rounded-lg border border-dark-600 bg-dark-900 py-2 pl-9 pr-3 text-white placeholder-gray-600 focus:border-accent-orange focus:outline-none"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label className="text-xs">Difficulté</Label>
-                        <div className="relative">
-                          <Zap className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                          <select
-                            value={config.difficulty}
-                            onChange={(e) =>
-                              updatePod(station.stationId, {
-                                difficulty: e.target.value as 'EASY' | 'PRO' | 'CUSTOM',
-                              })
-                            }
-                            className="w-full appearance-none rounded-lg border border-dark-600 bg-dark-900 py-2 pl-9 pr-3 text-white focus:border-accent-orange focus:outline-none"
-                          >
-                            <option value={DIFFICULTY_OPTIONS.EASY}>Easy</option>
-                            <option value={DIFFICULTY_OPTIONS.PRO}>Pro</option>
-                            <option value={DIFFICULTY_OPTIONS.CUSTOM}>Custom</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label className="text-xs">Voiture</Label>
-                        <div className="relative">
-                          <Car className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                          <select
-                            value={config.carAcId}
-                            onChange={(e) =>
-                              updatePod(station.stationId, { carAcId: e.target.value })
-                            }
-                            className="w-full appearance-none rounded-lg border border-dark-600 bg-dark-900 py-2 pl-9 pr-3 text-white focus:border-accent-orange focus:outline-none"
-                          >
-                            {server.cars.map((id) => {
-                              const car = carMap.get(id);
-                              return (
-                                <option key={id} value={id}>
-                                  {car?.name ?? id}
-                                </option>
-                              );
-                            })}
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {error && (
-            <p className="rounded-lg border border-red-900/40 bg-red-900/20 p-2 text-sm text-red-400">
-              {error}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button type="button" variant="secondary" onClick={onClose} disabled={isJoining}>
-              Annuler
-            </Button>
-            <Button
-              variant="success"
-              onClick={handleJoin}
-              disabled={selectedPods.length === 0 || isJoining}
-              isLoading={isJoining}
-            >
-              <Send className="h-4 w-4" />
-              Envoyer {selectedPods.length > 0 && `(${selectedPods.length})`}
-            </Button>
-          </div>
-        </div>
-      )}
     </Modal>
   );
 }
