@@ -49,6 +49,8 @@ export class SimRacingAgent {
   private contentInterval: NodeJS.Timeout | null = null;
   private acRunning = false;
   private acLoaded = false;
+  private lastReportedStatus: StationStatus | null = null;
+  private statusMismatchStreak = 0;
   private apiKey: string | undefined = config.API_KEY;
   private isProvisioning = false;
   private lastContentHash = '';
@@ -451,8 +453,14 @@ export class SimRacingAgent {
       try {
         this.acRunning = await this.processMonitor.isAcRunning();
         this.acLoaded = await this.acSharedMemory.isAcLoaded();
+        // Reconciliation: re-evaluate blanking and the reported POD status
+        // against reality on every tick (not just when something notifies
+        // us of a change), so the agent self-corrects any drift on its own
+        // — e.g. if a status emit was missed or blanking ended up in the
+        // wrong state for any reason.
         this.blankingManager.setAcRunning(this.acRunning);
         this.blankingManager.setAcLoaded(this.acLoaded);
+        this.reconcileReportedStatus();
       } catch (err) {
         this.logger.debug({ err }, 'Failed to refresh AC process state');
       }
@@ -470,6 +478,48 @@ export class SimRacingAgent {
     };
 
     void beat();
+  }
+
+  /**
+   * Self-heals the status reported to the backend: if what's actually
+   * running no longer matches what we last told the backend (a missed
+   * transition, a race between two emits, a reconnect, etc.), correct it
+   * immediately instead of waiting on the next explicit event. Mirrors the
+   * same reconciliation the previous production launcher did every polling
+   * cycle (`syncAssettoState()`).
+   */
+  private reconcileReportedStatus(): void {
+    const desired = this.acRunning ? StationStatus.IN_GAME : StationStatus.ONLINE;
+    if (this.lastReportedStatus === desired) {
+      this.statusMismatchStreak = 0;
+      return;
+    }
+    if (this.lastReportedStatus === null) {
+      // First observation since connecting: nothing to protect against, so
+      // report the accurate status right away instead of waiting out the
+      // debounce below (e.g. the agent was restarted while AC was already
+      // running).
+      this.setReportedStatus(desired);
+      this.statusMismatchStreak = 0;
+      return;
+    }
+    // Require the drift to persist for a couple of ticks (~4s) so this
+    // doesn't fight the brief, expected lag right after an explicit launch
+    // (process not detected by tasklist yet) — only genuine drift gets
+    // corrected here.
+    this.statusMismatchStreak += 1;
+    if (this.statusMismatchStreak < 2) return;
+    this.logger.info(
+      { from: this.lastReportedStatus, to: desired },
+      'POD status drifted, correcting',
+    );
+    this.setReportedStatus(desired);
+    this.statusMismatchStreak = 0;
+  }
+
+  private setReportedStatus(status: StationStatus): void {
+    this.lastReportedStatus = status;
+    this.socket?.emit('agent:status', { stationId: config.STATION_ID, status });
   }
 
   private stopHeartbeat(): void {
@@ -562,10 +612,7 @@ export class SimRacingAgent {
       this.acSharedMemoryReader?.start();
       this.lapTelemetryRecorder.start(payload.sessionId);
       await this.luaBridge.autoStart();
-      this.socket?.emit('agent:status', {
-        stationId: config.STATION_ID,
-        status: StationStatus.IN_GAME,
-      });
+      this.setReportedStatus(StationStatus.IN_GAME);
       // Keep the blanking screen up until telemetry confirms the game has
       // really started (mirrors the in_game status just reported). Resets
       // any stale manual override internally.
@@ -602,10 +649,7 @@ export class SimRacingAgent {
     this.blankingManager.clearResults();
     this.blankingManager.setAuto();
     this.kioskManager.exit();
-    this.socket?.emit('agent:status', {
-      stationId: config.STATION_ID,
-      status: StationStatus.ONLINE,
-    });
+    this.setReportedStatus(StationStatus.ONLINE);
   }
 
   private clearCurrentSession(): void {
@@ -821,10 +865,7 @@ export class SimRacingAgent {
     try {
       await this.acLauncher.joinServer(payload);
       this.acRunning = true;
-      this.socket?.emit('agent:status', {
-        stationId: config.STATION_ID,
-        status: StationStatus.IN_GAME,
-      });
+      this.setReportedStatus(StationStatus.IN_GAME);
       // Keep the blanking screen up until telemetry confirms the game has
       // really started (mirrors the in_game status just reported). Resets
       // any stale manual override internally.
@@ -889,10 +930,7 @@ export class SimRacingAgent {
     try {
       await this.acLauncher.quit();
       this.acRunning = false;
-      this.socket?.emit('agent:status', {
-        stationId: config.STATION_ID,
-        status: StationStatus.ONLINE,
-      });
+      this.setReportedStatus(StationStatus.ONLINE);
       this.blankingManager.setPodInGame(false);
       this.kioskManager.exit();
       if (session) {

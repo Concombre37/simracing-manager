@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.43 — Auto-réparation périodique du blanking et du statut du POD
+
+### Ajouté
+
+- **Réconciliation périodique** (à chaque battement de cœur, toutes les 2s) : l'agent réévalue systématiquement l'état du blanking (voir v2.2.41 — déjà implicitement réévalué à chaque battement, rendu explicite ici) et **le statut rapporté au dashboard** (`agent:status`). Si le statut envoyé ne correspond plus à la réalité (processus AC réellement lancé/arrêté), l'agent le corrige tout seul après quelques secondes, sans attendre un événement explicite — même principe que RS Launcher (`syncAssettoState()`), qui resynchronisait `isconnected` à chaque cycle de sondage.
+- Un délai de quelques secondes (2 battements) protège cette correction automatique des transitions normales de lancement/arrêt (le temps que `tasklist` détecte le nouveau processus), sauf à la toute première connexion de l'agent où la correction est immédiate (ex. agent redémarré alors qu'Assetto Corsa tournait déjà).
+
 ## v2.2.42 — Délai de retrait du blanking configurable
 
 ### Ajouté
