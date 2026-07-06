@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stationsApi, type Station } from '../services/stations';
+import { settingsApi } from '../services/settings';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Monitor, Wifi, Network, Power, PowerOff, AlertCircle } from 'lucide-react';
+import { Input, Label } from '../components/ui/Input';
+import { Monitor, Wifi, Network, Power, PowerOff, AlertCircle, Clock } from 'lucide-react';
 
 export function Settings() {
   const queryClient = useQueryClient();
@@ -53,6 +55,45 @@ export function Settings() {
     },
   });
 
+  const { data: appSettings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: settingsApi.get,
+  });
+
+  const [blankingDelayInput, setBlankingDelayInput] = useState('10');
+
+  useEffect(() => {
+    if (appSettings) {
+      setBlankingDelayInput(String(appSettings.blankingDelaySeconds));
+    }
+  }, [appSettings]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: settingsApi.update,
+    onSuccess: (settings) => {
+      setFeedback({ type: 'success', message: 'Paramètres enregistrés.' });
+      queryClient.setQueryData(['settings'], settings);
+    },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) => {
+      setFeedback({
+        type: 'error',
+        message: err.response?.data?.message ?? err.message ?? "Erreur lors de l'enregistrement",
+      });
+    },
+  });
+
+  function handleSaveBlankingDelay() {
+    const value = Number(blankingDelayInput);
+    if (!Number.isInteger(value) || value < 0 || value > 120) {
+      setFeedback({
+        type: 'error',
+        message: 'Le délai doit être un nombre entier entre 0 et 120 secondes.',
+      });
+      return;
+    }
+    updateSettingsMutation.mutate({ blankingDelaySeconds: value });
+  }
+
   return (
     <PageShell title="Paramètres" subtitle="Réseau des PODs, Wake-on-LAN et arrêt distant">
       {feedback && (
@@ -75,6 +116,40 @@ export function Settings() {
           </div>
         </div>
       )}
+
+      <Card className="max-w-xl">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="rounded-lg bg-accent-orange/10 p-2">
+            <Clock className="h-5 w-5 text-accent-orange" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Écran d'attente</h3>
+            <p className="text-xs text-gray-500">
+              Délai avant le retrait du blanking une fois le jeu lancé
+            </p>
+          </div>
+        </div>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <Label htmlFor="blankingDelay">Délai (secondes)</Label>
+            <Input
+              id="blankingDelay"
+              type="number"
+              min={0}
+              max={120}
+              value={blankingDelayInput}
+              onChange={(e) => setBlankingDelayInput(e.target.value)}
+            />
+          </div>
+          <Button
+            variant="primary"
+            onClick={handleSaveBlankingDelay}
+            isLoading={updateSettingsMutation.isPending}
+          >
+            Enregistrer
+          </Button>
+        </div>
+      </Card>
 
       {isLoading && <p className="text-gray-500">Chargement des stations...</p>}
       {error && (

@@ -27,6 +27,7 @@ import {
 } from '@simracing/shared';
 import { DashboardGateway } from '../dashboard/dashboard.gateway';
 import { TelemetryService } from '../telemetry/telemetry.service';
+import { SettingsService } from '../settings/settings.service';
 import { TelemetrySnapshot } from '@simracing/shared';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -60,6 +61,7 @@ export class AgentGateway
     private readonly dedicatedServersService: DedicatedServersService,
     private readonly dashboardGateway: DashboardGateway,
     private readonly telemetryService: TelemetryService,
+    private readonly settingsService: SettingsService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -109,6 +111,13 @@ export class AgentGateway
         await this.emitBlankingMediaUpdated(payload.stationId);
       },
     );
+
+    this.eventEmitter.on(
+      'settings.updated',
+      (payload: { blankingDelaySeconds: number }) => {
+        this.server.emit('settings:updated', payload);
+      },
+    );
   }
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
@@ -122,6 +131,10 @@ export class AgentGateway
       this.logger.log(
         `Agent connected and joined room station:${client.stationId} (socket ${client.id})`,
       );
+      const settings = await this.settingsService.get();
+      client.emit('settings:updated', {
+        blankingDelaySeconds: settings.blankingDelaySeconds,
+      });
     } else {
       this.logger.log(`Agent connected: unknown station (socket ${client.id})`);
     }

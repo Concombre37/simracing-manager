@@ -47,8 +47,17 @@ export class BlankingManager {
   private slideIntervalMs = 10000;
   private resultsHtmlPath: string | null = null;
   private pidFilePath: string | null = null;
+  private hideDelaySeconds = 10;
+  private pendingHideTimeout: NodeJS.Timeout | null = null;
 
   constructor(private readonly logger: Logger) {}
+
+  /** Configurable from the dashboard (Paramètres), pushed over the socket. */
+  setHideDelaySeconds(seconds: number): void {
+    if (!Number.isFinite(seconds) || seconds < 0) return;
+    this.hideDelaySeconds = seconds;
+    this.logger.info({ hideDelaySeconds: seconds }, 'Blanking hide delay updated');
+  }
 
   async init(): Promise<void> {
     try {
@@ -97,6 +106,7 @@ export class BlankingManager {
 
   /** Forcibly stops blanking during agent shutdown (update, quit). */
   shutdown(): void {
+    this.clearPendingHide();
     if (this.process && !this.process.killed) {
       this.stoppingIntentionally = true;
       this.process.kill('SIGKILL');
@@ -137,6 +147,7 @@ export class BlankingManager {
       this.override = 'auto';
       this.clearResults();
       this.restartIfActive();
+      this.clearPendingHide();
     }
     this.logger.info({ podInGame: inGame }, 'POD in-game status changed');
     this.evaluate();
@@ -528,10 +539,12 @@ export class BlankingManager {
 
   private evaluate(): void {
     if (this.override === 'hide') {
+      this.clearPendingHide();
       this.stopBlanking();
       return;
     }
     if (this.override === 'show') {
+      this.clearPendingHide();
       this.startBlanking();
       return;
     }
@@ -548,9 +561,25 @@ export class BlankingManager {
     const shouldHide = this.acRunning || this.acLoaded;
 
     if (shouldHide) {
-      this.stopBlanking();
+      // Give the game a configurable grace period (default 10s, set from
+      // the dashboard) before actually removing blanking, so it doesn't
+      // vanish the instant acs.exe appears while AC is still loading.
+      if (this.isBlankingActive() && !this.pendingHideTimeout) {
+        this.pendingHideTimeout = setTimeout(() => {
+          this.pendingHideTimeout = null;
+          this.stopBlanking();
+        }, this.hideDelaySeconds * 1000);
+      }
     } else {
+      this.clearPendingHide();
       this.startBlanking();
+    }
+  }
+
+  private clearPendingHide(): void {
+    if (this.pendingHideTimeout) {
+      clearTimeout(this.pendingHideTimeout);
+      this.pendingHideTimeout = null;
     }
   }
 

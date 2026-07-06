@@ -5,6 +5,7 @@ import { SessionsModule } from '../sessions/sessions.module';
 import { DashboardModule } from '../dashboard/dashboard.module';
 import { DedicatedServersModule } from '../dedicated-servers/dedicated-servers.module';
 import { TelemetryModule } from '../telemetry/telemetry.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { TelemetryModule } from '../telemetry/telemetry.module';
     DashboardModule,
     TelemetryModule,
     forwardRef(() => DedicatedServersModule),
+    SettingsModule,
   ],
   providers: [AgentGateway],
   exports: [AgentGateway],

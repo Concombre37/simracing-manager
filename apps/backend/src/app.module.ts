@@ -17,6 +17,7 @@ import { BlankingMediaModule } from './blanking-media/blanking-media.module';
 import { DedicatedServersModule } from './dedicated-servers/dedicated-servers.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { PowerManagementModule } from './power-management/power-management.module';
+import { SettingsModule } from './settings/settings.module';
 import { envSchema } from './config/env.validation';
 
 @Module({
@@ -44,6 +45,7 @@ import { envSchema } from './config/env.validation';
     DedicatedServersModule,
     TelemetryModule,
     PowerManagementModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}

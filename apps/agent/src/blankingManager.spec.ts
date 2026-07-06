@@ -98,26 +98,62 @@ describe('BlankingManager', () => {
     expect(manager.isBlankingActive()).toBe(true);
   });
 
-  it('hides blanking when AC shared memory is loaded', () => {
+  it('hides blanking after the grace period when AC shared memory is loaded', () => {
+    vi.useFakeTimers();
     manager.setAuto();
     manager.setAcLoaded(true);
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(10000);
     expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
   });
 
-  it('hides blanking as soon as the AC process is detected running', () => {
-    // Matches the proven approach from the previous production launcher:
-    // plain process presence, no telemetry-based "car ready" confirmation.
+  it('hides blanking after the default 10s grace period once AC is running', () => {
+    // Matches the proven approach from the previous production launcher
+    // (plain process presence, no telemetry-based "car ready" confirmation)
+    // plus a configurable grace period so it doesn't vanish the instant
+    // acs.exe appears while AC is still loading.
+    vi.useFakeTimers();
     manager.setAuto();
     manager.setAcRunning(true);
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(10000);
     expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('cancels the pending hide if AC stops running before the delay elapses', () => {
+    vi.useFakeTimers();
+    manager.setAuto();
+    manager.setAcRunning(true);
+    vi.advanceTimersByTime(5000);
+    manager.setAcRunning(false);
+    vi.advanceTimersByTime(10000);
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('uses a configurable delay set via setHideDelaySeconds()', () => {
+    vi.useFakeTimers();
+    manager.setHideDelaySeconds(3);
+    manager.setAuto();
+    manager.setAcRunning(true);
+    vi.advanceTimersByTime(2999);
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
   });
 
   it('shows blanking again once AC stops running and shared memory unmaps', () => {
+    vi.useFakeTimers();
     manager.setAuto();
     manager.setAcRunning(true);
+    vi.advanceTimersByTime(10000);
     expect(manager.isBlankingActive()).toBe(false);
     manager.setAcRunning(false);
     expect(manager.isBlankingActive()).toBe(true);
+    vi.useRealTimers();
   });
 
   it('manual hide overrides auto and keeps screen off', () => {
@@ -152,12 +188,15 @@ describe('BlankingManager', () => {
     // Auto blanking behaves identically whether or not a session is
     // "in game" — the only thing setPodInGame(true) still does is clear a
     // stale manual override so a new session always starts from auto.
+    vi.useFakeTimers();
     manager.setAuto();
     manager.setPodInGame(true);
     manager.setAcRunning(false);
     expect(manager.isBlankingActive()).toBe(true);
     manager.setAcRunning(true);
+    vi.advanceTimersByTime(10000);
     expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
   });
 
   it('setPodInGame(true) alone clears a stale manual override', () => {

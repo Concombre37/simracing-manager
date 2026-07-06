@@ -391,6 +391,9 @@ export class SimRacingAgent {
     this.socket.on('blanking:hide', () => this.blankingManager.hide());
     this.socket.on('blanking:show', () => this.blankingManager.show());
     this.socket.on('blanking:mediaUpdated', () => this.handleBlankingMediaUpdated());
+    this.socket.on('settings:updated', (payload) =>
+      this.blankingManager.setHideDelaySeconds(payload.blankingDelaySeconds),
+    );
     this.socket.on('system:shutdown', () => this.handleShutdown());
     this.socket.on('wol:send', (payload) => this.handleWakeOnLan(payload));
   }

@@ -59,6 +59,7 @@ export interface ServerToAgentEvents {
   'blanking:hide': () => void;
   'blanking:show': () => void;
   'blanking:mediaUpdated': () => void;
+  'settings:updated': (payload: { blankingDelaySeconds: number }) => void;
 }
 
 export interface ServerToClientEvents {

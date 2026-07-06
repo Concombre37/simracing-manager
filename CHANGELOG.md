@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.42 — Délai de retrait du blanking configurable
+
+### Ajouté
+
+- **Réglage "Écran d'attente"** dans la page Paramètres : délai (en secondes) avant le retrait du blanking une fois le jeu détecté lancé, pour laisser le temps au chargement. Réglable par l'admin, appliqué en direct à tous les PODs connectés (et à tout nouvel agent qui se connecte), par défaut **10 secondes**.
+- Nouveau modèle `AppSettings` (backend), endpoints `GET/PATCH /api/settings`, événement socket `settings:updated` diffusé aux agents.
+- Côté agent : `BlankingManager` applique désormais ce délai comme simple minuteur après détection du jeu (`acRunning`/`acLoaded`), sans dépendre de la télémétrie — s'il redevient "non prêt" avant la fin du délai, le retrait est annulé.
+
 ## v2.2.41 — Blanking basé sur la présence du processus AC (comme RS Launcher)
 
 ### Modifié
