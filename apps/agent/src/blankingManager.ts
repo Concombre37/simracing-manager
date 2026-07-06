@@ -8,6 +8,16 @@ import { config } from './config';
 
 export type BlankingOverride = 'auto' | 'hide' | 'show';
 
+/** Below this uptime, an unexpected exit is treated as a crash (the window
+ * has no visible close button — the only deliberate way to close it is the
+ * Escape key, which can't plausibly happen this fast right after spawning)
+ * and blanking is restarted instead of revealing the game. */
+const EARLY_EXIT_THRESHOLD_MS = 2000;
+/** Caps the restart-on-crash loop so a genuinely broken script doesn't spin
+ * forever — after this many consecutive early exits, fall back to the
+ * previous behavior (switch to hide override) so the POD is at least usable. */
+const MAX_EARLY_EXIT_RETRIES = 3;
+
 interface SessionResultsSummary {
   clientName?: string;
   carAcId?: string;
@@ -44,6 +54,8 @@ export class BlankingManager {
   private acLoaded = false;
   private podInGame = false;
   private stoppingIntentionally = false;
+  private lastSpawnedAt = 0;
+  private consecutiveEarlyExits = 0;
   private scriptPath: string | null = null;
   private playlistPath: string | null = null;
   private mediaPaths: string[] = [];
@@ -665,6 +677,17 @@ export class BlankingManager {
       detached: false,
       windowsHide: true,
     });
+    this.lastSpawnedAt = Date.now();
+
+    // Otherwise a PowerShell/WPF exception right after spawn (the scenario
+    // the crash-restart logic below reacts to) would leave no trace at all
+    // — these now also land in the persisted log file / local console.
+    this.process.stdout?.on('data', (chunk: Buffer) => {
+      this.logger.debug({ output: chunk.toString('utf-8').trim() }, 'Blanking screen stdout');
+    });
+    this.process.stderr?.on('data', (chunk: Buffer) => {
+      this.logger.warn({ output: chunk.toString('utf-8').trim() }, 'Blanking screen stderr');
+    });
 
     if (this.pidFilePath && this.process.pid) {
       try {
@@ -675,15 +698,7 @@ export class BlankingManager {
     }
 
     this.process.on('exit', (code) => {
-      this.logger.debug(
-        { code, intentional: this.stoppingIntentionally },
-        'Blanking screen process exited',
-      );
-      if (!this.stoppingIntentionally) {
-        this.logger.info('Blanking screen was closed manually, switching to hide override');
-        this.override = 'hide';
-      }
-      this.stoppingIntentionally = false;
+      const upDurationMs = Date.now() - this.lastSpawnedAt;
       this.process = null;
       if (this.pidFilePath) {
         try {
@@ -692,6 +707,37 @@ export class BlankingManager {
           // ignore
         }
       }
+
+      if (this.stoppingIntentionally) {
+        this.stoppingIntentionally = false;
+        this.consecutiveEarlyExits = 0;
+        this.logger.debug({ code, upDurationMs }, 'Blanking screen process exited (intentional)');
+        return;
+      }
+
+      // The window has no title bar/close button (kiosk overlay) — the only
+      // deliberate way to close it is the Escape key. An exit within
+      // EARLY_EXIT_THRESHOLD_MS of spawning can't plausibly be that, so
+      // treat it as a crash and restart instead of revealing the game:
+      // otherwise a single WPF/PowerShell hiccup would permanently defeat
+      // the configured grace period for the rest of the session.
+      const crashedEarly = upDurationMs < EARLY_EXIT_THRESHOLD_MS;
+      if (crashedEarly && this.consecutiveEarlyExits < MAX_EARLY_EXIT_RETRIES) {
+        this.consecutiveEarlyExits += 1;
+        this.logger.warn(
+          { code, upDurationMs, attempt: this.consecutiveEarlyExits },
+          'Blanking screen exited unexpectedly right after starting; restarting it instead of revealing the game',
+        );
+        this.startBlanking();
+        return;
+      }
+
+      this.consecutiveEarlyExits = 0;
+      this.logger.info(
+        { code, upDurationMs },
+        'Blanking screen was closed, switching to hide override',
+      );
+      this.override = 'hide';
     });
     this.process.on('error', (err) => {
       this.logger.error({ err }, 'Blanking screen process error');

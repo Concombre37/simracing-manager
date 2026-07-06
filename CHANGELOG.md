@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.48 — Blanking qui se coupe presque instantanément malgré le délai réglé à 10s
+
+### Corrigé
+
+- **Cause probable trouvée** : la fenêtre de l'écran d'attente n'a ni barre de titre ni bouton de fermeture (recouvrement plein écran) — la seule façon "normale" de la fermer manuellement est la touche Échap. Or si le processus PowerShell/WPF se ferme tout seul (crash, exception WPF, etc.) très peu de temps après son lancement, l'agent interprétait ça comme une fermeture manuelle et basculait immédiatement en mode "masqué" — ce qui révélait le jeu instantanément, sans jamais passer par le délai configuré (10s par défaut), puisque ce délai ne s'applique qu'au chemin normal (jeu détecté → minuteur → masquage), pas à ce cas.
+- L'agent relance maintenant automatiquement l'écran d'attente si le processus se ferme tout seul moins de 2 secondes après son démarrage (jusqu'à 3 tentatives consécutives), au lieu de considérer ça comme une fermeture volontaire et de révéler le jeu. Au-delà de 3 échecs consécutifs, l'ancien comportement (bascule en "masqué") reprend le dessus pour ne pas boucler indéfiniment si le script est réellement cassé.
+- La sortie standard et les erreurs du script PowerShell de l'écran d'attente sont désormais capturées et journalisées (visibles dans le fichier de log et le panneau de la console locale ajoutés en v2.2.47) — jusqu'ici, une exception dans ce script ne laissait aucune trace exploitable.
+
 ## v2.2.47 — Console locale moderne pour l'agent
 
 ### Ajouté
