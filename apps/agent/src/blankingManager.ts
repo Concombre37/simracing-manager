@@ -16,6 +16,9 @@ interface SessionResultsSummary {
   trackLayout?: string;
   bestLapMs?: number;
   result?: RaceResultData;
+  /** True while the leaderboard is still being read from race_out.json.
+   * Shows a loading placeholder instead of an empty gap. */
+  pending?: boolean;
 }
 
 function formatLapTime(ms: number): string {
@@ -95,6 +98,17 @@ export class BlankingManager {
     if (this.podInGame === inGame) return;
     this.podInGame = inGame;
     if (inGame) {
+      // A new session must always start from a clean auto state: a manual
+      // hide/show left over from maintenance (Escape, "Masquer écran") would
+      // otherwise stick forever. This is done here, atomically with
+      // podInGame flipping to true and before the evaluate() call below,
+      // rather than via a separate setAuto() call beforehand — doing it
+      // separately left a brief window where evaluate() would run with
+      // podInGame still false and could use stale acLoaded/acRunning state
+      // to incorrectly dismiss blanking for a moment.
+      this.override = 'auto';
+      this.clearResults();
+      this.restartIfActive();
       // Force a fresh ready confirmation for the new session so blanking
       // cannot be dismissed by stale state from a previous run.
       this.clearReady();
@@ -186,7 +200,16 @@ export class BlankingManager {
     const trackDisplay = summary.trackLayout
       ? `${summary.track} (${summary.trackLayout})`
       : (summary.track ?? '-');
-    const leaderboard = summary.result ? this.renderLeaderboard(summary.result) : '';
+    const leaderboard = summary.result
+      ? this.renderLeaderboard(summary.result)
+      : summary.pending
+        ? `<div class="leaderboard placeholder">
+  <div class="spinner"></div>
+  <p>Chargement du classement…</p>
+</div>`
+        : `<div class="leaderboard placeholder">
+  <p>Classement indisponible</p>
+</div>`;
 
     // Rendered inside a WPF WebBrowser control (IE11 engine): no CSS grid,
     // no clamp()/conic-gradient. Layout uses flexbox/vw units and a
@@ -213,9 +236,22 @@ export class BlankingManager {
       align-items: center;
       justify-content: flex-start;
       text-align: center;
-      animation: fadeIn 0.5s ease-out;
+      animation: fadeIn 0.4s ease-out;
     }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes revealUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    header, .driver-banner, .summary, .leaderboard {
+      opacity: 0;
+      animation: revealUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    header { animation-delay: 0.05s; }
+    .driver-banner { animation-delay: 0.15s; }
+    .summary { animation-delay: 0.25s; }
+    .leaderboard { animation-delay: 0.35s; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .checkers {
       width: 100%;
       height: 14px;
@@ -317,6 +353,26 @@ export class BlankingManager {
       border-radius: 14px;
       overflow: hidden;
       margin-bottom: 2vw;
+    }
+    .leaderboard.placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8vw;
+      padding: 2.2vw;
+      color: #8a8a96;
+      font-size: 1.1vw;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .spinner {
+      width: 2vw;
+      height: 2vw;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.12);
+      border-top-color: #ff6b35;
+      animation: spin 0.8s linear infinite;
     }
     table { width: 100%; border-collapse: collapse; font-size: 1.35vw; }
     th {

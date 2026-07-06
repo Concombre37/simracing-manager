@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.2.36 — Correction du flicker au lancement + écran de résultats instantané et animé
+
+### Corrigé
+
+- **Flicker du blanking ~2s après le lancement** : au lancement d'une session, l'agent appelait `setAuto()` (réinitialisation de l'override) puis `setPodInGame(true)` séparément. Entre les deux, `evaluate()` pouvait s'exécuter avec `podInGame` encore à `false` et se baser sur un état `acLoaded`/`acRunning` obsolète (d'une session précédente), retirant le blanking un instant avant qu'il ne soit remis. La réinitialisation de l'override est désormais faite de façon atomique à l'intérieur de `setPodInGame(true)`, supprimant la fenêtre d'incohérence.
+
+### Modifié
+
+- **Écran de résultats instantané** : au lieu d'attendre ~3 secondes (le temps que Assetto Corsa écrive `race_out.json`) avant d'afficher quoi que ce soit, l'écran de résultats apparaît désormais immédiatement avec les informations déjà connues (pilote, voiture, circuit, meilleur tour) et un indicateur de chargement animé à la place du classement, qui se complète dès que disponible.
+- **Animation d'apparition** : le titre, la fiche pilote, les tuiles et le classement apparaissent maintenant avec un effet de révélation progressif (fondu + léger glissement vers le haut, en cascade) plutôt que d'un coup.
+
 ## v2.2.35 — Correction : le mode kiosque ne doit jamais toucher à la fenêtre du jeu
 
 ### Corrigé

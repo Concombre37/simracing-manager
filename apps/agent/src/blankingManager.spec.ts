@@ -249,6 +249,20 @@ describe('BlankingManager', () => {
     vi.useRealTimers();
   });
 
+  it('setPodInGame(true) alone clears a stale manual override', () => {
+    // A manual override left over from maintenance (Escape, "Masquer
+    // écran") must not require a separate setAuto() call from the caller:
+    // doing it as a separate step left a window where evaluate() could run
+    // with podInGame still false and use stale acLoaded/acRunning state to
+    // dismiss blanking for a moment right as a new session starts.
+    manager.hide();
+    expect(manager.isBlankingActive()).toBe(false);
+
+    manager.setPodInGame(true);
+
+    expect(manager.isBlankingActive()).toBe(true);
+  });
+
   it('keeps blanking during a session when telemetry reports the main menu', () => {
     vi.useFakeTimers();
     manager.setAuto();

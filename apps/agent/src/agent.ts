@@ -563,13 +563,9 @@ export class SimRacingAgent {
         stationId: config.STATION_ID,
         status: StationStatus.IN_GAME,
       });
-      // A new session must always start from a clean auto state: a manual
-      // hide/show left over from maintenance (Escape, "Masquer écran") would
-      // otherwise stick forever and prevent the auto blanking logic from
-      // ever running again for this session.
-      this.blankingManager.setAuto();
       // Keep the blanking screen up until telemetry confirms the game has
-      // really started (mirrors the in_game status just reported).
+      // really started (mirrors the in_game status just reported). Resets
+      // any stale manual override internally.
       this.blankingManager.setPodInGame(true);
       // Only the game should be visible during a session: hide the
       // taskbar, minimize whatever else was open, and bring the game
@@ -824,13 +820,9 @@ export class SimRacingAgent {
         stationId: config.STATION_ID,
         status: StationStatus.IN_GAME,
       });
-      // A new session must always start from a clean auto state: a manual
-      // hide/show left over from maintenance (Escape, "Masquer écran") would
-      // otherwise stick forever and prevent the auto blanking logic from
-      // ever running again for this session.
-      this.blankingManager.setAuto();
       // Keep the blanking screen up until telemetry confirms the game has
-      // really started (mirrors the in_game status just reported).
+      // really started (mirrors the in_game status just reported). Resets
+      // any stale manual override internally.
       this.blankingManager.setPodInGame(true);
       // Only the game should be visible during a session: hide the
       // taskbar, minimize whatever else was open, and bring the game
@@ -888,6 +880,19 @@ export class SimRacingAgent {
       this.blankingManager.setPodInGame(false);
       this.kioskManager.exit();
       if (session) {
+        // Show the results screen immediately with what we already know
+        // (driver/car/track/best lap from live telemetry) instead of
+        // leaving the plain waiting screen up while race_out.json is
+        // written. The leaderboard slots in a moment later.
+        this.blankingManager.showResults({
+          clientName: session.clientName,
+          carAcId: session.carAcId,
+          track: session.track,
+          trackLayout: session.trackLayout,
+          bestLapMs: session.bestLapMs,
+          pending: true,
+        });
+
         // Wait for Assetto Corsa to write race_out.json, then read and push results.
         await new Promise((resolve) => setTimeout(resolve, 3000));
         const rawResult = await this.raceResultReader.readLatest(session.startedAt);
