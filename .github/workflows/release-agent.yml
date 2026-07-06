@@ -57,9 +57,27 @@ jobs:
           & $7z a -tzip -r -y exe\sim-center-agent-win.zip exe\sim-center-agent-win.exe exe\start-agent.vbs exe\build
           if (-not (Test-Path exe\sim-center-agent-win.zip)) { throw "ZIP not created" }
 
+      - name: Extract changelog section for this release
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          START=$(grep -nE "^## ${TAG}( |$)" CHANGELOG.md | head -1 | cut -d: -f1)
+          if [ -z "$START" ]; then
+            echo "_Voir [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) pour le détail des changements._" > release_notes.md
+          else
+            END=$(tail -n +"$((START+1))" CHANGELOG.md | grep -nE "^## " | head -1 | cut -d: -f1)
+            if [ -z "$END" ]; then
+              tail -n +"$START" CHANGELOG.md > release_notes.md
+            else
+              sed -n "${START},$((START+END-1))p" CHANGELOG.md > release_notes.md
+            fi
+          fi
+          cat release_notes.md
+
       - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release_notes.md
           files: |
             apps/agent/exe/sim-center-agent-win-setup.exe
             apps/agent/exe/sim-center-agent-win.zip
@@ -95,9 +113,26 @@ jobs:
           mv ./exe/agent ./exe/sim-center-agent-linux-x64
           tar czf ./exe/sim-center-agent-linux-x64.tar.gz -C ./exe sim-center-agent-linux-x64
 
+      - name: Extract changelog section for this release
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          START=$(grep -nE "^## ${TAG}( |$)" CHANGELOG.md | head -1 | cut -d: -f1)
+          if [ -z "$START" ]; then
+            echo "_Voir [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) pour le détail des changements._" > release_notes.md
+          else
+            END=$(tail -n +"$((START+1))" CHANGELOG.md | grep -nE "^## " | head -1 | cut -d: -f1)
+            if [ -z "$END" ]; then
+              tail -n +"$START" CHANGELOG.md > release_notes.md
+            else
+              sed -n "${START},$((START+END-1))p" CHANGELOG.md > release_notes.md
+            fi
+          fi
+          cat release_notes.md
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
+          body_path: release_notes.md
           files: apps/agent/exe/sim-center-agent-linux-x64.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
