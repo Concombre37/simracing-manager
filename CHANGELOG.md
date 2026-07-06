@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.34 — Mode kiosque pendant une session
+
+### Ajouté
+
+- **Mode kiosque** : au lancement d'une session (démarrage direct ou jointure d'un serveur dédié), l'agent masque la barre des tâches Windows, minimise toute fenêtre déjà ouverte (Explorer, etc.) et met la fenêtre du jeu au premier plan une fois qu'elle apparaît. Tout est restauré (barre des tâches réaffichée) dès que la session se termine, quelle que soit la raison (fin normale, réduction à 0, arrêt manuel).
+- Nouveau script `kiosk.ps1` (P/Invoke Win32) et module agent `kioskManager.ts`. Windows uniquement ; no-op sur les autres plateformes.
+
 ## v2.2.33 — Mise en page verticale de l'écran de résultats
 
 ### Modifié

@@ -36,6 +36,7 @@ import { LapTelemetryRecorder } from './lapTelemetryRecorder';
 import { TrayManager } from './trayManager';
 import { ProcessMonitor } from './processMonitor';
 import { BlankingManager } from './blankingManager';
+import { KioskManager } from './kioskManager';
 import { AcSharedMemoryChecker } from './acSharedMemory';
 import { BlankingMediaSync } from './blankingMediaSync';
 import { sendWakeOnLan } from './wol';
@@ -78,6 +79,7 @@ export class SimRacingAgent {
   private raceResultReader: RaceResultReader;
   private processMonitor: ProcessMonitor;
   private blankingManager: BlankingManager;
+  private kioskManager: KioskManager;
   private acSharedMemory: AcSharedMemoryChecker;
   private lapTelemetryRecorder: LapTelemetryRecorder;
   private trayManager: TrayManager;
@@ -93,6 +95,7 @@ export class SimRacingAgent {
     this.processMonitor = new ProcessMonitor(logger);
     this.raceResultReader = new RaceResultReader(logger);
     this.blankingManager = new BlankingManager(logger);
+    this.kioskManager = new KioskManager(logger);
     this.acSharedMemory = new AcSharedMemoryChecker(logger);
     this.lapTelemetryRecorder = new LapTelemetryRecorder(logger);
     this.trayManager = new TrayManager(logger, {
@@ -176,6 +179,7 @@ export class SimRacingAgent {
     await this.resolveAcPath();
     await this.ensureContentManagerPath();
     await this.blankingManager.init();
+    await this.kioskManager.init();
     await this.acSharedMemory.init();
     await this.trayManager.init();
     this.blankingManager.setAuto();
@@ -567,6 +571,10 @@ export class SimRacingAgent {
       // Keep the blanking screen up until telemetry confirms the game has
       // really started (mirrors the in_game status just reported).
       this.blankingManager.setPodInGame(true);
+      // Only the game should be visible during a session: hide the
+      // taskbar, minimize whatever else was open, and bring the game
+      // window to the foreground once it appears.
+      this.kioskManager.enter();
     } catch (err) {
       this.logger.error({ err }, 'Failed to launch Assetto Corsa');
     }
@@ -594,6 +602,7 @@ export class SimRacingAgent {
     this.blankingManager.setPodInGame(false);
     this.blankingManager.clearResults();
     this.blankingManager.setAuto();
+    this.kioskManager.exit();
     this.socket?.emit('agent:status', {
       stationId: config.STATION_ID,
       status: StationStatus.ONLINE,
@@ -823,6 +832,10 @@ export class SimRacingAgent {
       // Keep the blanking screen up until telemetry confirms the game has
       // really started (mirrors the in_game status just reported).
       this.blankingManager.setPodInGame(true);
+      // Only the game should be visible during a session: hide the
+      // taskbar, minimize whatever else was open, and bring the game
+      // window to the foreground once it appears.
+      this.kioskManager.enter();
       this.logger.info('Join server command completed');
 
       if (payload.sessionId && payload.durationMinutes && payload.durationMinutes > 0) {
@@ -873,6 +886,7 @@ export class SimRacingAgent {
         status: StationStatus.ONLINE,
       });
       this.blankingManager.setPodInGame(false);
+      this.kioskManager.exit();
       if (session) {
         // Wait for Assetto Corsa to write race_out.json, then read and push results.
         await new Promise((resolve) => setTimeout(resolve, 3000));

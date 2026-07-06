@@ -47,6 +47,7 @@ foreach ($item in $playlist) {
 }
 
 $window = New-Object System.Windows.Window
+$window.Title = 'SimRacingBlanking'
 $window.WindowStyle = 'None'
 $window.ResizeMode = 'NoResize'
 $window.WindowState = 'Maximized'
