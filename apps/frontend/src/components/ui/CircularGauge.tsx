@@ -57,7 +57,7 @@ export function CircularGauge({
         <path
           d={trackPath}
           fill="none"
-          stroke="#1f2937"
+          stroke="#1a1a25"
           strokeWidth={stroke}
           strokeLinecap="round"
         />
@@ -67,8 +67,17 @@ export function CircularGauge({
           stroke={`url(#gaugeGradient-${label})`}
           strokeWidth={stroke}
           strokeLinecap="round"
+          style={{ filter: `drop-shadow(0 0 6px ${color}99)` }}
         />
-        <circle cx={center} cy={center} r={radius - 16} fill="#111827" />
+        <circle cx={center} cy={center} r={radius - 16} fill="#0a0a0f" />
+        <circle
+          cx={center}
+          cy={center}
+          r={radius - 16}
+          fill="none"
+          stroke="#252536"
+          strokeWidth={1}
+        />
         <line
           x1={center}
           y1={center}

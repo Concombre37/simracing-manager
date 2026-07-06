@@ -33,3 +33,33 @@ export function findTrackName(
   const track = content?.tracks?.find((t) => t.acId === trackAcId);
   return formatTrackName(track?.name, trackAcId);
 }
+
+export function findTrackPreview(
+  trackAcId: string | undefined,
+  content: { tracks?: (TrackLike & { preview?: string })[] } | null | undefined,
+): string | undefined {
+  if (!trackAcId) return undefined;
+  return content?.tracks?.find((t) => t.acId === trackAcId)?.preview;
+}
+
+export interface CarLike {
+  acId: string;
+  name: string;
+  preview?: string;
+}
+
+export function formatCarName(name: string | undefined, acId: string): string {
+  const cleaned = (name || '').trim();
+  if (cleaned && cleaned.toLowerCase() !== acId.toLowerCase()) {
+    return cleaned;
+  }
+  return formatTrackAcId(acId);
+}
+
+export function findCar(
+  carAcId: string | undefined,
+  content: { cars?: CarLike[] } | null | undefined,
+): CarLike | undefined {
+  if (!carAcId) return undefined;
+  return content?.cars?.find((c) => c.acId === carAcId);
+}
