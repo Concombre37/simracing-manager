@@ -41,9 +41,6 @@ export class BlankingManager {
   private acRunning = false;
   private acLoaded = false;
   private podInGame = false;
-  private driving = false;
-  private lastTelemetryAt = 0;
-  private readonly telemetryTimeoutMs = 5000;
   private readySince: number | null = null;
   private readyTimeout: NodeJS.Timeout | null = null;
   private readyConfirmed = false;
@@ -161,8 +158,6 @@ export class BlankingManager {
   }
 
   onTelemetry(snapshot: TelemetrySnapshot): void {
-    this.lastTelemetryAt = Date.now();
-    this.driving = this.isDriving(snapshot);
     this.updateReadyState(snapshot);
     this.evaluate();
   }
@@ -549,19 +544,6 @@ export class BlankingManager {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-  }
-
-  private isDriving(snapshot: TelemetrySnapshot): boolean {
-    if (snapshot.isInMainMenu === true) return false;
-    if (snapshot.isSessionStarted === false) return false;
-
-    return (
-      snapshot.speedKmh > 0.5 ||
-      snapshot.rpm > 100 ||
-      snapshot.gear > 0 ||
-      snapshot.throttle > 0 ||
-      snapshot.brake > 0
-    );
   }
 
   private evaluate(): void {

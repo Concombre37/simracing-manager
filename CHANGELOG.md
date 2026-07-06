@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.40 — Correction de la vraie cause du blanking qui ne se retire jamais + nettoyage
+
+### Corrigé
+
+- **Cause probable de "le blanking ne se retire jamais"** : deux sources de télémétrie indépendantes (le lecteur de mémoire partagée natif `acSharedMemoryReader.ts`, et le fallback UDP/fichier alimenté par l'app Lua CSP) alimentaient toutes les deux `blankingManager.onTelemetry()`. Si l'une des deux rapportait "pas prêt" pendant qu'une autre rapportait "prêt", le minuteur de confirmation de 5s (`updateReadyState`) était réinitialisé à chaque désaccord — empêchant la confirmation de jamais aboutir, même si la voiture était réellement en piste. Une seule source fait désormais autorité à la fois : la mémoire partagée quand elle est active, le fallback uniquement quand elle ne l'est pas.
+
+### Nettoyé
+
+- Suite à un audit complet du code de l'agent (comparaison avec l'ancien agent "RS Launcher") : suppression de champs et méthodes mortes jamais utilisées (`driving`/`isDriving()`/`lastTelemetryAt` dans `blankingManager.ts`, `cmRunning`/`vrConnected` dans le heartbeat — jamais renseignés ni consommés côté backend/frontend, retirés du contrat partagé `HeartbeatPayload`).
+
 ## v2.2.39 — Correction du flicker à l'écran de résultats
 
 ### Corrigé

@@ -80,8 +80,6 @@ export interface HeartbeatPayload {
   localIp: string | null;
   macAddress: string | null;
   acRunning: boolean;
-  cmRunning: boolean;
-  vrConnected: boolean;
   timestamp: number;
 }
 
