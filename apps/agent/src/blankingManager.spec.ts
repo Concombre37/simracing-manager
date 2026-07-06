@@ -284,6 +284,34 @@ describe('BlankingManager', () => {
     expect(resultsHtmlPath).toBeUndefined();
   });
 
+  it('renders a second tile for the best invalid (cut) lap when present', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({
+      clientName: 'Alice',
+      carAcId: 'ks_porsche_911',
+      bestLapMs: 95123,
+      bestInvalidLapMs: 92456,
+    });
+    const { resultsHtmlPath } = lastSpawnArgs();
+    const html = readFileSync(resultsHtmlPath!, 'utf-8');
+    expect(html).toContain('Meilleur tour vérifié');
+    expect(html).toContain('non valide (cut)');
+  });
+
+  it('omits the invalid-lap tile when there is no invalid lap to report', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({
+      clientName: 'Alice',
+      carAcId: 'ks_porsche_911',
+      bestLapMs: 95123,
+    });
+    const { resultsHtmlPath } = lastSpawnArgs();
+    const html = readFileSync(resultsHtmlPath!, 'utf-8');
+    expect(html).not.toContain('non valide (cut)');
+  });
+
   it('shutdown() force-kills an active blanking process', () => {
     // Guards against orphaned windows piling up across agent restarts
     // (self-update, crash): shutdown() must actually tear the process down

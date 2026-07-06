@@ -14,6 +14,9 @@ interface SessionResultsSummary {
   track?: string;
   trackLayout?: string;
   bestLapMs?: number;
+  /** Fastest lap AC rejected as invalid (cut, etc.) — only set when it would
+   * otherwise have beaten bestLapMs. */
+  bestInvalidLapMs?: number;
   result?: RaceResultData;
   /** True while the leaderboard is still being read from race_out.json.
    * Shows a loading placeholder instead of an empty gap. */
@@ -234,6 +237,10 @@ export class BlankingManager {
     const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
     const htmlPath = path.join(tmpDir, 'session-results.html');
     const bestLap = formatLapTime(summary.bestLapMs ?? 0);
+    const bestInvalidLap =
+      summary.bestInvalidLapMs && summary.bestInvalidLapMs > 0
+        ? formatLapTime(summary.bestInvalidLapMs)
+        : null;
     const trackDisplay = summary.trackLayout
       ? `${summary.track} (${summary.trackLayout})`
       : (summary.track ?? '-');
@@ -382,6 +389,16 @@ export class BlankingManager {
       font-family: 'Consolas', 'Courier New', monospace;
       font-size: 1.8vw;
     }
+    .tile.invalid-lap {
+      background: linear-gradient(135deg, rgba(255,51,51,0.16), rgba(255,51,51,0.05));
+      border-color: rgba(255,51,51,0.4);
+    }
+    .tile.invalid-lap .label { color: #ff9a9a; }
+    .tile.invalid-lap .value {
+      color: #ff6b6b;
+      font-family: 'Consolas', 'Courier New', monospace;
+      font-size: 1.8vw;
+    }
     .leaderboard {
       width: 92%;
       max-width: 1400px;
@@ -476,9 +493,17 @@ export class BlankingManager {
       <div class="value">${this.escapeHtml(summary.carAcId ?? '-')}</div>
     </div>
     <div class="tile best-lap">
-      <div class="label">Meilleur tour</div>
+      <div class="label">Meilleur tour vérifié</div>
       <div class="value">${bestLap}</div>
     </div>
+    ${
+      bestInvalidLap
+        ? `<div class="tile invalid-lap">
+      <div class="label">Meilleur tour non valide (cut)</div>
+      <div class="value">${bestInvalidLap}</div>
+    </div>`
+        : ''
+    }
   </div>
   ${leaderboard}
   <footer>SimRacing Manager</footer>

@@ -66,6 +66,8 @@ export class SimRacingAgent {
     track?: string;
     trackLayout?: string;
     bestLapMs?: number;
+    bestInvalidLapMs?: number;
+    lastSeenLapCount?: number;
   } | null = null;
   private resultsTimeout: NodeJS.Timeout | null = null;
   private acLauncher: AcLauncher;
@@ -138,6 +140,31 @@ export class SimRacingAgent {
       if (!current || snapshot.bestLapMs < current) {
         this.currentSession.bestLapMs = snapshot.bestLapMs;
         this.logger.debug({ bestLapMs: snapshot.bestLapMs }, 'New best lap recorded');
+      }
+    }
+
+    // AC's own bestLapMs (iBestTime) already excludes invalid laps (cuts,
+    // etc.) — it only ever reflects the fastest *valid* completed lap. So if
+    // a just-completed lap (lastLapMs) is faster than the currently known
+    // valid best but didn't become the new bestLapMs above, AC rejected it:
+    // it was invalid. Track the fastest such rejected lap separately.
+    if (
+      typeof snapshot.lapCount === 'number' &&
+      snapshot.lapCount !== this.currentSession.lastSeenLapCount &&
+      typeof snapshot.lastLapMs === 'number' &&
+      snapshot.lastLapMs > 0
+    ) {
+      this.currentSession.lastSeenLapCount = snapshot.lapCount;
+      const validBest = this.currentSession.bestLapMs;
+      if (!validBest || snapshot.lastLapMs < validBest) {
+        const currentInvalidBest = this.currentSession.bestInvalidLapMs;
+        if (!currentInvalidBest || snapshot.lastLapMs < currentInvalidBest) {
+          this.currentSession.bestInvalidLapMs = snapshot.lastLapMs;
+          this.logger.debug(
+            { lastLapMs: snapshot.lastLapMs },
+            'New best invalid (cut) lap recorded',
+          );
+        }
       }
     }
   }
@@ -944,6 +971,7 @@ export class SimRacingAgent {
           track: session.track,
           trackLayout: session.trackLayout,
           bestLapMs: session.bestLapMs,
+          bestInvalidLapMs: session.bestInvalidLapMs,
           pending: true,
         });
 
@@ -969,6 +997,7 @@ export class SimRacingAgent {
           track: session.track,
           trackLayout: session.trackLayout,
           bestLapMs: session.bestLapMs,
+          bestInvalidLapMs: session.bestInvalidLapMs,
           result: raceResult,
         });
         this.socket?.emit('agent:session:ended', { sessionId: session.sessionId });

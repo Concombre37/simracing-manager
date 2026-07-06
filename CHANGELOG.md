@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.44 — Détection du meilleur tour non valide (cut)
+
+### Ajouté
+
+- L'écran de fin de session affiche désormais **deux lignes de temps** : le meilleur tour **vérifié** (temps officiel reconnu par AC, `iBestTime`) et, si pertinent, le meilleur tour **non valide** (temps plus rapide mais rejeté par AC — sortie de piste/cut, etc.), affiché en rouge.
+- Détection sans nouvelle donnée de télémétrie : AC exclut déjà les tours invalides de son propre `bestLapMs`. Un tour tout juste bouclé (`lastLapMs`) plus rapide que le meilleur temps valide connu, mais qui n'a pas fait progresser ce dernier, est donc forcément invalide — l'agent le repère par comparaison, sans heuristique de sortie de piste (`numberOfTyresOut`) ni nouveau champ de mémoire partagée.
+- La tuile "meilleur tour non valide" n'apparaît que si un tel tour a réellement été enregistré durant la session.
+
 ## v2.2.43 — Auto-réparation périodique du blanking et du statut du POD
 
 ### Ajouté
