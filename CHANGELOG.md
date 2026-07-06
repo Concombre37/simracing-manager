@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.50 — Correction de la régression introduite par la v2.2.49 (délai de 10s à nouveau fiable)
+
+### Corrigé
+
+- La vérification "Not Responding" ajoutée en v2.2.49 pour ignorer les process `acs.exe` fantômes avait un effet de bord non voulu : le moteur physique d'AC continue de tourner (et de produire de la télémétrie) même quand Windows marque brièvement la fenêtre du jeu comme "Not Responding" pendant un chargement — ce qui est parfaitement normal. Résultat : pendant un lancement tout à fait normal, l'agent pouvait considérer qu'AC n'était "pas en cours" pendant toute la durée de ce chargement, retardant (parfois bien au-delà des 10 secondes configurées) voire empêchant le retrait de l'écran d'attente.
+- **`processMonitor.ts` sépare maintenant clairement les deux rôles** : `isAcRunning()` redevient une simple vérification de présence (comme avant la v2.2.49, et comme RS Launcher) — un `acs.exe` présent compte immédiatement comme "en cours", peu importe s'il est temporairement "Not Responding". Le suivi de la réactivité continue de tourner en tâche de fond, uniquement pour le nettoyage automatique des process réellement zombies après 5 minutes d'inactivité totale — il n'influence plus le délai de retrait du blanking.
+- Tests mis à jour en conséquence.
+
 ## v2.2.49 — Vérification de la présence réelle d'Assetto Corsa (pas juste process/mémoire présents)
 
 ### Corrigé

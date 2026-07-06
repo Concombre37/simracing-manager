@@ -19,24 +19,20 @@ export class ProcessMonitor {
   constructor(private readonly logger: Logger) {}
 
   /**
-   * Verification, not just detection: a process literally named `acs.exe`
-   * existing isn't enough to call AC "running" — a crashed/hung instance
-   * left behind by a previous session (taskkill failing to land, a manual
-   * kill that missed, etc.) still shows up in `tasklist` and would otherwise
-   * fool the blanking screen into hiding itself with nothing actually on
-   * screen. Windows' own "Not Responding" flag (from the process' message
-   * pump) is used to tell a genuinely running game apart from a stale one.
+   * Existence-based on purpose, matching RS Launcher and what blanking's
+   * hide timer expects: AC's own loading screens routinely leave the
+   * process flagged "Not Responding" by Windows for a while (its message
+   * pump can stall during a heavy load/transition even though its physics
+   * thread is very much alive and already producing telemetry) — excluding
+   * "not responding" from "running" here previously delayed or blocked
+   * blanking's reveal during completely normal launches. Responsiveness is
+   * still tracked, just for the independent cleanup below, not for this
+   * return value.
    */
   async isAcRunning(): Promise<boolean> {
     const state = await this.checkAcProcessState();
-
-    if (state === 'not-responding') {
-      await this.handleNotResponding();
-      return false;
-    }
-
-    this.notRespondingSince = null;
-    return state === 'running';
+    void this.trackForCleanup(state);
+    return state !== 'absent';
   }
 
   private async checkAcProcessState(): Promise<AcProcessState> {
@@ -67,11 +63,23 @@ export class ProcessMonitor {
     }
   }
 
-  private async handleNotResponding(): Promise<void> {
+  /**
+   * Pure background hygiene — does not affect isAcRunning()'s return value.
+   * Only a process unresponsive for NOT_RESPONDING_KILL_THRESHOLD_MS
+   * straight (5 minutes — well beyond any legitimate loading screen) is
+   * assumed to be a genuine zombie and force-killed, so a crashed/hung
+   * leftover from an earlier session doesn't sit there forever fooling the
+   * next agent startup into thinking AC is already running.
+   */
+  private async trackForCleanup(state: AcProcessState): Promise<void> {
+    if (state !== 'not-responding') {
+      this.notRespondingSince = null;
+      return;
+    }
+
     const now = Date.now();
     if (this.notRespondingSince === null) {
       this.notRespondingSince = now;
-      this.logger.warn('acs.exe detected but not responding — watching before cleanup');
       return;
     }
 

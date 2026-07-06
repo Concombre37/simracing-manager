@@ -82,12 +82,14 @@ describe('ProcessMonitor', () => {
     expect(await monitor.isAcRunning()).toBe(true);
   });
 
-  it('returns false (not just "running") when acs.exe exists but is not responding', async () => {
+  it('still returns true when acs.exe exists but is briefly "Not Responding" (e.g. a loading screen)', async () => {
+    // AC's message pump can legitimately stall during a heavy load/transition
+    // while its physics thread keeps ticking and producing telemetry — this
+    // must not delay or block blanking's reveal on a completely normal launch.
     mockTasklistOutput(
       '"acs.exe","1234","Console","1","123,456 K","Not Responding","USER","0:00:01","N/A"',
     );
-    expect(await monitor.isAcRunning()).toBe(false);
-    expect(mockLogger.warn).toHaveBeenCalled();
+    expect(await monitor.isAcRunning()).toBe(true);
   });
 
   it('does not force-kill on the first not-responding observation', async () => {
