@@ -329,6 +329,21 @@ describe('BlankingManager', () => {
     expect(resultsHtmlPath).toBeDefined();
   });
 
+  it('updates results in place without restarting when already showing results', () => {
+    // The immediate "pending" display and the final one a few seconds later
+    // must not restart the window in between — that's a visible flicker.
+    // blanking.ps1 reloads the rewritten HTML file on its own poll timer.
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({ clientName: 'Alice', carAcId: 'ks_porsche_911', pending: true });
+    expect(manager.isBlankingActive()).toBe(true);
+    const spawnCountAfterFirstShow = vi.mocked(spawn).mock.calls.length;
+
+    manager.showResults({ clientName: 'Alice', carAcId: 'ks_porsche_911', bestLapMs: 95123 });
+
+    expect(vi.mocked(spawn).mock.calls.length).toBe(spawnCountAfterFirstShow);
+  });
+
   it('returns to normal blanking after showing results even if the window was still up', () => {
     manager.setAuto();
     manager.setAcRunning(false);

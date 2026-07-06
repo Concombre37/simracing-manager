@@ -204,4 +204,35 @@ $window.Add_Loaded({
   }
 })
 
+# The agent updates the results HTML in place (e.g. the leaderboard arriving
+# a few seconds after the initial "pending" display) rather than restarting
+# this whole process — restarting would kill and respawn the window, visible
+# as a flicker. Poll the file's last-write time on the UI thread (a
+# DispatcherTimer, like the slideshow timer above) and reload the browser in
+# place when it changes.
+if ($webBrowser -ne $null -and $ResultsHtmlPath) {
+  $script:lastResultsWriteTime = if (Test-Path $ResultsHtmlPath) {
+    [System.IO.File]::GetLastWriteTimeUtc($ResultsHtmlPath)
+  } else {
+    [DateTime]::MinValue
+  }
+  $resultsPollTimer = New-Object System.Windows.Threading.DispatcherTimer
+  $resultsPollTimer.Interval = [System.TimeSpan]::FromMilliseconds(400)
+  $resultsPollTimer.Add_Tick({
+    try {
+      if (Test-Path $ResultsHtmlPath) {
+        $writeTime = [System.IO.File]::GetLastWriteTimeUtc($ResultsHtmlPath)
+        if ($writeTime -ne $script:lastResultsWriteTime) {
+          $script:lastResultsWriteTime = $writeTime
+          $webBrowser.Navigate([System.Uri]::new($ResultsHtmlPath))
+        }
+      }
+    } catch {
+      Write-Warning "Failed to check for results update: $_"
+    }
+  })
+  $resultsPollTimer.Start()
+  $window.Add_Closed({ $resultsPollTimer.Stop() })
+}
+
 [void]$window.ShowDialog()

@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.39 — Correction du flicker à l'écran de résultats
+
+### Corrigé
+
+- **Flicker entre l'affichage immédiat et l'affichage final des résultats** : `showResults()` redémarrait entièrement le processus PowerShell/WPF à chaque appel (une fois pour l'affichage immédiat avec spinner, une fois pour le classement final ~3s après), ce qui fermait puis rouvrait visiblement la fenêtre. Le fichier HTML des résultats est maintenant mis à jour sur place : `blanking.ps1` surveille sa propre date de modification et recharge le contenu affiché sans jamais fermer la fenêtre. Un redémarrage du processus ne se produit plus que pour _entrer_ dans l'écran de résultats depuis un autre affichage, pas entre les deux affichages des résultats eux-mêmes.
+
 ## v2.2.38 — Correction : fenêtres de blanking/résultats dupliquées
 
 ### Corrigé

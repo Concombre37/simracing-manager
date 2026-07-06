@@ -213,13 +213,21 @@ export class BlankingManager {
 
   showResults(summary: SessionResultsSummary): void {
     this.logger.info(summary, 'Showing session results');
+    // If we're already showing the results screen (the "pending" display,
+    // then the final one a few seconds later once the leaderboard is read),
+    // blanking.ps1 picks up the rewritten HTML file in place via its own
+    // poll timer — no process restart, no flicker. A restart is only needed
+    // to *enter* results mode from whatever was showing before.
+    const alreadyShowingResults = this.override === 'show' && this.resultsHtmlPath !== null;
     this.generateResultsHtml(summary);
     this.override = 'show';
-    // The plain waiting screen may already be up at this point (e.g. it
-    // came back briefly while we were reading race_out.json). startBlanking()
-    // no-ops if a process is already running, so without a forced restart
-    // the results HTML would never actually be displayed.
-    this.restartIfActive();
+    if (!alreadyShowingResults) {
+      // The plain waiting screen may already be up at this point (e.g. it
+      // came back briefly while we were reading race_out.json). startBlanking()
+      // no-ops if a process is already running, so without a forced restart
+      // the results HTML would never actually be displayed.
+      this.restartIfActive();
+    }
     this.evaluate();
   }
 
