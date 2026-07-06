@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.49 — Vérification de la présence réelle d'Assetto Corsa (pas juste process/mémoire présents)
+
+### Corrigé
+
+- **Cause probable du blanking qui se retire tout seul au démarrage de l'agent, sans rien de lancé** : `isAcRunning()` se contentait de vérifier qu'un processus nommé `acs.exe` existe (`tasklist`), et `isAcLoaded()` que la mémoire partagée d'AC est mappée — aucun des deux ne vérifiait que c'était réellement le jeu **en cours d'utilisation**, pas un reste d'une session précédente (process planté/zombie, mémoire partagée restée mappée après un crash). Vérifié dans la dernière version de RS Launcher (`isAssettoRunning()`) : il fait exactement le même check `tasklist` basique, sans vérification supplémentaire — ce n'était donc pas quelque chose à copier depuis là, il fallait construire une vérification plus robuste que l'original.
+- **`processMonitor.ts`** : `tasklist` est maintenant appelé en mode verbeux (`/V`) pour lire la colonne Status — un `acs.exe` présent mais marqué "Not Responding" par Windows n'est plus considéré comme "en cours" (donc ne masque plus l'écran d'attente à tort). S'il reste non-réactif plus de 5 minutes (largement au-delà de n'importe quel écran de chargement légitime), il est nettoyé automatiquement (`taskkill /F /T`).
+- **`acSharedMemory.ts`** / `check-ac-shared-memory.ps1` : la présence des sections de mémoire partagée ne suffit plus — le script lit maintenant `packetId` (les 4 premiers octets d'`acpmf_graphics`) à deux reprises, à un instant d'écart ; s'il n'a pas bougé, la mémoire est considérée figée/périmée (laissée par une session précédente) et ignorée.
+- Nouveaux tests (`processMonitor.spec.ts`, `acSharedMemory.spec.ts`) verrouillant ce comportement.
+
 ## v2.2.48 — Blanking qui se coupe presque instantanément malgré le délai réglé à 10s
 
 ### Corrigé

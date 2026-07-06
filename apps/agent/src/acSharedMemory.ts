@@ -7,6 +7,10 @@ interface SharedMemoryCheckResult {
   acpmf_physics: boolean;
   acpmf_graphics: boolean;
   acpmf_static: boolean;
+  /** False if acpmf_graphics' packetId hasn't moved between two quick reads
+   * — a mapping can outlive the AC process that created it (crash, a stale
+   * handle held open elsewhere), so existing alone isn't proof it's alive. */
+  fresh: boolean;
 }
 
 export class AcSharedMemoryChecker {
@@ -89,7 +93,18 @@ export class AcSharedMemoryChecker {
         }
         try {
           const result = JSON.parse(stdout.trim()) as SharedMemoryCheckResult;
-          const loaded = result.acpmf_physics && result.acpmf_graphics && result.acpmf_static;
+          const loaded =
+            result.acpmf_physics && result.acpmf_graphics && result.acpmf_static && result.fresh;
+          if (
+            result.acpmf_physics &&
+            result.acpmf_graphics &&
+            result.acpmf_static &&
+            !result.fresh
+          ) {
+            this.logger.warn(
+              'AC shared memory is mapped but frozen (stale from a previous session) — ignoring it',
+            );
+          }
           this.lastResult = loaded;
           resolve(loaded);
         } catch (err) {
