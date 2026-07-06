@@ -38,6 +38,7 @@ model Station {
   macAddress  String?   @map("mac_address")
   lastSeenAt  DateTime? @map("last_seen_at")
   status      String    @default("offline")
+  blankingActive Boolean @default(true) @map("blanking_active")
   config      Json?
   content     Json?
   createdAt   DateTime  @default(now()) @map("created_at")

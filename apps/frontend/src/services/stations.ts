@@ -13,6 +13,7 @@ export interface Station {
   macAddress: string | null;
   lastSeenAt: string | null;
   status: 'offline' | 'online' | 'in_game' | 'updating';
+  blankingActive: boolean;
   config: Record<string, unknown> | null;
   content: Record<string, unknown> | null;
   createdAt: string;

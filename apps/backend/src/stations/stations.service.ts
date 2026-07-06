@@ -159,6 +159,7 @@ export class StationsService {
         macAddress: payload.macAddress,
         lastSeenAt: new Date(payload.timestamp),
         status,
+        blankingActive: payload.blankingActive,
       },
     });
   }

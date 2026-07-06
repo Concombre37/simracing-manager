@@ -47,8 +47,12 @@ export class DashboardGateway
     this.logger.log(`Dashboard client disconnected: ${client.id}`);
   }
 
-  emitStationUpdated(stationId: string, status: string): void {
-    this.server.emit('station:updated', { stationId, status });
+  emitStationUpdated(
+    stationId: string,
+    status: string,
+    blankingActive: boolean,
+  ): void {
+    this.server.emit('station:updated', { stationId, status, blankingActive });
   }
 
   emitStationTelemetry(payload: TelemetrySnapshot): void {

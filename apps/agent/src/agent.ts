@@ -498,6 +498,7 @@ export class SimRacingAgent {
         localIp: getLocalIp(),
         macAddress: getMacAddress(),
         acRunning: this.acRunning,
+        blankingActive: this.blankingManager.isBlankingActive(),
         timestamp: Date.now(),
       };
       this.socket?.emit('agent:heartbeat', payload);

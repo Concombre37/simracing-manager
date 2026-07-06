@@ -150,6 +150,7 @@ export class AgentGateway
       this.dashboardGateway.emitStationUpdated(
         station.stationId,
         station.status,
+        station.blankingActive,
       );
     }
     this.logger.log(`Agent disconnected: ${client.stationId ?? 'unknown'}`);
@@ -198,7 +199,11 @@ export class AgentGateway
     }
     this.connectedStationIds.add(payload.stationId);
     const station = await this.stationsService.updateHeartbeat(payload);
-    this.dashboardGateway.emitStationUpdated(station.stationId, station.status);
+    this.dashboardGateway.emitStationUpdated(
+      station.stationId,
+      station.status,
+      station.blankingActive,
+    );
   }
 
   @SubscribeMessage('agent:log')
@@ -297,7 +302,11 @@ export class AgentGateway
       payload.stationId,
       payload.status,
     );
-    this.dashboardGateway.emitStationUpdated(station.stationId, station.status);
+    this.dashboardGateway.emitStationUpdated(
+      station.stationId,
+      station.status,
+      station.blankingActive,
+    );
   }
 
   @SubscribeMessage('agent:session:ended')

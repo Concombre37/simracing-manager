@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.2.45 — LED de statut du blanking sur la page des stations
+
+### Ajouté
+
+- **LED "Blanking"** sur chaque carte station de la page Postes : ambre (avec halo pulsant) quand l'écran d'attente est actif, grise quand il est retiré (jeu affiché). Reflète l'état réel envoyé par l'agent à chaque battement de cœur (`blankingActive`), donc à jour en direct sans rechargement.
+- Nouvelle colonne `blanking_active` sur `stations` (migration `20260706195500_add_station_blanking_active`), alimentée par le heartbeat de l'agent et diffusée via `station:updated`.
+
+### Note de déploiement
+
+- Le délai configurable de 10s (v2.2.42) et son réglage dans **Paramètres** étaient déjà déployés en production (vérifié : bundle frontend et route backend `/api/settings` bien servis), mais ne pouvaient pas être visibles/actifs sur les PODs qui tournent encore une version de l'agent antérieure à la v2.2.42 — la mise à jour de l'agent ne se fait pas automatiquement, il faut déclencher le bouton **"Mettre à jour l'agent"** sur la page Postes pour chaque POD concerné (ou réinstaller manuellement).
+
 ## v2.2.44 — Détection du meilleur tour non valide (cut)
 
 ### Ajouté

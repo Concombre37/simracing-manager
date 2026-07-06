@@ -63,7 +63,11 @@ export interface ServerToAgentEvents {
 }
 
 export interface ServerToClientEvents {
-  'station:updated': (payload: { stationId: string; status: string }) => void;
+  'station:updated': (payload: {
+    stationId: string;
+    status: string;
+    blankingActive: boolean;
+  }) => void;
   'station:telemetry': (payload: TelemetrySnapshot) => void;
   'session:updated': (payload: {
     sessionId: string;
@@ -81,6 +85,7 @@ export interface HeartbeatPayload {
   localIp: string | null;
   macAddress: string | null;
   acRunning: boolean;
+  blankingActive: boolean;
   timestamp: number;
 }
 

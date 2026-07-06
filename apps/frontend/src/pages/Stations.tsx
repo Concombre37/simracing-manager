@@ -69,9 +69,9 @@ export function Stations() {
     refetchInterval: 5000,
   });
 
-  socket?.on('station:updated', ({ stationId, status }) => {
+  socket?.on('station:updated', ({ stationId, status, blankingActive }) => {
     queryClient.setQueryData<Station[]>(['stations'], (old) =>
-      old?.map((s) => (s.stationId === stationId ? { ...s, status } : s)),
+      old?.map((s) => (s.stationId === stationId ? { ...s, status, blankingActive } : s)),
     );
   });
 
@@ -245,6 +245,7 @@ export function Stations() {
 
                     <StatusBadge status={station.status} />
                     <RoleBadge role={station.role} />
+                    <BlankingLed active={station.blankingActive} />
 
                     <div className="ml-auto mr-2 hidden grid-cols-3 gap-6 xl:grid">
                       <Cell label="IP locale" value={station.localIp ?? '—'} />
@@ -578,6 +579,27 @@ function StatusBadge({ status }: { status: string }) {
     default:
       return <Badge variant="gray">Hors ligne</Badge>;
   }
+}
+
+function BlankingLed({ active }: { active: boolean }) {
+  return (
+    <div
+      className="flex items-center gap-1.5"
+      title={active ? "Écran d'attente actif" : "Écran d'attente désactivé"}
+    >
+      <span className="relative flex h-2.5 w-2.5">
+        {active && (
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+        )}
+        <span
+          className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
+            active ? 'bg-amber-400' : 'bg-gray-600'
+          }`}
+        />
+      </span>
+      <span className="text-xs text-gray-500">Blanking</span>
+    </div>
+  );
 }
 
 function getStatusColor(status: string): string {
