@@ -391,11 +391,6 @@ export class AcSharedMemoryReader {
     }
   }
 
-  /** True once started and successfully polling (false on non-Windows/no koffi). */
-  isActive(): boolean {
-    return this.interval !== null;
-  }
-
   start(): void {
     if (this.interval) return;
     if (!koffi) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.41 — Blanking basé sur la présence du processus AC (comme RS Launcher)
+
+### Modifié
+
+- **Changement de stratégie pour le retrait du blanking** : après plusieurs corrections infructueuses de l'approche basée sur la télémétrie (mémoire partagée, `isSessionStarted`/`isInMainMenu`, confirmation à 5s), le blanking se base désormais uniquement sur la présence du processus `acs.exe` (déjà détectée de manière fiable par `processMonitor.ts`, sondée toutes les 2s), exactement comme le faisait RS Launcher en production. Toute la logique de confirmation par télémétrie (minuteur de 5s, double source de télémétrie en course) est retirée — elle ne s'est jamais montrée fiable et complexifiait le diagnostic sans bénéfice constaté.
+- Nettoyage en conséquence : suppression de `onTelemetry()`/`isReady()`/`updateReadyState()`/`clearReady()` dans `blankingManager.ts`, et de la logique de priorité entre sources de télémétrie ajoutée en v2.2.40 (devenue inutile).
+
 ## v2.2.40 — Correction de la vraie cause du blanking qui ne se retire jamais + nettoyage
 
 ### Corrigé

@@ -113,7 +113,7 @@ export class SimRacingAgent {
     this.blankingMediaSync = new BlankingMediaSync(logger, this.blankingManager);
   }
 
-  private onTelemetrySnapshot(snapshot: TelemetrySnapshot, fromSharedMemory = false): void {
+  private onTelemetrySnapshot(snapshot: TelemetrySnapshot): void {
     this.logger.debug(
       { stationId: snapshot.stationId, speedKmh: snapshot.speedKmh },
       'Local telemetry snapshot received',
@@ -125,15 +125,6 @@ export class SimRacingAgent {
       timestamp: Date.now(),
     });
     this.trackBestLap(snapshot);
-    // Only one source may drive blanking's ready-detection at a time. The
-    // shared-memory reader (raw AC graphics.status) and the CSP UDP/file
-    // fallback (its own isSessionStarted/isInMainMenu) can briefly disagree;
-    // updateReadyState() resets its 5s countdown on ANY "not ready" snapshot,
-    // so letting both feed it meant blanking's readiness never latched and
-    // the screen never cleared. Prefer shared memory whenever it's active.
-    if (fromSharedMemory || !this.acSharedMemoryReader?.isActive()) {
-      this.blankingManager.onTelemetry(snapshot);
-    }
     this.lapTelemetryRecorder.record(snapshot);
     this.socket?.emit('agent:telemetry', snapshot);
   }
@@ -345,7 +336,7 @@ export class SimRacingAgent {
         this.logger,
         config.STATION_ID,
         this.currentSession?.sessionId,
-        (snapshot) => this.onTelemetrySnapshot(snapshot, true),
+        (snapshot) => this.onTelemetrySnapshot(snapshot),
       );
     });
 

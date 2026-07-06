@@ -3,7 +3,6 @@ import fs from 'fs/promises';
 import { writeFileSync, existsSync, readFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
-import { TelemetrySnapshot } from '@simracing/shared';
 import { RaceResultData, getLeaderboard } from './raceResultCleaner';
 import { config } from './config';
 
@@ -41,10 +40,6 @@ export class BlankingManager {
   private acRunning = false;
   private acLoaded = false;
   private podInGame = false;
-  private readySince: number | null = null;
-  private readyTimeout: NodeJS.Timeout | null = null;
-  private readyConfirmed = false;
-  private readonly readyDelayMs = 5000;
   private stoppingIntentionally = false;
   private scriptPath: string | null = null;
   private playlistPath: string | null = null;
@@ -117,7 +112,6 @@ export class BlankingManager {
 
   setAcRunning(running: boolean): void {
     this.acRunning = running;
-    if (!running) this.clearReady();
     this.evaluate();
   }
 
@@ -130,9 +124,8 @@ export class BlankingManager {
   }
 
   /**
-   * Mirrors the status reported to the backend via `agent:status`.
-   * While a launched session is in progress (`in_game`), auto blanking must
-   * stay up until telemetry confirms the car is really on track.
+   * Mirrors the status reported to the backend via `agent:status`. Kept so a
+   * new session always starts from a clean auto override state.
    */
   setPodInGame(inGame: boolean): void {
     if (this.podInGame === inGame) return;
@@ -140,25 +133,12 @@ export class BlankingManager {
     if (inGame) {
       // A new session must always start from a clean auto state: a manual
       // hide/show left over from maintenance (Escape, "Masquer écran") would
-      // otherwise stick forever. This is done here, atomically with
-      // podInGame flipping to true and before the evaluate() call below,
-      // rather than via a separate setAuto() call beforehand — doing it
-      // separately left a brief window where evaluate() would run with
-      // podInGame still false and could use stale acLoaded/acRunning state
-      // to incorrectly dismiss blanking for a moment.
+      // otherwise stick forever.
       this.override = 'auto';
       this.clearResults();
       this.restartIfActive();
-      // Force a fresh ready confirmation for the new session so blanking
-      // cannot be dismissed by stale state from a previous run.
-      this.clearReady();
     }
     this.logger.info({ podInGame: inGame }, 'POD in-game status changed');
-    this.evaluate();
-  }
-
-  onTelemetry(snapshot: TelemetrySnapshot): void {
-    this.updateReadyState(snapshot);
     this.evaluate();
   }
 
@@ -556,49 +536,22 @@ export class BlankingManager {
       return;
     }
 
-    // During a launched session (`agent:status` = in_game), blanking must stay
-    // until telemetry confirms the car has been ready for 5s: the shared
-    // memory alone maps too early, while AC is still on its loading screen.
-    // Outside a session, keep the legacy behavior (shared memory loaded, or
-    // AC running with a confirmed ready state).
-    const shouldHide = this.podInGame
-      ? this.readyConfirmed
-      : this.acLoaded || (this.acRunning && this.readyConfirmed);
+    // Matches the proven approach from the previous production launcher
+    // ("RS Launcher"): hide blanking whenever Assetto Corsa is actually
+    // running (process detected, polled every 2s) or its shared memory is
+    // mapped — no telemetry-based "car ready" confirmation. That approach
+    // (waiting for isSessionStarted via shared memory, held for 5s) chased
+    // a moving target across many releases and was never fully reliable:
+    // two independent telemetry sources could disagree on readiness and
+    // the confirmation would never land. Plain process presence is simpler
+    // and is what actually works in production.
+    const shouldHide = this.acRunning || this.acLoaded;
 
     if (shouldHide) {
       this.stopBlanking();
     } else {
       this.startBlanking();
     }
-  }
-
-  private updateReadyState(snapshot: TelemetrySnapshot): void {
-    const ready = this.isReady(snapshot);
-    if (ready && this.readySince === null) {
-      this.readySince = Date.now();
-      this.logger.info('Car ready detected, blanking will be removed in 5s');
-      this.readyTimeout = setTimeout(() => {
-        this.readyConfirmed = true;
-        this.evaluate();
-      }, this.readyDelayMs);
-    } else if (!ready && this.readySince !== null) {
-      this.clearReady();
-      this.logger.info('Car ready state lost, blanking delay reset');
-    }
-  }
-
-  private isReady(snapshot: TelemetrySnapshot): boolean {
-    if (snapshot.isInMainMenu === true) return false;
-    return snapshot.isSessionStarted === true;
-  }
-
-  private clearReady(): void {
-    if (this.readyTimeout) {
-      clearTimeout(this.readyTimeout);
-      this.readyTimeout = null;
-    }
-    this.readySince = null;
-    this.readyConfirmed = false;
   }
 
   private buildPlaylist(): PlaylistItem[] {

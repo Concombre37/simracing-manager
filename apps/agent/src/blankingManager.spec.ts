@@ -5,7 +5,6 @@ import { readFileSync, mkdirSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { BlankingManager } from './blankingManager';
-import type { TelemetrySnapshot } from '@simracing/shared';
 
 vi.mock('child_process', async (importOriginal) => {
   const mod = (await importOriginal()) as typeof import('child_process');
@@ -29,22 +28,6 @@ function createFakeProcess() {
   proc.stderr = null as unknown as typeof proc.stderr;
   proc.stdio = [] as unknown as typeof proc.stdio;
   return proc;
-}
-
-function makeSnapshot(overrides: Partial<TelemetrySnapshot> = {}): TelemetrySnapshot {
-  return {
-    stationId: 'pod-01',
-    timestamp: Date.now(),
-    speedKmh: 0,
-    rpm: 0,
-    gear: 0,
-    throttle: 0,
-    brake: 0,
-    steering: 0,
-    isInMainMenu: false,
-    isSessionStarted: true,
-    ...overrides,
-  };
 }
 
 function lastSpawnArgs(): {
@@ -121,62 +104,20 @@ describe('BlankingManager', () => {
     expect(manager.isBlankingActive()).toBe(false);
   });
 
-  it('hides blanking 5s after car ready telemetry arrives and AC is running', () => {
-    vi.useFakeTimers();
+  it('hides blanking as soon as the AC process is detected running', () => {
+    // Matches the proven approach from the previous production launcher:
+    // plain process presence, no telemetry-based "car ready" confirmation.
     manager.setAuto();
     manager.setAcRunning(true);
-    manager.onTelemetry(makeSnapshot({ speedKmh: 120, rpm: 6000, gear: 4 }));
-    expect(manager.isBlankingActive()).toBe(true);
-    vi.advanceTimersByTime(5000);
     expect(manager.isBlankingActive()).toBe(false);
-    vi.useRealTimers();
   });
 
-  it('keeps blanking when in main menu even if car data exists', () => {
+  it('shows blanking again once AC stops running and shared memory unmaps', () => {
     manager.setAuto();
     manager.setAcRunning(true);
-    manager.onTelemetry(makeSnapshot({ isInMainMenu: true, speedKmh: 0, rpm: 900 }));
-    expect(manager.isBlankingActive()).toBe(true);
-  });
-
-  it('keeps blanking when session not started', () => {
-    manager.setAuto();
-    manager.setAcRunning(true);
-    manager.onTelemetry(makeSnapshot({ isSessionStarted: false, speedKmh: 0, rpm: 0 }));
-    expect(manager.isBlankingActive()).toBe(true);
-  });
-
-  it('shows blanking when AC is not running even with driving telemetry', () => {
-    manager.setAuto();
+    expect(manager.isBlankingActive()).toBe(false);
     manager.setAcRunning(false);
-    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
     expect(manager.isBlankingActive()).toBe(true);
-  });
-
-  it('keeps blanking active if car ready state is lost before 5s', () => {
-    vi.useFakeTimers();
-    manager.setAuto();
-    manager.setAcRunning(true);
-    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
-    expect(manager.isBlankingActive()).toBe(true);
-    vi.advanceTimersByTime(3000);
-    manager.onTelemetry(makeSnapshot({ isInMainMenu: true, speedKmh: 0 }));
-    expect(manager.isBlankingActive()).toBe(true);
-    vi.advanceTimersByTime(5000);
-    expect(manager.isBlankingActive()).toBe(true);
-    vi.useRealTimers();
-  });
-
-  it('restores blanking when car ready state is lost after confirmation', () => {
-    vi.useFakeTimers();
-    manager.setAuto();
-    manager.setAcRunning(true);
-    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
-    vi.advanceTimersByTime(5000);
-    expect(manager.isBlankingActive()).toBe(false);
-    manager.onTelemetry(makeSnapshot({ isInMainMenu: true, speedKmh: 0 }));
-    expect(manager.isBlankingActive()).toBe(true);
-    vi.useRealTimers();
   });
 
   it('manual hide overrides auto and keeps screen off', () => {
@@ -184,7 +125,6 @@ describe('BlankingManager', () => {
     expect(manager.isBlankingActive()).toBe(false);
     manager.setAcRunning(true);
     manager.setAcLoaded(true);
-    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
     expect(manager.isBlankingActive()).toBe(false);
   });
 
@@ -192,7 +132,6 @@ describe('BlankingManager', () => {
     manager.show();
     expect(manager.isBlankingActive()).toBe(true);
     manager.setAcLoaded(true);
-    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
     expect(manager.isBlankingActive()).toBe(true);
   });
 
@@ -209,79 +148,27 @@ describe('BlankingManager', () => {
     expect(manager.isBlankingActive()).toBe(false);
   });
 
-  it('keeps blanking during a session even when AC shared memory is loaded', () => {
+  it('podInGame no longer changes the hide decision, only resets a stale override', () => {
+    // Auto blanking behaves identically whether or not a session is
+    // "in game" — the only thing setPodInGame(true) still does is clear a
+    // stale manual override so a new session always starts from auto.
     manager.setAuto();
     manager.setPodInGame(true);
-    manager.setAcRunning(true);
-    manager.setAcLoaded(true);
+    manager.setAcRunning(false);
     expect(manager.isBlankingActive()).toBe(true);
-  });
-
-  it('hides blanking during a session only after ready is confirmed for 5s', () => {
-    vi.useFakeTimers();
-    manager.setAuto();
-    manager.setPodInGame(true);
     manager.setAcRunning(true);
-    manager.setAcLoaded(true);
-    manager.onTelemetry(makeSnapshot({ speedKmh: 80, rpm: 4000, gear: 3 }));
-    expect(manager.isBlankingActive()).toBe(true);
-    vi.advanceTimersByTime(5000);
     expect(manager.isBlankingActive()).toBe(false);
-    vi.useRealTimers();
-  });
-
-  it('requires a fresh ready confirmation when a new session starts', () => {
-    vi.useFakeTimers();
-    manager.setAuto();
-    manager.setAcRunning(true);
-    manager.onTelemetry(makeSnapshot({ speedKmh: 120 }));
-    vi.advanceTimersByTime(5000);
-    expect(manager.isBlankingActive()).toBe(false);
-
-    // A new session launches: blanking must come back until the game is
-    // confirmed again, even though the previous ready state was confirmed.
-    manager.setPodInGame(true);
-    expect(manager.isBlankingActive()).toBe(true);
-
-    manager.onTelemetry(makeSnapshot({ speedKmh: 50 }));
-    vi.advanceTimersByTime(5000);
-    expect(manager.isBlankingActive()).toBe(false);
-    vi.useRealTimers();
   });
 
   it('setPodInGame(true) alone clears a stale manual override', () => {
     // A manual override left over from maintenance (Escape, "Masquer
-    // écran") must not require a separate setAuto() call from the caller:
-    // doing it as a separate step left a window where evaluate() could run
-    // with podInGame still false and use stale acLoaded/acRunning state to
-    // dismiss blanking for a moment right as a new session starts.
+    // écran") must not require a separate setAuto() call from the caller.
     manager.hide();
     expect(manager.isBlankingActive()).toBe(false);
 
     manager.setPodInGame(true);
 
     expect(manager.isBlankingActive()).toBe(true);
-  });
-
-  it('keeps blanking during a session when telemetry reports the main menu', () => {
-    vi.useFakeTimers();
-    manager.setAuto();
-    manager.setPodInGame(true);
-    manager.setAcRunning(true);
-    manager.setAcLoaded(true);
-    manager.onTelemetry(makeSnapshot({ isInMainMenu: true, speedKmh: 0 }));
-    vi.advanceTimersByTime(10000);
-    expect(manager.isBlankingActive()).toBe(true);
-    vi.useRealTimers();
-  });
-
-  it('falls back to legacy behavior when the session ends', () => {
-    manager.setAuto();
-    manager.setPodInGame(true);
-    manager.setAcLoaded(true);
-    expect(manager.isBlankingActive()).toBe(true);
-    manager.setPodInGame(false);
-    expect(manager.isBlankingActive()).toBe(false);
   });
 
   it('passes an empty playlist when no media is configured', () => {
