@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('Enter', 'Exit')]
+  [ValidateSet('Enter', 'Foreground', 'Exit')]
   [string]$Action = 'Enter',
   [string]$GameProcessName = 'acs',
   [string]$SkipTitle = 'SimRacingBlanking',
@@ -134,8 +134,14 @@ function Set-GameForeground {
 
 switch ($Action) {
   'Enter' {
+    # Deliberately does NOT bring the game to the foreground here: the
+    # blanking screen (topmost) must stay the visible thing on top of it
+    # for the configured grace period. Foreground is requested separately
+    # (Action 'Foreground') once the agent actually hides blanking.
     Hide-Taskbar
     Minimize-OtherWindows -SkipTitle $SkipTitle -GameProcessName $GameProcessName
+  }
+  'Foreground' {
     Set-GameForeground -ProcessName $GameProcessName -TimeoutMs $ForegroundTimeoutMs
   }
   'Exit' {

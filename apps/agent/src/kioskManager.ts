@@ -6,9 +6,10 @@ import { Logger } from 'pino';
 /**
  * Enforces a kiosk-like experience while a session is running: the Windows
  * taskbar is hidden, any already-open windows (Explorer, etc.) are minimized,
- * and the game window is brought to the foreground. Everything is restored
- * once the session ends. Windows-only; no-ops elsewhere (e.g. local dev on
- * Linux) since the underlying PowerShell/Win32 calls don't apply.
+ * and the game window is brought to the foreground (on request, once
+ * blanking is done covering it). Everything is restored once the session
+ * ends. Windows-only; no-ops elsewhere (e.g. local dev on Linux) since the
+ * underlying PowerShell/Win32 calls don't apply.
  */
 export class KioskManager {
   private scriptPath: string | null = null;
@@ -29,12 +30,21 @@ export class KioskManager {
     }
   }
 
-  /** Hides the taskbar, minimizes other windows, and brings the game to the
-   * foreground once its window appears. Fire-and-forget: the script polls
-   * for the game window itself with its own timeout. */
+  /** Hides the taskbar and minimizes other windows. Does not touch the
+   * game's foreground state — call revealGame() for that once blanking
+   * actually hides, otherwise the game would visually cover the blanking
+   * screen well before its grace period elapses. Fire-and-forget. */
   enter(gameProcessName = 'acs'): void {
     this.logger.info({ gameProcessName }, 'Entering kiosk mode');
     this.run(['-Action', 'Enter', '-GameProcessName', gameProcessName]);
+  }
+
+  /** Brings the game window to the foreground once its window appears.
+   * Fire-and-forget: the script polls for the game window itself with its
+   * own timeout. Call this when blanking is about to hide, not at launch. */
+  revealGame(gameProcessName = 'acs'): void {
+    this.logger.info({ gameProcessName }, 'Bringing game window to foreground');
+    this.run(['-Action', 'Foreground', '-GameProcessName', gameProcessName]);
   }
 
   /** Restores the taskbar when a session ends. */

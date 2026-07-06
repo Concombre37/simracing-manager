@@ -53,7 +53,15 @@ export class BlankingManager {
   private hideDelaySeconds = 10;
   private pendingHideTimeout: NodeJS.Timeout | null = null;
 
-  constructor(private readonly logger: Logger) {}
+  constructor(
+    private readonly logger: Logger,
+    /** Called right when blanking actually hides (grace period elapsed, or
+     * a manual "hide" override) — not on internal restarts. The game window
+     * must stay hidden behind blanking until this fires, otherwise it would
+     * grab the foreground and visually cover blanking well before its own
+     * grace period elapses. */
+    private readonly onGameRevealed?: () => void,
+  ) {}
 
   /** Configurable from the dashboard (Paramètres), pushed over the socket. */
   setHideDelaySeconds(seconds: number): void {
@@ -566,6 +574,7 @@ export class BlankingManager {
     if (this.override === 'hide') {
       this.clearPendingHide();
       this.stopBlanking();
+      this.onGameRevealed?.();
       return;
     }
     if (this.override === 'show') {
@@ -593,6 +602,7 @@ export class BlankingManager {
         this.pendingHideTimeout = setTimeout(() => {
           this.pendingHideTimeout = null;
           this.stopBlanking();
+          this.onGameRevealed?.();
         }, this.hideDelaySeconds * 1000);
       }
     } else {

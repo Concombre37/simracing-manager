@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.46 — Le vrai bug de l'écran d'attente qui se coupe instantanément
+
+### Corrigé
+
+- **Cause racine trouvée** : le blanking se coupait instantanément non pas à cause du délai (qui fonctionnait), mais parce que le mode kiosque amenait la fenêtre du jeu au premier plan dès qu'elle apparaissait (`Set-GameForeground`), en parallèle et sans se soucier du délai configuré de `BlankingManager`. La fenêtre du jeu passait ainsi visuellement par-dessus l'écran d'attente (pourtant "topmost") bien avant la fin du délai — les deux fonctionnalités (kiosque et délai) ne communiquaient pas entre elles.
+- Le passage au premier plan du jeu est maintenant déclenché uniquement au moment où le blanking se retire réellement (fin du délai, ou masquage manuel), via un callback (`onGameRevealed`) — plus jamais avant. `kiosk.ps1` a une nouvelle action `Foreground` séparée de `Enter` (qui ne fait plus que masquer la barre des tâches et minimiser les autres fenêtres).
+- **Fiche de fin affichée avant la fermeture du jeu** : `endSession()` affichait d'abord la fiche des stats _après_ avoir attendu la fermeture d'AC (jusqu'à 15s), laissant un temps mort. La fiche s'affiche maintenant immédiatement (fenêtre topmost par-dessus le jeu encore ouvert), puis le jeu se ferme derrière en tâche de fond.
+
 ## v2.2.45 — LED de statut du blanking sur la page des stations
 
 ### Ajouté

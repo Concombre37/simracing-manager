@@ -97,8 +97,8 @@ export class SimRacingAgent {
     this.updater = new Updater(logger);
     this.processMonitor = new ProcessMonitor(logger);
     this.raceResultReader = new RaceResultReader(logger);
-    this.blankingManager = new BlankingManager(logger);
     this.kioskManager = new KioskManager(logger);
+    this.blankingManager = new BlankingManager(logger, () => this.kioskManager.revealGame());
     this.acSharedMemory = new AcSharedMemoryChecker(logger);
     this.lapTelemetryRecorder = new LapTelemetryRecorder(logger);
     this.trayManager = new TrayManager(logger, {
@@ -955,6 +955,27 @@ export class SimRacingAgent {
       await this.uploadLapTelemetryCsv(csvPath);
     }
     this.acSharedMemoryReader?.stop();
+
+    // Show the results screen right away, before asking AC to quit: quit()
+    // waits up to 15s for the game to close gracefully, and leaving that
+    // time dead (last frame frozen, nothing shown) is exactly the gap users
+    // saw between the session ending and the results appearing. The
+    // blanking window is topmost, so it already covers the still-running
+    // game — no need to wait for it to actually exit first.
+    if (session) {
+      this.blankingManager.showResults({
+        clientName: session.clientName,
+        carAcId: session.carAcId,
+        track: session.track,
+        trackLayout: session.trackLayout,
+        bestLapMs: session.bestLapMs,
+        bestInvalidLapMs: session.bestInvalidLapMs,
+        pending: true,
+      });
+    } else {
+      this.blankingManager.show();
+    }
+
     try {
       await this.acLauncher.quit();
       this.acRunning = false;
@@ -962,20 +983,6 @@ export class SimRacingAgent {
       this.blankingManager.setPodInGame(false);
       this.kioskManager.exit();
       if (session) {
-        // Show the results screen immediately with what we already know
-        // (driver/car/track/best lap from live telemetry) instead of
-        // leaving the plain waiting screen up while race_out.json is
-        // written. The leaderboard slots in a moment later.
-        this.blankingManager.showResults({
-          clientName: session.clientName,
-          carAcId: session.carAcId,
-          track: session.track,
-          trackLayout: session.trackLayout,
-          bestLapMs: session.bestLapMs,
-          bestInvalidLapMs: session.bestInvalidLapMs,
-          pending: true,
-        });
-
         // Wait for Assetto Corsa to write race_out.json, then read and push results.
         await new Promise((resolve) => setTimeout(resolve, 3000));
         const rawResult = await this.raceResultReader.readLatest(session.startedAt);
@@ -1007,8 +1014,6 @@ export class SimRacingAgent {
           this.blankingManager.setAuto();
           this.resultsTimeout = null;
         }, 60000);
-      } else {
-        this.blankingManager.show();
       }
       this.logger.info('POD returned to paddock (blanking shown)');
     } catch (err) {

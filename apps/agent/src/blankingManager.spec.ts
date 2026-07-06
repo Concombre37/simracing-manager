@@ -312,6 +312,40 @@ describe('BlankingManager', () => {
     expect(html).not.toContain('non valide (cut)');
   });
 
+  it('reveals the game only once the grace period elapses, not when AC is first detected', () => {
+    // The kiosk manager brings the game window to the foreground on this
+    // callback. Firing it early would visually cover blanking well before
+    // its own configurable delay elapses.
+    vi.useFakeTimers();
+    const onGameRevealed = vi.fn();
+    const m = new BlankingManager(mockLogger, onGameRevealed);
+    (m as unknown as { scriptPath: string }).scriptPath = path.join(os.tmpdir(), 'blanking.ps1');
+    (m as unknown as { playlistPath: string }).playlistPath = path.join(
+      os.tmpdir(),
+      'blanking-playlist.json',
+    );
+    m.setAuto();
+    m.setAcRunning(true);
+    expect(onGameRevealed).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(9999);
+    expect(onGameRevealed).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(onGameRevealed).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('reveals the game immediately on a manual hide override', () => {
+    const onGameRevealed = vi.fn();
+    const m = new BlankingManager(mockLogger, onGameRevealed);
+    (m as unknown as { scriptPath: string }).scriptPath = path.join(os.tmpdir(), 'blanking.ps1');
+    (m as unknown as { playlistPath: string }).playlistPath = path.join(
+      os.tmpdir(),
+      'blanking-playlist.json',
+    );
+    m.hide();
+    expect(onGameRevealed).toHaveBeenCalledTimes(1);
+  });
+
   it('shutdown() force-kills an active blanking process', () => {
     // Guards against orphaned windows piling up across agent restarts
     // (self-update, crash): shutdown() must actually tear the process down
