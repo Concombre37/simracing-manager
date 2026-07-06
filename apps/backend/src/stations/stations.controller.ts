@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { StationsService } from './stations.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -23,7 +24,7 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '@simracing/shared';
+import { StationRole, UserRole } from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 @Controller('stations')
@@ -92,6 +93,11 @@ export class StationsController {
   @Roles(UserRole.ADMIN)
   async launch(@Param('id') id: string) {
     const station = await this.stationsService.findOne(id);
+    if (station.role !== StationRole.SIMULATOR) {
+      throw new BadRequestException(
+        'Only a simulator station can launch a direct session',
+      );
+    }
     const session = await this.sessionsService.create({
       stationId: station.id,
       config: (station.config ?? {}) as Record<string, unknown>,

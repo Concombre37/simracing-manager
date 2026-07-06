@@ -23,6 +23,7 @@ model Station {
   id          String    @id @default(uuid()) @db.Uuid
   stationId   String    @unique @map("station_id")
   name        String
+  role        String    @default("simulator")
   apiKeyHash  String?   @map("api_key_hash")
   version     String?
   localIp     String?   @map("local_ip")

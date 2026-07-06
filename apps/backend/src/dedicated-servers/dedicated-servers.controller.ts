@@ -24,7 +24,7 @@ import { AgentGateway } from '../agent/agent.gateway';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '@simracing/shared';
+import { StationRole, UserRole } from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 
 @Controller('dedicated-servers')
@@ -126,6 +126,12 @@ export class DedicatedServersController {
       });
       if (!station) {
         this.logger.warn(`Station ${pod.stationId} not found, skipping`);
+        continue;
+      }
+      if (station.role !== StationRole.SIMULATOR) {
+        this.logger.warn(
+          `Station ${pod.stationId} is not a simulator station, skipping join`,
+        );
         continue;
       }
 

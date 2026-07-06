@@ -10,6 +10,11 @@ export enum StationStatus {
   UPDATING = 'updating',
 }
 
+export enum StationRole {
+  SIMULATOR = 'simulator',
+  ADMIN = 'admin',
+}
+
 export enum LaunchMode {
   CONTENT_MANAGER = 'cm',
   DIRECT = 'ac',

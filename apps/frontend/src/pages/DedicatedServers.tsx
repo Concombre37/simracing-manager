@@ -427,7 +427,10 @@ function JoinServerModal({ server, stations, onClose, onJoin }: JoinServerModalP
   ];
 
   const onlineStations = stations.filter(
-    (s) => s.id !== server.stationId && (s.status === 'online' || s.status === 'in_game'),
+    (s) =>
+      s.id !== server.stationId &&
+      s.role === 'simulator' &&
+      (s.status === 'online' || s.status === 'in_game'),
   );
 
   const carMap = useMemo(() => {

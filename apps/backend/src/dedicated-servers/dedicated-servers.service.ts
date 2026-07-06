@@ -6,6 +6,7 @@ import {
 import * as net from 'net';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+import { StationRole } from '@simracing/shared';
 import { CreateDedicatedServerDto } from './dto/create-dedicated-server.dto';
 import { UpdateDedicatedServerDto } from './dto/update-dedicated-server.dto';
 
@@ -36,6 +37,11 @@ export class DedicatedServersService {
     }
     if (!station) {
       throw new BadRequestException('Station not found');
+    }
+    if (station.role !== StationRole.ADMIN) {
+      throw new BadRequestException(
+        'Only an admin (hosting) station can host a dedicated server',
+      );
     }
 
     const usedPorts = await this.getUsedPorts();

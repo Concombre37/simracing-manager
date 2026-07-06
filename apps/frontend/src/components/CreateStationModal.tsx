@@ -1,19 +1,40 @@
 import { useState, FormEvent } from 'react';
-import { stationsApi } from '../services/stations';
+import { stationsApi, type StationRole } from '../services/stations';
 import { downloadEnvFile } from '../utils/downloadEnv';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Input, Label } from './ui/Input';
-import { Copy, Check, Download } from 'lucide-react';
+import { Copy, Check, Download, Gamepad2, Server } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
   onCreated: () => void;
 }
 
+const ROLE_OPTIONS: {
+  value: StationRole;
+  label: string;
+  description: string;
+  icon: typeof Gamepad2;
+}[] = [
+  {
+    value: 'simulator',
+    label: 'Simulateur',
+    description: 'POD joueur (volant, pédalier)',
+    icon: Gamepad2,
+  },
+  {
+    value: 'admin',
+    label: 'Admin',
+    description: 'PC hébergement (serveurs dédiés)',
+    icon: Server,
+  },
+];
+
 export function CreateStationModal({ onClose, onCreated }: Props) {
   const [stationId, setStationId] = useState('');
   const [name, setName] = useState('');
+  const [role, setRole] = useState<StationRole>('simulator');
   const [loading, setLoading] = useState(false);
   const [createdStation, setCreatedStation] = useState<{
     stationId: string;
@@ -26,7 +47,7 @@ export function CreateStationModal({ onClose, onCreated }: Props) {
     e.preventDefault();
     setLoading(true);
     try {
-      const data = await stationsApi.create({ stationId, name });
+      const data = await stationsApi.create({ stationId, name, role });
       setCreatedStation({ stationId: data.stationId, name: data.name, apiKey: data.apiKey });
       onCreated();
     } finally {
@@ -106,6 +127,37 @@ export function CreateStationModal({ onClose, onCreated }: Props) {
               placeholder="Poste 1"
               required
             />
+          </div>
+          <div>
+            <Label>Type de poste</Label>
+            <div className="grid grid-cols-2 gap-3">
+              {ROLE_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                const selected = role === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setRole(option.value)}
+                    className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors ${
+                      selected
+                        ? 'border-accent-orange bg-accent-orange/10'
+                        : 'border-dark-600 bg-dark-900/60 hover:border-dark-500'
+                    }`}
+                  >
+                    <Icon
+                      className={`h-4 w-4 ${selected ? 'text-accent-orange' : 'text-gray-400'}`}
+                    />
+                    <span
+                      className={`text-sm font-medium ${selected ? 'text-white' : 'text-gray-300'}`}
+                    >
+                      {option.label}
+                    </span>
+                    <span className="text-xs text-gray-500">{option.description}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div className="flex gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={onClose} className="flex-1">

@@ -65,7 +65,10 @@ export function CreateDedicatedServer() {
   });
 
   const onlineStations = useMemo(
-    () => stations?.filter((s) => s.status === 'online' || s.status === 'in_game') ?? [],
+    () =>
+      stations?.filter(
+        (s) => s.role === 'admin' && (s.status === 'online' || s.status === 'in_game'),
+      ) ?? [],
     [stations],
   );
 
@@ -356,9 +359,10 @@ function StepStation({
     return (
       <div className="rounded-xl border border-dashed border-dark-600 bg-dark-900/50 py-16 text-center">
         <AlertCircle className="mx-auto mb-3 h-10 w-10 text-gray-600" />
-        <p className="text-gray-400">Aucun poste en ligne pour le moment.</p>
+        <p className="text-gray-400">Aucun poste admin en ligne pour le moment.</p>
         <p className="mt-1 text-sm text-gray-600">
-          Lance un poste depuis la page Postes pour pouvoir créer un serveur.
+          Seul un poste de type "Admin" peut héberger un serveur dédié. Configure le type d'un poste
+          depuis la page Postes.
         </p>
       </div>
     );

@@ -27,9 +27,12 @@ import {
   Eye,
   EyeOff,
   ImageIcon,
+  Gamepad2,
+  Server,
 } from 'lucide-react';
 
 type StatusFilter = 'all' | Station['status'];
+type RoleFilter = 'all' | Station['role'];
 
 const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'all', label: 'Tous' },
@@ -39,12 +42,19 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: 'offline', label: 'Hors ligne' },
 ];
 
+const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
+  { value: 'all', label: 'Tous types' },
+  { value: 'simulator', label: 'Simulateurs' },
+  { value: 'admin', label: 'Admin' },
+];
+
 export function Stations() {
   const queryClient = useQueryClient();
   const { isAdmin, isTechnician } = useAuth();
   const [showModal, setShowModal] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
   const [apiKeyStation, setApiKeyStation] = useState<{
     stationId: string;
     name: string;
@@ -96,13 +106,24 @@ export function Stations() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
   });
 
+  const updateRoleMutation = useMutation({
+    mutationFn: ({ id, role }: { id: string; role: Station['role'] }) =>
+      stationsApi.update(id, { role }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
+  });
+
   function sendCommand(stationId: string, command: string) {
     socket?.emit('station:command', { stationId, command });
   }
 
   const filtered = useMemo(
-    () => data?.filter((s) => statusFilter === 'all' || s.status === statusFilter) ?? [],
-    [data, statusFilter],
+    () =>
+      data?.filter(
+        (s) =>
+          (statusFilter === 'all' || s.status === statusFilter) &&
+          (roleFilter === 'all' || s.role === roleFilter),
+      ) ?? [],
+    [data, statusFilter, roleFilter],
   );
 
   return (
@@ -140,6 +161,39 @@ export function Stations() {
                 <motion.span
                   layoutId="station-filter-pill"
                   className="absolute inset-0 rounded-full bg-accent-orange shadow-glow-orange"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
+              )}
+              <span className="relative flex items-center gap-1.5">
+                {f.label}
+                <span className={active ? 'opacity-80' : 'opacity-50'}>{count}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {ROLE_FILTERS.map((f) => {
+          const active = roleFilter === f.value;
+          const count =
+            f.value === 'all'
+              ? (data?.length ?? 0)
+              : (data?.filter((s) => s.role === f.value).length ?? 0);
+          return (
+            <button
+              key={f.value}
+              onClick={() => setRoleFilter(f.value)}
+              className={`relative rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                active
+                  ? 'text-dark-900'
+                  : 'border border-dark-600 bg-dark-800/70 text-gray-400 hover:text-white'
+              }`}
+            >
+              {active && (
+                <motion.span
+                  layoutId="station-role-filter-pill"
+                  className="absolute inset-0 rounded-full bg-accent-blue shadow-glow-blue"
                   transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                 />
               )}
@@ -190,6 +244,7 @@ export function Stations() {
                     </div>
 
                     <StatusBadge status={station.status} />
+                    <RoleBadge role={station.role} />
 
                     <div className="ml-auto mr-2 hidden grid-cols-3 gap-6 xl:grid">
                       <Cell label="IP locale" value={station.localIp ?? '—'} />
@@ -205,7 +260,7 @@ export function Stations() {
                     </div>
 
                     <div className="ml-auto flex items-center gap-2 xl:ml-0">
-                      {isAdmin && (
+                      {isAdmin && station.role === 'simulator' && (
                         <>
                           <Button
                             variant="success"
@@ -337,6 +392,42 @@ export function Stations() {
                             </CommandGroup>
                           )}
 
+                          {isAdmin && (
+                            <div>
+                              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                                Type de poste
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                <Chip
+                                  icon={Gamepad2}
+                                  onClick={() =>
+                                    updateRoleMutation.mutate({ id: station.id, role: 'simulator' })
+                                  }
+                                  isLoading={
+                                    updateRoleMutation.isPending &&
+                                    updateRoleMutation.variables?.id === station.id
+                                  }
+                                  active={station.role === 'simulator'}
+                                >
+                                  Simulateur
+                                </Chip>
+                                <Chip
+                                  icon={Server}
+                                  onClick={() =>
+                                    updateRoleMutation.mutate({ id: station.id, role: 'admin' })
+                                  }
+                                  isLoading={
+                                    updateRoleMutation.isPending &&
+                                    updateRoleMutation.variables?.id === station.id
+                                  }
+                                  active={station.role === 'admin'}
+                                >
+                                  Admin
+                                </Chip>
+                              </div>
+                            </div>
+                          )}
+
                           <div>
                             <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
                               Configuration
@@ -435,12 +526,14 @@ function Chip({
   onClick,
   danger,
   isLoading,
+  active,
 }: {
   icon: React.ElementType;
   children: ReactNode;
   onClick: () => void;
   danger?: boolean;
   isLoading?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
@@ -450,7 +543,9 @@ function Chip({
       className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all active:scale-95 disabled:opacity-50 ${
         danger
           ? 'border-red-900/60 bg-red-900/20 text-red-300 hover:bg-red-900/40'
-          : 'border-dark-600 bg-dark-900/60 text-gray-300 hover:border-accent-orange/50 hover:text-white'
+          : active
+            ? 'border-accent-orange/60 bg-accent-orange/15 text-white'
+            : 'border-dark-600 bg-dark-900/60 text-gray-300 hover:border-accent-orange/50 hover:text-white'
       }`}
     >
       {isLoading ? (
@@ -460,6 +555,14 @@ function Chip({
       )}
       {children}
     </button>
+  );
+}
+
+function RoleBadge({ role }: { role: Station['role'] }) {
+  return role === 'admin' ? (
+    <Badge variant="purple">Admin</Badge>
+  ) : (
+    <Badge variant="blue">Simulateur</Badge>
   );
 }
 

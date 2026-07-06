@@ -33,6 +33,7 @@ export class StationsService {
       data: {
         stationId: dto.stationId,
         name: dto.name,
+        role: dto.role,
         apiKeyHash: this.hashApiKey(apiKey),
         config: (dto.config ?? {}) as Prisma.InputJsonValue,
       },
@@ -70,6 +71,7 @@ export class StationsService {
       where: { id },
       data: {
         ...(dto.name && { name: dto.name }),
+        ...(dto.role && { role: dto.role }),
         ...(dto.config && { config: dto.config as Prisma.InputJsonValue }),
       },
     });

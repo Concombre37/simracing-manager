@@ -1,9 +1,12 @@
 import { api } from './api';
 
+export type StationRole = 'simulator' | 'admin';
+
 export interface Station {
   id: string;
   stationId: string;
   name: string;
+  role: StationRole;
   apiKeyHash: string | null;
   version: string | null;
   localIp: string | null;
@@ -19,11 +22,13 @@ export interface Station {
 export interface CreateStationData {
   stationId: string;
   name: string;
+  role?: StationRole;
   config?: Record<string, unknown>;
 }
 
 export interface UpdateStationData {
   name?: string;
+  role?: StationRole;
   config?: Record<string, unknown>;
 }
 
