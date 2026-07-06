@@ -57,7 +57,8 @@ export class SimRacingAgent {
   private joinTimeout: NodeJS.Timeout | null = null;
   private currentSession: {
     sessionId: string;
-    durationMinutes: number;
+    /** null means unlimited ("Illimité" join) — no auto-end is scheduled. */
+    durationMinutes: number | null;
     startedAt: number;
     timeout: NodeJS.Timeout | null;
     clientName?: string;
@@ -632,7 +633,9 @@ export class SimRacingAgent {
       );
       return;
     }
-    const oldDuration = this.currentSession.durationMinutes;
+    // durationMinutes is null for a session that started unlimited
+    // ("Illimité") — treat it as 0 for the relative-math fallback below.
+    const oldDuration = this.currentSession.durationMinutes ?? 0;
     // The backend sends the absolute new duration; use it as the source of
     // truth so the agent timer stays in sync even if a relative update is
     // lost or delivered twice. Fall back to relative math only if the
@@ -662,7 +665,7 @@ export class SimRacingAgent {
   }
 
   private scheduleSessionEnd(): void {
-    if (!this.currentSession) return;
+    if (!this.currentSession || this.currentSession.durationMinutes === null) return;
     if (this.currentSession.timeout) {
       clearTimeout(this.currentSession.timeout);
       this.currentSession.timeout = null;
@@ -830,10 +833,22 @@ export class SimRacingAgent {
       this.kioskManager.enter();
       this.logger.info('Join server command completed');
 
-      if (payload.sessionId && payload.durationMinutes && payload.durationMinutes > 0) {
+      // Shared-memory telemetry (the only reliable source for the
+      // isInMainMenu/isSessionStarted fields blanking's ready-detection
+      // relies on) and session tracking must both start regardless of
+      // whether the session has a duration — an "Illimité" join (the
+      // frontend's default) must dismiss blanking and show the results
+      // screen on stop just like a timed one. Only the auto-end timer is
+      // actually conditional on having a duration.
+      if (payload.sessionId) {
+        this.acSharedMemoryReader?.setSessionId(payload.sessionId);
+        this.acSharedMemoryReader?.start();
+        this.lapTelemetryRecorder.start(payload.sessionId);
+
+        const hasDuration = !!payload.durationMinutes && payload.durationMinutes > 0;
         this.currentSession = {
           sessionId: payload.sessionId,
-          durationMinutes: payload.durationMinutes,
+          durationMinutes: hasDuration ? (payload.durationMinutes as number) : null,
           startedAt: Date.now(),
           timeout: null,
           clientName: payload.clientName,
@@ -842,13 +857,12 @@ export class SimRacingAgent {
           trackLayout: payload.trackLayout,
         };
         this.logger.info(
-          { sessionId: payload.sessionId, durationMinutes: payload.durationMinutes },
+          { sessionId: payload.sessionId, durationMinutes: payload.durationMinutes ?? 'unlimited' },
           'Session tracking started',
         );
-        this.acSharedMemoryReader?.setSessionId(payload.sessionId);
-        this.acSharedMemoryReader?.start();
-        this.scheduleSessionEnd();
-        this.lapTelemetryRecorder.start(payload.sessionId);
+        if (hasDuration) {
+          this.scheduleSessionEnd();
+        }
       }
     } catch (err) {
       this.logger.error({ err }, 'Failed to execute join server command');

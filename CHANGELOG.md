@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.37 — Correction : le blanking ne se retirait jamais pour une jointure sans durée
+
+### Corrigé
+
+- **Cause racine du blanking qui ne se retire jamais** : le lecteur de mémoire partagée AC (seule source fiable pour détecter que la voiture est réellement en piste) n'était démarré, lors d'une jointure de serveur dédié, que si une durée avait été explicitement choisie (`durationMinutes > 0`). Or la modale de jointour a "Illimité" comme option par défaut — donc pour la quasi-totalité des lancements sans durée choisie, le lecteur ne démarrait jamais : le blanking ne pouvait jamais détecter que la voiture était prête et restait affiché indéfiniment, alors même que la télémétrie de base (vitesse/RPM, via le fallback) continuait de s'afficher normalement dans "En cours".
+- Le suivi de session (`currentSession`) est désormais toujours activé à la jointure, avec ou sans durée : une session "Illimitée" affiche donc aussi l'écran de résultats à l'arrêt, et peut recevoir une durée après coup via "+15/+30/..." comme une session normale. Seule la programmation de la fin automatique reste conditionnée à l'existence d'une durée.
+
 ## v2.2.36 — Correction du flicker au lancement + écran de résultats instantané et animé
 
 ### Corrigé
