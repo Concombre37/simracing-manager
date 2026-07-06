@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.32 — Correction : l'écran de résultats ne s'affichait jamais
+
+### Corrigé
+
+- L'écran de résultats introduit en v2.2.31 ne s'affichait en réalité jamais : `showResults()` change le contenu (HTML) à afficher mais la fenêtre de blanking, si elle était déjà à l'écran à ce moment (ce qui arrive régulièrement, le POD repassant par l'écran d'attente pendant les ~3s de lecture de `race_out.json`), ne redémarrait pas pour prendre en compte ce nouveau contenu — `startBlanking()` ne fait rien si une fenêtre est déjà active. Même problème au retour à la normale après les 60 secondes d'affichage. Le correctif force désormais un redémarrage de la fenêtre à chaque fois que son contenu doit changer (résultats affichés, puis retour à l'écran d'attente normal), sur le même principe déjà utilisé pour la playlist du blanking.
+- 2 tests de non-régression ajoutés couvrant explicitement ce scénario.
+
 ## v2.2.31 — Écran de résultats systématique et refonte visuelle F1
 
 ### Ajouté

@@ -127,6 +127,10 @@ export class BlankingManager {
     this.logger.info('Blanking override: auto');
     this.override = 'auto';
     this.clearResults();
+    // Coming back from the results screen (or any other content) must force
+    // a fresh window: startBlanking() no-ops if a process is already up, so
+    // without this the results screen could stay stuck on-screen forever.
+    this.restartIfActive();
     this.evaluate();
   }
 
@@ -141,8 +145,7 @@ export class BlankingManager {
 
     // If currently blanking, restart with new playlist
     if (this.override !== 'hide' && this.process && !this.process.killed) {
-      this.stopBlanking();
-      this.process = null;
+      this.restartIfActive();
       this.startBlanking();
     }
   }
@@ -155,7 +158,21 @@ export class BlankingManager {
     this.logger.info(summary, 'Showing session results');
     this.generateResultsHtml(summary);
     this.override = 'show';
+    // The plain waiting screen may already be up at this point (e.g. it
+    // came back briefly while we were reading race_out.json). startBlanking()
+    // no-ops if a process is already running, so without a forced restart
+    // the results HTML would never actually be displayed.
+    this.restartIfActive();
     this.evaluate();
+  }
+
+  /** Forces the current blanking window to relaunch so it picks up new content
+   * (results HTML, or dropping it). No-op if blanking isn't currently shown. */
+  private restartIfActive(): void {
+    if (this.process && !this.process.killed) {
+      this.stopBlanking();
+      this.process = null;
+    }
   }
 
   clearResults(): void {

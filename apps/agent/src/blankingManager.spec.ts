@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 import { spawn } from 'child_process';
-import { readFileSync } from 'fs';
+import { readFileSync, mkdirSync } from 'fs';
 import os from 'os';
 import path from 'path';
 import { BlankingManager } from './blankingManager';
@@ -47,7 +47,12 @@ function makeSnapshot(overrides: Partial<TelemetrySnapshot> = {}): TelemetrySnap
   };
 }
 
-function lastSpawnArgs(): { file: string; playlistPath?: string; slideIntervalMs?: string } {
+function lastSpawnArgs(): {
+  file: string;
+  playlistPath?: string;
+  slideIntervalMs?: string;
+  resultsHtmlPath?: string;
+} {
   const calls = vi.mocked(spawn).mock.calls;
   const lastCall = calls[calls.length - 1];
   const args = lastCall[1] as string[];
@@ -57,7 +62,9 @@ function lastSpawnArgs(): { file: string; playlistPath?: string; slideIntervalMs
   const playlistPath = playlistIndex >= 0 ? args[playlistIndex + 1] : undefined;
   const intervalIndex = args.indexOf('-SlideIntervalMs');
   const slideIntervalMs = intervalIndex >= 0 ? args[intervalIndex + 1] : undefined;
-  return { file, playlistPath, slideIntervalMs };
+  const resultsIndex = args.indexOf('-ResultsHtmlPath');
+  const resultsHtmlPath = resultsIndex >= 0 ? args[resultsIndex + 1] : undefined;
+  return { file, playlistPath, slideIntervalMs, resultsHtmlPath };
 }
 
 function readPlaylistFile(playlistPath?: string): unknown {
@@ -85,6 +92,11 @@ describe('BlankingManager', () => {
     vi.mocked(spawn).mockImplementation(() => createFakeProcess() as never);
     manager = new BlankingManager(mockLogger);
     const tmpDir = os.tmpdir();
+    // Matches the tmp dir generateResultsHtml() computes internally
+    // (process.env.TEMP || '/tmp', joined with 'simracing-manager'), which
+    // init() would normally create — skipped here since tests set
+    // scriptPath/playlistPath directly instead of calling init().
+    mkdirSync(path.join(process.env.TEMP || '/tmp', 'simracing-manager'), { recursive: true });
     (manager as unknown as { scriptPath: string }).scriptPath = path.join(tmpDir, 'blanking.ps1');
     (manager as unknown as { playlistPath: string }).playlistPath = path.join(
       tmpDir,
@@ -284,5 +296,36 @@ describe('BlankingManager', () => {
       { path: 'C:\\media\\intro.mp4', type: 'video' },
     ]);
     expect(vi.mocked(spawn).mock.calls.length).toBeGreaterThan(initialSpawnCount);
+  });
+
+  it('shows the results screen even when the plain blanking window is already up', () => {
+    // Simulates the POD being back in the paddock (blanking auto-shown)
+    // right before the agent has finished reading race_out.json.
+    manager.setAuto();
+    manager.setAcRunning(false);
+    expect(manager.isBlankingActive()).toBe(true);
+    const initialSpawnCount = vi.mocked(spawn).mock.calls.length;
+
+    manager.showResults({ clientName: 'Alice', carAcId: 'ks_porsche_911', bestLapMs: 95123 });
+
+    // Without a forced restart, startBlanking() no-ops because a process is
+    // already running, and the results screen never actually appears.
+    expect(vi.mocked(spawn).mock.calls.length).toBeGreaterThan(initialSpawnCount);
+    const { resultsHtmlPath } = lastSpawnArgs();
+    expect(resultsHtmlPath).toBeDefined();
+  });
+
+  it('returns to normal blanking after showing results even if the window was still up', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({ clientName: 'Alice', carAcId: 'ks_porsche_911', bestLapMs: 95123 });
+    expect(manager.isBlankingActive()).toBe(true);
+    const spawnCountWithResults = vi.mocked(spawn).mock.calls.length;
+
+    manager.setAuto();
+
+    expect(vi.mocked(spawn).mock.calls.length).toBeGreaterThan(spawnCountWithResults);
+    const { resultsHtmlPath } = lastSpawnArgs();
+    expect(resultsHtmlPath).toBeUndefined();
   });
 });
