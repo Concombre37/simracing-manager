@@ -34,6 +34,9 @@ public class SimRacingKiosk {
 
   [DllImport("user32.dll", CharSet = CharSet.Auto)]
   public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+  [DllImport("user32.dll")]
+  public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
 }
 '@
 
@@ -76,7 +79,13 @@ function Show-Taskbar {
 }
 
 function Minimize-OtherWindows {
-  param([string]$SkipTitle)
+  param([string]$SkipTitle, [string]$GameProcessName)
+
+  # The game's own window must never be touched here: it may already exist
+  # (e.g. on its loading screen) at this point, and force-minimizing a
+  # fullscreen game window can disrupt its rendering/telemetry state even
+  # if Set-GameForeground restores it moments later.
+  $gamePids = @(Get-Process -Name $GameProcessName -ErrorAction SilentlyContinue | ForEach-Object { $_.Id })
 
   $skippedClasses = @('Shell_TrayWnd', 'Shell_SecondaryTrayWnd', 'Progman', 'WorkerW')
   $callback = {
@@ -86,6 +95,10 @@ function Minimize-OtherWindows {
     $classSb = New-Object System.Text.StringBuilder 256
     [SimRacingKiosk]::GetClassName($hWnd, $classSb, $classSb.Capacity) | Out-Null
     if ($skippedClasses -contains $classSb.ToString()) { return $true }
+
+    [uint32]$procId = 0
+    [SimRacingKiosk]::GetWindowThreadProcessId($hWnd, [ref]$procId) | Out-Null
+    if ($gamePids -contains [int]$procId) { return $true }
 
     $titleSb = New-Object System.Text.StringBuilder 256
     [SimRacingKiosk]::GetWindowText($hWnd, $titleSb, $titleSb.Capacity) | Out-Null
@@ -122,7 +135,7 @@ function Set-GameForeground {
 switch ($Action) {
   'Enter' {
     Hide-Taskbar
-    Minimize-OtherWindows -SkipTitle $SkipTitle
+    Minimize-OtherWindows -SkipTitle $SkipTitle -GameProcessName $GameProcessName
     Set-GameForeground -ProcessName $GameProcessName -TimeoutMs $ForegroundTimeoutMs
   }
   'Exit' {

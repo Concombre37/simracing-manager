@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.35 — Correction : le mode kiosque ne doit jamais toucher à la fenêtre du jeu
+
+### Corrigé
+
+- Le mode kiosque (v2.2.34) minimisait potentiellement la fenêtre du jeu lui-même si elle existait déjà (ex. écran de chargement) au moment où l'agent minimise les fenêtres existantes, avant de la remettre au premier plan un instant après. Ce minimize/restore involontaire pouvait perturber le rendu plein écran du jeu et empêcher la télémétrie de signaler correctement une session démarrée — le blanking ne se retirait alors jamais, même si la session apparaissait normalement dans "En cours". Le script `kiosk.ps1` identifie désormais les fenêtres du jeu par leur processus et ne les minimise jamais.
+
 ## v2.2.34 — Mode kiosque pendant une session
 
 ### Ajouté
