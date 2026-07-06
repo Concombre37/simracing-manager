@@ -70,6 +70,26 @@ async function main(): Promise<void> {
   const releaseLock = await acquireSingleInstance(scopedLogger);
   await ensureAutoStart(scopedLogger);
   const agent = new SimRacingAgent(scopedLogger);
+
+  // Best-effort cleanup on a graceful shutdown (Ctrl+C, service stop) so the
+  // blanking window doesn't orphan itself; killOrphanedProcess() on the next
+  // startup is the real safety net for crashes/forceful kills this can't catch.
+  let shuttingDown = false;
+  const shutdown = (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    scopedLogger.info({ signal }, 'Shutting down agent');
+    void agent
+      .stop()
+      .catch(() => undefined)
+      .finally(() => {
+        releaseLock();
+        process.exit(0);
+      });
+  };
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+
   try {
     await agent.start();
   } finally {

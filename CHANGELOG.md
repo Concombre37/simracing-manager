@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.38 — Correction : fenêtres de blanking/résultats dupliquées
+
+### Corrigé
+
+- **Cause** : les fenêtres de blanking/résultats sont des processus PowerShell/WPF enfants de l'agent. Sur Windows, un processus enfant ne meurt pas automatiquement avec son parent. Or la mise à jour automatique (`system:update`, bouton "MAJ agent") appelait `process.exit(0)` directement sans jamais arrêter cette fenêtre — l'ancienne restait affichée, orpheline, pendant que la nouvelle version de l'agent en spawnait une autre par-dessus. Chaque mise à jour ajoutait donc une fenêtre supplémentaire empilée (exactement ce qui s'est produit avec les nombreuses mises à jour de cette session de correctifs).
+- L'agent nettoie désormais systématiquement sa fenêtre de blanking avant de se fermer (mise à jour, arrêt propre) et, en filet de sécurité, tue au démarrage toute fenêtre orpheline laissée par une précédente instance qui aurait crashé sans pouvoir se nettoyer (suivi via un fichier PID).
+- **Important** : ce correctif empêche les futures duplications mais ne peut pas nettoyer rétroactivement les fenêtres déjà orphelines actuellement ouvertes sur le POD — il faudra les fermer manuellement (ou redémarrer la machine) une dernière fois après cette mise à jour.
+
 ## v2.2.37 — Correction : le blanking ne se retirait jamais pour une jointure sans durée
 
 ### Corrigé

@@ -434,6 +434,10 @@ export class SimRacingAgent {
     this.stopTelemetry();
     this.acSharedMemoryReader?.stop();
     this.trayManager.stop();
+    // Child processes on Windows don't die with their parent automatically:
+    // without this, every agent restart (update, crash recovery) piles up
+    // another blanking/results window on top of an orphaned one.
+    this.blankingManager.shutdown();
     await this.acLauncher.stop();
     this.socket?.disconnect();
   }
@@ -709,7 +713,7 @@ export class SimRacingAgent {
   private async handleUpdate(): Promise<void> {
     this.logger.info('Received update command');
     try {
-      await this.updater.update();
+      await this.updater.update(() => this.blankingManager.shutdown());
     } catch (err) {
       this.logger.error({ err }, 'Agent update failed');
     }

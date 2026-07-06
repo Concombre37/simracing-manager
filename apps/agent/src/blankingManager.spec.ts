@@ -342,4 +342,17 @@ describe('BlankingManager', () => {
     const { resultsHtmlPath } = lastSpawnArgs();
     expect(resultsHtmlPath).toBeUndefined();
   });
+
+  it('shutdown() force-kills an active blanking process', () => {
+    // Guards against orphaned windows piling up across agent restarts
+    // (self-update, crash): shutdown() must actually tear the process down
+    // rather than just flip internal state.
+    manager.setAuto();
+    manager.setAcRunning(false);
+    expect(manager.isBlankingActive()).toBe(true);
+
+    manager.shutdown();
+
+    expect(manager.isBlankingActive()).toBe(false);
+  });
 });

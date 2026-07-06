@@ -17,7 +17,7 @@ interface GitHubRelease {
 export class Updater {
   constructor(private readonly logger: Logger) {}
 
-  async update(): Promise<void> {
+  async update(onBeforeExit?: () => void): Promise<void> {
     if (process.platform !== 'win32') {
       this.logger.warn('Auto-update is only supported on Windows');
       return;
@@ -80,6 +80,10 @@ export class Updater {
     });
 
     this.logger.info('Agent update started, exiting current process');
+    // Child processes (blanking window) don't die with the agent on
+    // Windows: without this, the new version's agent spawns its own
+    // blanking window on top of the orphaned one from this process.
+    onBeforeExit?.();
     process.exit(0);
   }
 

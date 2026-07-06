@@ -1,6 +1,6 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execFileSync, ChildProcess } from 'child_process';
 import fs from 'fs/promises';
-import { writeFileSync } from 'fs';
+import { writeFileSync, existsSync, readFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
 import { TelemetrySnapshot } from '@simracing/shared';
@@ -54,6 +54,7 @@ export class BlankingManager {
   private mediaPaths: string[] = [];
   private slideIntervalMs = 10000;
   private resultsHtmlPath: string | null = null;
+  private pidFilePath: string | null = null;
 
   constructor(private readonly logger: Logger) {}
 
@@ -66,12 +67,54 @@ export class BlankingManager {
       const content = await fs.readFile(src, 'utf-8');
       await fs.writeFile(this.scriptPath, content, 'utf-8');
       this.playlistPath = path.join(tmpDir, 'blanking-playlist.json');
+      this.pidFilePath = path.join(tmpDir, 'blanking.pid');
+      this.killOrphanedProcess();
       this.logger.debug(
         { scriptPath: this.scriptPath, playlistPath: this.playlistPath },
         'Blanking script extracted',
       );
     } catch (err) {
       this.logger.error({ err }, 'Failed to extract blanking script');
+    }
+  }
+
+  /**
+   * Kills a blanking window left running by a previous agent process (e.g.
+   * a self-update or crash that never gave stopBlanking() a chance to run —
+   * child processes on Windows don't die with their parent automatically).
+   * Without this, every restart piles up another overlapping window.
+   */
+  private killOrphanedProcess(): void {
+    if (!this.pidFilePath || !existsSync(this.pidFilePath)) return;
+    try {
+      const pid = parseInt(readFileSync(this.pidFilePath, 'utf-8').trim(), 10);
+      if (Number.isFinite(pid) && pid > 0 && process.platform === 'win32') {
+        execFileSync('taskkill', ['/F', '/T', '/PID', String(pid)], { stdio: 'ignore' });
+        this.logger.info({ pid }, 'Killed orphaned blanking screen from a previous run');
+      }
+    } catch {
+      // Process was probably already gone; nothing to clean up.
+    } finally {
+      try {
+        unlinkSync(this.pidFilePath);
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  /** Forcibly stops blanking during agent shutdown (update, quit). */
+  shutdown(): void {
+    if (this.process && !this.process.killed) {
+      this.stoppingIntentionally = true;
+      this.process.kill('SIGKILL');
+    }
+    if (this.pidFilePath) {
+      try {
+        unlinkSync(this.pidFilePath);
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -616,6 +659,14 @@ export class BlankingManager {
       windowsHide: true,
     });
 
+    if (this.pidFilePath && this.process.pid) {
+      try {
+        writeFileSync(this.pidFilePath, String(this.process.pid), 'utf-8');
+      } catch (err) {
+        this.logger.warn({ err }, 'Failed to write blanking pid file');
+      }
+    }
+
     this.process.on('exit', (code) => {
       this.logger.debug(
         { code, intentional: this.stoppingIntentionally },
@@ -627,6 +678,13 @@ export class BlankingManager {
       }
       this.stoppingIntentionally = false;
       this.process = null;
+      if (this.pidFilePath) {
+        try {
+          unlinkSync(this.pidFilePath);
+        } catch {
+          // ignore
+        }
+      }
     });
     this.process.on('error', (err) => {
       this.logger.error({ err }, 'Blanking screen process error');
