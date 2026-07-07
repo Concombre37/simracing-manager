@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.51 — Statut "blanking" bloqué après un flicker au lancement (impossible à retirer depuis le site)
+
+### Corrigé
+
+- **Cause trouvée** : au lancement d'une session, `restartIfActive()` tue la fenêtre d'écran d'attente en cours puis en relance une nouvelle **dans le même passage synchrone**. Mais Windows ne délivre l'événement de fin de l'ancien processus que plus tard, de façon asynchrone — une fois la nouvelle fenêtre déjà en place et affichée. Le gestionnaire de cet événement, écrit sans distinguer "à quel processus il appartient", remettait alors à zéro la référence vers la fenêtre **actuelle** (pourtant bien vivante à l'écran) dès qu'il se déclenchait.
+- Conséquence exacte du signalement : l'écran d'attente reste réellement affiché sur le POD, mais l'agent croit qu'il n'y en a plus (`isBlankingActive()` renvoie `false`) — la LED/le statut du site affiche "non-blanking" alors que ce n'est pas le cas, et cliquer sur "masquer" depuis le site ne fait plus rien (le code pense qu'il n'y a rien à arrêter). Seule la touche Échap directement sur le POD fonctionnait encore, puisqu'elle ferme la fenêtre sans passer par cet état incohérent.
+- Chaque fenêtre d'écran d'attente identifie maintenant précisément l'événement de fin qui lui appartient ; un événement provenant d'une fenêtre déjà remplacée par une plus récente est désormais ignoré au lieu d'écraser l'état de la fenêtre courante. Nouveau test verrouillant ce scénario exact.
+
 ## v2.2.50 — Correction de la régression introduite par la v2.2.49 (délai de 10s à nouveau fiable)
 
 ### Corrigé

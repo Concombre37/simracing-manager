@@ -54,7 +54,6 @@ export class BlankingManager {
   private acLoaded = false;
   private podInGame = false;
   private stoppingIntentionally = false;
-  private lastSpawnedAt = 0;
   private consecutiveEarlyExits = 0;
   private scriptPath: string | null = null;
   private playlistPath: string | null = null;
@@ -673,32 +672,48 @@ export class BlankingManager {
 
     args.push('-MonitorIndex', String(config.BLANKING_MONITOR));
 
-    this.process = spawn('powershell.exe', args, {
+    const proc = spawn('powershell.exe', args, {
       detached: false,
       windowsHide: true,
     });
-    this.lastSpawnedAt = Date.now();
+    this.process = proc;
+    const spawnedAt = Date.now();
 
     // Otherwise a PowerShell/WPF exception right after spawn (the scenario
     // the crash-restart logic below reacts to) would leave no trace at all
     // — these now also land in the persisted log file / local console.
-    this.process.stdout?.on('data', (chunk: Buffer) => {
+    proc.stdout?.on('data', (chunk: Buffer) => {
       this.logger.debug({ output: chunk.toString('utf-8').trim() }, 'Blanking screen stdout');
     });
-    this.process.stderr?.on('data', (chunk: Buffer) => {
+    proc.stderr?.on('data', (chunk: Buffer) => {
       this.logger.warn({ output: chunk.toString('utf-8').trim() }, 'Blanking screen stderr');
     });
 
-    if (this.pidFilePath && this.process.pid) {
+    if (this.pidFilePath && proc.pid) {
       try {
-        writeFileSync(this.pidFilePath, String(this.process.pid), 'utf-8');
+        writeFileSync(this.pidFilePath, String(proc.pid), 'utf-8');
       } catch (err) {
         this.logger.warn({ err }, 'Failed to write blanking pid file');
       }
     }
 
-    this.process.on('exit', (code) => {
-      const upDurationMs = Date.now() - this.lastSpawnedAt;
+    proc.on('exit', (code) => {
+      // restartIfActive()/setAuto() kill the old window and spawn a
+      // replacement in the same synchronous pass, but the OS only delivers
+      // this 'exit' event for the *old* process later, asynchronously —
+      // by then `this.process` already points at the new (legitimately
+      // running) one. Without this guard, this stale event would null out
+      // the reference to the still-live window: isBlankingActive() starts
+      // reporting false (dashboard shows blanking "off" while it's actually
+      // showing) and hide()/stopBlanking() silently no-op since they think
+      // there's nothing to stop — the only way left to close it becomes
+      // pressing Escape directly on the POD.
+      if (this.process !== proc) {
+        this.logger.debug({ code }, 'Stale blanking process exit ignored (already superseded)');
+        return;
+      }
+
+      const upDurationMs = Date.now() - spawnedAt;
       this.process = null;
       if (this.pidFilePath) {
         try {
@@ -739,9 +754,11 @@ export class BlankingManager {
       );
       this.override = 'hide';
     });
-    this.process.on('error', (err) => {
+    proc.on('error', (err) => {
       this.logger.error({ err }, 'Blanking screen process error');
-      this.process = null;
+      if (this.process === proc) {
+        this.process = null;
+      }
     });
   }
 

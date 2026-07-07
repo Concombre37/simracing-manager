@@ -208,6 +208,41 @@ describe('BlankingManager', () => {
     expect(vi.mocked(spawn).mock.calls.length).toBeGreaterThan(spawnCountBefore);
   });
 
+  it('ignores a stale exit event from a process already superseded by a restart', () => {
+    // restartIfActive() (called by setPodInGame(true)/setAuto()) kills the
+    // old window and spawns a replacement in the same synchronous pass, but
+    // in production the OS only delivers the old process' 'exit' event
+    // later, asynchronously — after the new one is already tracked and
+    // showing. Simulate that ordering by making the old process' kill()
+    // NOT auto-emit 'exit' (unlike the default fake process), so we can
+    // fire it manually once the replacement is already in place.
+    manager.setAuto();
+    manager.setAcRunning(false);
+    expect(manager.isBlankingActive()).toBe(true);
+
+    const oldProc = vi.mocked(spawn).mock.results[vi.mocked(spawn).mock.results.length - 1]
+      .value as ReturnType<typeof createFakeProcess>;
+    oldProc.kill = vi.fn(() => {
+      oldProc.killed = true;
+      return true; // no synchronous 'exit' — simulates the OS not having delivered it yet
+    });
+
+    manager.setPodInGame(true); // triggers restartIfActive(): kills oldProc, spawns a new one
+
+    const newProc = vi.mocked(spawn).mock.results[vi.mocked(spawn).mock.results.length - 1]
+      .value as ReturnType<typeof createFakeProcess>;
+    expect(newProc).not.toBe(oldProc);
+
+    // The old process' exit notification finally arrives, after the fact.
+    oldProc.emit('exit', 0);
+
+    // The current (new) window must still be considered active and stoppable
+    // — a stale exit must not null out the reference to it.
+    expect(manager.isBlankingActive()).toBe(true);
+    manager.hide();
+    expect(newProc.kill).toHaveBeenCalled();
+  });
+
   it('gives up and switches to hide override after too many consecutive early crashes', () => {
     manager.setAuto();
     manager.setAcRunning(false);
