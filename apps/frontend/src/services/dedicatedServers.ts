@@ -31,10 +31,15 @@ export interface Car {
   preview?: string;
 }
 
+export interface TrackLayout {
+  name: string;
+  preview?: string;
+}
+
 export interface Track {
   acId: string;
   name: string;
-  layouts: string[];
+  layouts: TrackLayout[];
   preview?: string;
 }
 

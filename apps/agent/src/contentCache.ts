@@ -10,7 +10,8 @@ interface CachedTrack extends Track {
   updatedAt: number;
 }
 
-const CACHE_VERSION = 6;
+// v7: Track.layouts changed from string[] to TrackLayout[] (name + per-layout preview).
+const CACHE_VERSION = 7;
 
 interface CacheData {
   version?: number;

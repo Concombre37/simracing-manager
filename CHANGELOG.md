@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.56 — Choix du layout avec visuel à la création du serveur + photos de circuits manquantes corrigées
+
+### Corrigé
+
+- **Cause trouvée pour les photos de circuits manquantes** : pour un circuit à plusieurs layouts, l'agent ne cherchait la photo de chaque layout que dans `<circuit>/<layout>/` — hors la convention Assetto Corsa range en réalité ces fichiers sous `<circuit>/ui/<layout>/`, un dossier jamais consulté. Résultat : toute photo qui n'existait que sous cette convention standard n'était simplement jamais trouvée. La recherche vérifie désormais aussi `<circuit>/ui/<layout>/`, en plus des autres emplacements déjà couverts, pour couvrir les différentes conventions utilisées par les circuits (officiels et communautaires).
+
+### Ajouté
+
+- **Choix du layout avec visuel à la création d'un serveur dédié** : l'étape "Circuit" affiche maintenant chaque layout disponible sous forme de vignette (comme pour le choix du circuit et de la voiture) au lieu d'une simple liste de noms. Nécessite une resynchronisation du contenu (bouton "Synchroniser le contenu") sur les PODs déjà scannés pour que les nouvelles photos de layout apparaissent.
+
 ## v2.2.55 — Choix boîte manuelle/auto, redirection vers "En cours", mode kiosque
 
 ### Ajouté

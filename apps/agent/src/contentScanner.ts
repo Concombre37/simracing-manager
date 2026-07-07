@@ -17,10 +17,15 @@ export interface Car {
   preview?: string;
 }
 
+export interface TrackLayout {
+  name: string;
+  preview?: string;
+}
+
 export interface Track {
   acId: string;
   name: string;
-  layouts: string[];
+  layouts: TrackLayout[];
   preview?: string;
 }
 
@@ -160,10 +165,80 @@ async function findCarPreview(
   return undefined;
 }
 
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A multi-layout AC track's per-layout ui_track.json/preview normally lives
+ * under `<track>/ui/<layout>/`, not `<track>/<layout>/` (that sibling folder
+ * holds the layout's 3D data, referenced by models_<layout>.ini, not its UI
+ * assets) — this was the actual reason some circuits had no photo at all:
+ * the old lookup only ever checked the (wrong, for this convention)
+ * `<track>/<layout>/` path. Checked in this order since some community
+ * track packages do use the flatter convention.
+ */
+async function findLayoutPreview(
+  logger: Logger,
+  trackDir: string,
+  layout: string,
+): Promise<string | undefined> {
+  const candidateDirs = [
+    path.join(trackDir, 'ui', layout),
+    path.join(trackDir, layout, 'ui'),
+    path.join(trackDir, layout),
+  ];
+  for (const dir of candidateDirs) {
+    const preview = await findFirstImage(dir, PREVIEW_NAMES, logger);
+    if (preview) return preview;
+  }
+  return undefined;
+}
+
+/**
+ * Layout names, checking both the standard AC convention
+ * (`<track>/ui/<layout>/ui_track.json`) and the flatter one some community
+ * tracks use (`<track>/<layout>/ui_track.json`) — a track can be picked up
+ * by either without being listed twice.
+ */
+async function discoverLayoutNames(trackDir: string): Promise<string[]> {
+  const ignoredLayoutDirs = new Set(['ui', 'data', 'ai', 'models', 'skins', 'sfx', 'textures']);
+  const names = new Set<string>();
+
+  const uiDir = path.join(trackDir, 'ui');
+  const uiSubEntries = await fs.readdir(uiDir).catch(() => []);
+  for (const sub of uiSubEntries) {
+    const subDir = path.join(uiDir, sub);
+    const subStat = await fs.stat(subDir).catch(() => null);
+    if (!subStat?.isDirectory()) continue;
+    if (await pathExists(path.join(subDir, 'ui_track.json'))) {
+      names.add(sub);
+    }
+  }
+
+  const rootSubEntries = await fs.readdir(trackDir).catch(() => []);
+  for (const sub of rootSubEntries) {
+    if (ignoredLayoutDirs.has(sub.toLowerCase())) continue;
+    const subDir = path.join(trackDir, sub);
+    const subStat = await fs.stat(subDir).catch(() => null);
+    if (!subStat?.isDirectory()) continue;
+    if (await pathExists(path.join(subDir, 'ui_track.json'))) {
+      names.add(sub);
+    }
+  }
+
+  return [...names];
+}
+
 async function findTrackPreview(
   logger: Logger,
   trackDir: string,
-  layouts: string[],
+  layouts: TrackLayout[],
   acId: string,
 ): Promise<string | undefined> {
   const rootPreview = await findFirstImage(trackDir, PREVIEW_NAMES, logger);
@@ -172,17 +247,16 @@ async function findTrackPreview(
   const uiPreview = await findFirstImage(path.join(trackDir, 'ui'), PREVIEW_NAMES, logger);
   if (uiPreview) return uiPreview;
 
-  for (const layout of layouts) {
-    const layoutPreview = await findFirstImage(path.join(trackDir, layout), PREVIEW_NAMES, logger);
-    if (layoutPreview) return layoutPreview;
-  }
+  const layoutPreview = layouts.find((l) => l.preview)?.preview;
+  if (layoutPreview) return layoutPreview;
 
   logger.warn(
     {
       acId,
       tried: [
         path.join(trackDir, 'preview.*'),
-        ...layouts.map((l) => path.join(trackDir, l, 'preview.*')),
+        path.join(trackDir, 'ui', 'preview.*'),
+        ...layouts.map((l) => path.join(trackDir, 'ui', l.name, 'preview.*')),
       ],
     },
     'No track preview found',
@@ -292,26 +366,13 @@ export class ContentScanner {
           );
         }
 
-        const ignoredLayoutDirs = new Set([
-          'ui',
-          'data',
-          'ai',
-          'models',
-          'skins',
-          'sfx',
-          'textures',
-        ]);
-        const layouts: string[] = [];
-        const subEntries = await fs.readdir(trackDir).catch(() => []);
-        for (const sub of subEntries) {
-          if (ignoredLayoutDirs.has(sub.toLowerCase())) continue;
-          const subDir = path.join(trackDir, sub);
-          const subStat = await fs.stat(subDir).catch(() => null);
-          if (!subStat?.isDirectory()) continue;
-          if (await this.pathExists(path.join(subDir, 'ui_track.json'))) {
-            layouts.push(sub);
-          }
-        }
+        const layoutNames = await discoverLayoutNames(trackDir);
+        const layouts: TrackLayout[] = await Promise.all(
+          layoutNames.map(async (name) => ({
+            name,
+            preview: await findLayoutPreview(this.logger, trackDir, name),
+          })),
+        );
 
         const track: Track = {
           acId: entry,

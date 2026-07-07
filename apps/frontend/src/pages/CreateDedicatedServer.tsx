@@ -126,7 +126,7 @@ export function CreateDedicatedServer() {
 
   function selectTrack(track: Track) {
     setTrackId(track.acId);
-    setTrackLayout(track.layouts.length > 0 ? track.layouts[0] : '');
+    setTrackLayout(track.layouts.length > 0 ? track.layouts[0].name : '');
     if (!name) {
       setName(`Serveur ${formatTrackName(track.name, track.acId)}`);
     }
@@ -537,21 +537,43 @@ function StepTrack({
           {selectedTrack && selectedTrack.layouts.length > 0 && (
             <div className="mt-4">
               <Label>Layout</Label>
-              <div className="flex flex-wrap gap-2">
-                {selectedTrack.layouts.map((layout) => (
-                  <button
-                    key={layout}
-                    type="button"
-                    onClick={() => onSelectLayout(layout)}
-                    className={`rounded-lg px-3 py-2 text-sm font-medium transition-all ${
-                      trackLayout === layout
-                        ? 'bg-accent-orange text-dark-900 shadow-lg shadow-accent-orange/30'
-                        : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
-                    }`}
-                  >
-                    {layout}
-                  </button>
-                ))}
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
+                {selectedTrack.layouts.map((layout) => {
+                  const active = trackLayout === layout.name;
+                  return (
+                    <button
+                      key={layout.name}
+                      type="button"
+                      onClick={() => onSelectLayout(layout.name)}
+                      className={`group relative overflow-hidden rounded-lg border text-left transition-all duration-200 hover:scale-[1.03] ${
+                        active
+                          ? 'border-accent-orange shadow-lg shadow-accent-orange/20 ring-2 ring-accent-orange'
+                          : 'border-dark-600 bg-dark-800 hover:border-accent-orange/50'
+                      }`}
+                    >
+                      <div className="flex aspect-video items-center justify-center bg-dark-900">
+                        {layout.preview ? (
+                          <img
+                            src={layout.preview}
+                            alt={layout.name}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <MapPin className="h-6 w-6 text-gray-600" />
+                        )}
+                        {active && (
+                          <div className="absolute right-1.5 top-1.5 rounded-full bg-accent-orange p-0.5 text-dark-900">
+                            <Check className="h-3 w-3" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-1.5">
+                        <p className="truncate text-xs font-medium text-white">{layout.name}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
