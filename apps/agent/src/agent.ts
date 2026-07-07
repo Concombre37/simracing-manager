@@ -655,6 +655,17 @@ export class SimRacingAgent {
   private async handleLaunch(payload: LaunchSessionPayload): Promise<void> {
     this.logger.info({ sessionId: payload.sessionId }, 'Received launch command');
     this.clearResultsTimeout();
+    // Shown immediately, before AC/Content Manager is even spawned below: any
+    // restart this causes (dropping the plain waiting screen for this one)
+    // happens in isolation, before the launcher's own window exists to race
+    // against — instead of racing it, which is what caused a visible flicker
+    // right at launch previously.
+    const cfg = (payload.config ?? {}) as Record<string, unknown>;
+    this.blankingManager.showLaunching({
+      carAcId: cfg.carId ? String(cfg.carId) : undefined,
+      track: cfg.trackId ? String(cfg.trackId) : undefined,
+      trackLayout: cfg.trackConfig ? String(cfg.trackConfig) : undefined,
+    });
     try {
       await this.acLauncher.launch(payload);
       this.acRunning = true;
@@ -672,6 +683,9 @@ export class SimRacingAgent {
       this.kioskManager.enter();
     } catch (err) {
       this.logger.error({ err }, 'Failed to launch Assetto Corsa');
+      // Otherwise the POD is left stuck on the launching screen forever —
+      // there was never a game to reveal it from.
+      this.blankingManager.setAuto();
     }
   }
 
@@ -959,6 +973,17 @@ export class SimRacingAgent {
   }): Promise<void> {
     this.logger.info(payload, 'Received join server command');
     this.clearCurrentSession();
+    // Shown immediately, before AC/Content Manager is even spawned below: any
+    // restart this causes (dropping the plain waiting screen for this one)
+    // happens in isolation, before the launcher's own window exists to race
+    // against — instead of racing it, which is what caused a visible flicker
+    // right at launch previously.
+    this.blankingManager.showLaunching({
+      clientName: payload.clientName,
+      carAcId: payload.carAcId,
+      track: payload.track,
+      trackLayout: payload.trackLayout,
+    });
     try {
       await this.acLauncher.joinServer(payload);
       this.acRunning = true;
@@ -1006,6 +1031,9 @@ export class SimRacingAgent {
       }
     } catch (err) {
       this.logger.error({ err }, 'Failed to execute join server command');
+      // Otherwise the POD is left stuck on the launching screen forever —
+      // there was never a game to reveal it from.
+      this.blankingManager.setAuto();
     }
   }
 

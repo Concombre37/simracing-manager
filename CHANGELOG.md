@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.54 — Écran de lancement (pilote / circuit / voiture) au lieu de l'écran d'attente générique
+
+### Ajouté
+
+- Au lancement d'une session (`session:launch` ou envoi vers un serveur dédié), l'écran d'attente affiche désormais un écran dédié « Lancement en cours » — même habillage visuel que l'écran de fin de session (dégradés, bandeau pilote, tuiles Circuit/Voiture) — au lieu du simple écran d'attente générique, pendant tout le temps où Assetto Corsa charge.
+- Cet écran est affiché **avant même que le jeu ne soit lancé**, pas après : le seul redémarrage de fenêtre que ça déclenche a donc lieu à un moment où rien d'autre ne peut apparaître par-dessus, au lieu de se produire pendant le lancement du jeu lui-même — ce qui était la source du flicker signalé sur les versions précédentes (v2.2.51 à v2.2.53 corrigeaient déjà des causes réelles, mais distinctes, du même symptôme).
+- Si le lancement échoue (erreur de connexion, jeu introuvable, etc.), l'écran revient automatiquement à l'écran d'attente normal au lieu de rester bloqué sur « Lancement en cours ».
+
 ## v2.2.53 — Flicker au lancement encore visible malgré le v2.2.52
 
 ### Corrigé

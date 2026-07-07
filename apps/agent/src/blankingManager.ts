@@ -33,6 +33,13 @@ interface SessionResultsSummary {
   pending?: boolean;
 }
 
+interface SessionLaunchInfo {
+  clientName?: string;
+  carAcId?: string;
+  track?: string;
+  trackLayout?: string;
+}
+
 function formatLapTime(ms: number): string {
   if (!ms || ms <= 0) return '-';
   const totalSeconds = Math.floor(ms / 1000);
@@ -60,6 +67,7 @@ export class BlankingManager {
   private mediaPaths: string[] = [];
   private slideIntervalMs = 10000;
   private resultsHtmlPath: string | null = null;
+  private launchingHtmlPath: string | null = null;
   private pidFilePath: string | null = null;
   private hideDelaySeconds = 10;
   private pendingHideTimeout: NodeJS.Timeout | null = null;
@@ -189,6 +197,7 @@ export class BlankingManager {
     this.logger.info('Blanking override: hide');
     this.override = 'hide';
     this.clearResults();
+    this.clearLaunching();
     this.evaluate();
   }
 
@@ -201,15 +210,18 @@ export class BlankingManager {
   setAuto(): void {
     this.logger.info('Blanking override: auto');
     this.override = 'auto';
-    // Coming back from the results screen must force a fresh window:
-    // startBlanking() no-ops if a process is already up, so without this the
-    // results screen could stay stuck on-screen forever. But if blanking is
-    // already showing the plain waiting screen, there is nothing to drop —
-    // killing and respawning the window here would just be a visible
-    // flicker for no visual change.
-    const wasShowingResults = this.resultsHtmlPath !== null;
+    // Coming back from the results screen (or an abandoned launching screen,
+    // e.g. the launch command failed) must force a fresh window:
+    // startBlanking() no-ops if a process is already up, so without this it
+    // could stay stuck on-screen forever. But if blanking is already showing
+    // the plain waiting screen, there is nothing to drop — killing and
+    // respawning the window here would just be a visible flicker for no
+    // visual change.
+    const wasShowingCustomContent =
+      this.resultsHtmlPath !== null || this.launchingHtmlPath !== null;
     this.clearResults();
-    if (wasShowingResults) {
+    this.clearLaunching();
+    if (wasShowingCustomContent) {
       this.restartIfActive();
     }
     this.evaluate();
@@ -244,12 +256,37 @@ export class BlankingManager {
     // to *enter* results mode from whatever was showing before.
     const alreadyShowingResults = this.override === 'show' && this.resultsHtmlPath !== null;
     this.generateResultsHtml(summary);
+    this.launchingHtmlPath = null;
     this.override = 'show';
     if (!alreadyShowingResults) {
       // The plain waiting screen may already be up at this point (e.g. it
       // came back briefly while we were reading race_out.json). startBlanking()
       // no-ops if a process is already running, so without a forced restart
       // the results HTML would never actually be displayed.
+      this.restartIfActive();
+    }
+    this.evaluate();
+  }
+
+  /**
+   * Shows a themed "session launching" screen (driver, car, circuit) instead
+   * of the plain waiting screen, from the moment a launch/join command is
+   * received until the game is confirmed running and blanking's normal
+   * grace-period reveal kicks in — same timing as before, just with useful
+   * content on screen while the game loads instead of the generic playlist.
+   *
+   * Callers must invoke this *before* actually spawning the game process:
+   * the one restart it causes then happens in isolation, before Content
+   * Manager's/AC's own window exists to race against, instead of during the
+   * launch itself (the closest thing left to the flicker previously caused
+   * by an unconditional restart on setPodInGame(true), now fixed).
+   */
+  showLaunching(info: SessionLaunchInfo): void {
+    this.logger.info(info, 'Showing session launching screen');
+    const alreadyShowingLaunching = this.launchingHtmlPath !== null;
+    this.generateLaunchingHtml(info);
+    this.resultsHtmlPath = null;
+    if (!alreadyShowingLaunching) {
       this.restartIfActive();
     }
     this.evaluate();
@@ -268,39 +305,19 @@ export class BlankingManager {
     this.resultsHtmlPath = null;
   }
 
-  private generateResultsHtml(summary: SessionResultsSummary): void {
-    const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
-    const htmlPath = path.join(tmpDir, 'session-results.html');
-    const bestLap = formatLapTime(summary.bestLapMs ?? 0);
-    const bestInvalidLap =
-      summary.bestInvalidLapMs && summary.bestInvalidLapMs > 0
-        ? formatLapTime(summary.bestInvalidLapMs)
-        : null;
-    const trackDisplay = summary.trackLayout
-      ? `${summary.track} (${summary.trackLayout})`
-      : (summary.track ?? '-');
-    const leaderboard = summary.result
-      ? this.renderLeaderboard(summary.result)
-      : summary.pending
-        ? `<div class="leaderboard placeholder">
-  <div class="spinner"></div>
-  <p>Chargement du classement…</p>
-</div>`
-        : `<div class="leaderboard placeholder">
-  <p>Classement indisponible</p>
-</div>`;
+  private clearLaunching(): void {
+    this.launchingHtmlPath = null;
+  }
 
-    // Rendered inside a WPF WebBrowser control (IE11 engine): no CSS grid,
-    // no clamp()/conic-gradient. Layout uses flexbox/vw units and a
-    // repeating-linear-gradient checkerboard, all supported in IE11 edge
-    // mode (see the FEATURE_BROWSER_EMULATION fix in blanking.ps1).
-    const html = `<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Session terminée</title>
-  <style>
+  // Shared by generateResultsHtml() and generateLaunchingHtml() so both
+  // screens are visually the same "game" (dark gradients, checkers stripe,
+  // driver banner, tiles) rather than two independently-drifting stylesheets.
+  // Rendered inside a WPF WebBrowser control (IE11 engine): no CSS grid, no
+  // clamp()/conic-gradient. Layout uses flexbox/vw units and a
+  // repeating-linear-gradient checkerboard, all supported in IE11 edge mode
+  // (see the FEATURE_BROWSER_EMULATION fix in blanking.ps1).
+  private commonStyles(): string {
+    return `
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
     body {
@@ -434,6 +451,12 @@ export class BlankingManager {
       font-family: 'Consolas', 'Courier New', monospace;
       font-size: 1.8vw;
     }
+    .tile.launching {
+      background: linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,212,255,0.05));
+      border-color: rgba(0,212,255,0.4);
+    }
+    .tile.launching .label { color: #9fe6ff; }
+    .tile.launching .value { color: #00d4ff; }
     .leaderboard {
       width: 92%;
       max-width: 1400px;
@@ -503,7 +526,38 @@ export class BlankingManager {
       font-size: 0.9vw;
       text-transform: uppercase;
       letter-spacing: 0.15em;
-    }
+    }`;
+  }
+
+  private generateResultsHtml(summary: SessionResultsSummary): void {
+    const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
+    const htmlPath = path.join(tmpDir, 'session-results.html');
+    const bestLap = formatLapTime(summary.bestLapMs ?? 0);
+    const bestInvalidLap =
+      summary.bestInvalidLapMs && summary.bestInvalidLapMs > 0
+        ? formatLapTime(summary.bestInvalidLapMs)
+        : null;
+    const trackDisplay = summary.trackLayout
+      ? `${summary.track} (${summary.trackLayout})`
+      : (summary.track ?? '-');
+    const leaderboard = summary.result
+      ? this.renderLeaderboard(summary.result)
+      : summary.pending
+        ? `<div class="leaderboard placeholder">
+  <div class="spinner"></div>
+  <p>Chargement du classement…</p>
+</div>`
+        : `<div class="leaderboard placeholder">
+  <p>Classement indisponible</p>
+</div>`;
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Session terminée</title>
+  <style>${this.commonStyles()}
   </style>
 </head>
 <body>
@@ -547,6 +601,56 @@ export class BlankingManager {
 
     writeFileSync(htmlPath, html, 'utf-8');
     this.resultsHtmlPath = htmlPath;
+  }
+
+  private generateLaunchingHtml(info: SessionLaunchInfo): void {
+    const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
+    const htmlPath = path.join(tmpDir, 'session-launching.html');
+    const trackDisplay = info.trackLayout
+      ? `${info.track} (${info.trackLayout})`
+      : (info.track ?? '-');
+
+    const html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lancement de la session</title>
+  <style>${this.commonStyles()}
+  </style>
+</head>
+<body>
+  <div class="checkers"></div>
+  <header>
+    <span class="flag">🏁</span>
+    <h1>Lancement en cours</h1>
+    <span class="flag">🏁</span>
+  </header>
+  <div class="bar"></div>
+  <div class="driver-banner">
+    <div class="driver-name">${this.escapeHtml(info.clientName ?? 'Pilote')}</div>
+    <div class="driver-meta">${this.escapeHtml(info.carAcId ?? '-')} · ${this.escapeHtml(trackDisplay)}</div>
+  </div>
+  <div class="summary">
+    <div class="tile">
+      <div class="label">Circuit</div>
+      <div class="value">${this.escapeHtml(trackDisplay)}</div>
+    </div>
+    <div class="tile launching">
+      <div class="label">Voiture</div>
+      <div class="value">${this.escapeHtml(info.carAcId ?? '-')}</div>
+    </div>
+  </div>
+  <div class="leaderboard placeholder">
+    <div class="spinner"></div>
+    <p>Chargement d'Assetto Corsa…</p>
+  </div>
+  <footer>SimRacing Manager</footer>
+</body>
+</html>`;
+
+    writeFileSync(htmlPath, html, 'utf-8');
+    this.launchingHtmlPath = htmlPath;
   }
 
   private renderLeaderboard(result: RaceResultData): string {
@@ -684,6 +788,8 @@ export class BlankingManager {
 
     if (this.resultsHtmlPath) {
       args.push('-ResultsHtmlPath', this.resultsHtmlPath);
+    } else if (this.launchingHtmlPath) {
+      args.push('-ResultsHtmlPath', this.launchingHtmlPath);
     }
 
     args.push('-MonitorIndex', String(config.BLANKING_MONITOR));

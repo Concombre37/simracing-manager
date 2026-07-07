@@ -379,6 +379,66 @@ describe('BlankingManager', () => {
     expect(resultsHtmlPath).toBeUndefined();
   });
 
+  it('shows the launching screen even when the plain blanking window is already up', () => {
+    // Called right as a session launch command comes in, before the game
+    // process is even spawned — the plain waiting screen may already be up
+    // since the agent started.
+    manager.setAuto();
+    manager.setAcRunning(false);
+    expect(manager.isBlankingActive()).toBe(true);
+    const initialSpawnCount = vi.mocked(spawn).mock.calls.length;
+
+    manager.showLaunching({ clientName: 'Alice', carAcId: 'ks_porsche_911', track: 'ks_monza' });
+
+    expect(vi.mocked(spawn).mock.calls.length).toBeGreaterThan(initialSpawnCount);
+    const { resultsHtmlPath } = lastSpawnArgs();
+    expect(resultsHtmlPath).toBeDefined();
+    const html = readFileSync(resultsHtmlPath!, 'utf-8');
+    expect(html).toContain('Alice');
+    expect(html).toContain('ks_monza');
+  });
+
+  it('updates the launching screen in place without restarting when already showing it', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showLaunching({ clientName: 'Alice', carAcId: 'ks_porsche_911', track: 'ks_monza' });
+    const spawnCountAfterFirstShow = vi.mocked(spawn).mock.calls.length;
+
+    manager.showLaunching({ clientName: 'Bob', carAcId: 'ks_ferrari_488', track: 'ks_spa' });
+
+    expect(vi.mocked(spawn).mock.calls.length).toBe(spawnCountAfterFirstShow);
+  });
+
+  it('does not tear down the launching screen when setPodInGame(true) fires once launch succeeds', () => {
+    // This is the exact transition that used to cause a visible flicker:
+    // setPodInGame(true) fires right after the game process is spawned,
+    // while the launching screen shown just before must stay up untouched
+    // until the grace-period reveal.
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showLaunching({ clientName: 'Alice', carAcId: 'ks_porsche_911', track: 'ks_monza' });
+    const spawnCountAfterLaunching = vi.mocked(spawn).mock.calls.length;
+
+    manager.setPodInGame(true);
+
+    expect(vi.mocked(spawn).mock.calls.length).toBe(spawnCountAfterLaunching);
+    const { resultsHtmlPath } = lastSpawnArgs();
+    expect(resultsHtmlPath).toBeDefined();
+    expect(readFileSync(resultsHtmlPath!, 'utf-8')).toContain('Alice');
+  });
+
+  it('drops the launching screen and returns to the plain waiting screen via setAuto() (e.g. a failed launch)', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showLaunching({ clientName: 'Alice', carAcId: 'ks_porsche_911', track: 'ks_monza' });
+    expect(manager.isBlankingActive()).toBe(true);
+
+    manager.setAuto();
+
+    const { resultsHtmlPath } = lastSpawnArgs();
+    expect(resultsHtmlPath).toBeUndefined();
+  });
+
   it('renders a second tile for the best invalid (cut) lap when present', () => {
     manager.setAuto();
     manager.setAcRunning(false);
