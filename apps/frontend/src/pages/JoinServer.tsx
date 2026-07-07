@@ -20,14 +20,16 @@ import {
   Target,
   Flame,
   Monitor,
-  Flag,
+  Settings2,
 } from 'lucide-react';
 
 type Difficulty = 'EASY' | 'PRO' | 'CUSTOM';
+type Gearbox = 'MANUAL' | 'AUTO';
 
 interface PodConfig {
   clientName: string;
   difficulty: Difficulty;
+  gearbox: Gearbox;
   carAcId: string;
 }
 
@@ -40,13 +42,13 @@ const DIFFICULTIES: {
   {
     value: 'EASY',
     label: 'Easy',
-    description: 'Ligne idéale, boîte auto, aides maximales',
+    description: 'Ligne idéale, aides maximales',
     icon: Feather,
   },
   {
     value: 'PRO',
     label: 'Pro',
-    description: 'TC / ABS actifs, pilotage manuel',
+    description: 'TC / ABS actifs',
     icon: Target,
   },
   {
@@ -55,6 +57,11 @@ const DIFFICULTIES: {
     description: 'Aucune aide, contrôle total',
     icon: Flame,
   },
+];
+
+const GEARBOXES: { value: Gearbox; label: string }[] = [
+  { value: 'MANUAL', label: 'Manuelle' },
+  { value: 'AUTO', label: 'Automatique' },
 ];
 
 const DURATION_OPTIONS: { value: number | undefined; label: string }[] = [
@@ -79,7 +86,6 @@ export function JoinServer() {
   const [durationMinutes, setDurationMinutes] = useState<number | undefined>(undefined);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [configs, setConfigs] = useState<Record<string, PodConfig>>({});
-  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const availableCars = useMemo(() => server?.cars ?? [], [server]);
@@ -110,6 +116,7 @@ export function JoinServer() {
         [stationId]: c[stationId] ?? {
           clientName: '',
           difficulty: 'PRO',
+          gearbox: 'MANUAL',
           carAcId: availableCars[0] ?? '',
         },
       }));
@@ -131,11 +138,12 @@ export function JoinServer() {
           carAcId: cfg.carAcId,
           clientName: cfg.clientName || undefined,
           difficulty: cfg.difficulty,
+          gearbox: cfg.gearbox,
         };
       });
       await dedicatedServersApi.join(id, pods, durationMinutes);
     },
-    onSuccess: () => setSent(true),
+    onSuccess: () => navigate('/en-cours'),
     onError: (err: unknown) =>
       setError(err instanceof Error ? err.message : "Échec de l'envoi des POD"),
   });
@@ -144,33 +152,6 @@ export function JoinServer() {
     return (
       <PageShell title="Envoyer les POD" subtitle="Chargement du serveur...">
         <p className="text-gray-500">Chargement...</p>
-      </PageShell>
-    );
-  }
-
-  if (sent) {
-    return (
-      <PageShell title="Envoyer les POD" accent={`sur ${server.name}`}>
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-col items-center justify-center rounded-2xl border border-green-800/50 bg-gradient-to-b from-green-900/20 to-transparent py-20 text-center"
-        >
-          <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-green-900/30 shadow-lg shadow-green-500/20">
-            <Flag className="h-10 w-10 text-green-400" />
-          </div>
-          <h3 className="mb-2 text-2xl font-black text-white">En piste !</h3>
-          <p className="mb-8 max-w-md text-gray-400">
-            {selectedIds.length} POD ont reçu l'ordre de rejoindre{' '}
-            <span className="font-mono text-accent-orange">
-              {server.station.localIp ?? '127.0.0.1'}:{server.tcpPort ?? 9600}
-            </span>
-          </p>
-          <Button variant="primary" size="lg" onClick={() => navigate('/dedicated-servers')}>
-            Retour aux serveurs
-          </Button>
-        </motion.div>
       </PageShell>
     );
   }
@@ -400,6 +381,32 @@ function DriverSetupCard({
                       </span>
                     </div>
                     <p className="mt-1 text-[11px] leading-tight text-gray-500">{d.description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <Label>
+              <Settings2 className="mr-1 inline h-3.5 w-3.5" />
+              Boîte de vitesses
+            </Label>
+            <div className="grid grid-cols-2 gap-2">
+              {GEARBOXES.map((g) => {
+                const active = config.gearbox === g.value;
+                return (
+                  <button
+                    key={g.value}
+                    type="button"
+                    onClick={() => onChange({ gearbox: g.value })}
+                    className={`rounded-lg border py-2 text-sm font-bold transition-all ${
+                      active
+                        ? 'border-accent-orange bg-accent-orange/10 text-white ring-1 ring-accent-orange'
+                        : 'border-dark-600 bg-dark-900 text-gray-300 hover:border-dark-500'
+                    }`}
+                  >
+                    {g.label}
                   </button>
                 );
               })}

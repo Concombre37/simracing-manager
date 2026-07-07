@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -13,6 +14,7 @@ import {
   Minus,
   Square,
   Gauge,
+  Tv,
 } from 'lucide-react';
 import type { TelemetrySnapshot } from '@simracing/shared';
 import { useSocket } from '../hooks/useSocket';
@@ -129,12 +131,20 @@ export function Sessions() {
       accent="cours"
       subtitle="PODs actuellement en session, télémétrie temps réel"
       actions={
-        <div className="flex items-center gap-2 rounded-full border border-dark-600 bg-dark-800/70 px-3 py-1.5 text-xs font-semibold text-gray-400">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ring-pulse rounded-full bg-green-400" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-400" />
-          </span>
-          {count} POD{count > 1 ? 's' : ''} en session
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 rounded-full border border-dark-600 bg-dark-800/70 px-3 py-1.5 text-xs font-semibold text-gray-400">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ring-pulse rounded-full bg-green-400" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-400" />
+            </span>
+            {count} POD{count > 1 ? 's' : ''} en session
+          </div>
+          <Link to="/en-cours/kiosk" target="_blank" rel="noopener noreferrer">
+            <Button variant="secondary">
+              <Tv className="h-4 w-4" />
+              Mode kiosque
+            </Button>
+          </Link>
         </div>
       }
     >

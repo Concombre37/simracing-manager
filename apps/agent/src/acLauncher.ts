@@ -20,6 +20,7 @@ export interface JoinServerConfig {
   durationMinutes?: number;
   clientName?: string;
   difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
+  gearbox?: 'MANUAL' | 'AUTO';
   sessionId?: string;
 }
 
@@ -91,7 +92,7 @@ export class AcLauncher {
     });
 
     await this.configureVideoIni(documentsPath);
-    await this.configureAssistsIni(documentsPath, joinConfig.difficulty);
+    await this.configureAssistsIni(documentsPath, joinConfig.difficulty, joinConfig.gearbox);
     if (joinConfig.clientName) {
       await this.luaBridge.setClientName(joinConfig.clientName);
     }
@@ -437,11 +438,16 @@ export class AcLauncher {
   private async configureAssistsIni(
     documentsPath: string,
     difficulty?: 'EASY' | 'PRO' | 'CUSTOM',
+    gearbox?: 'MANUAL' | 'AUTO',
   ): Promise<void> {
     const assistsIniPath = path.join(documentsPath, 'cfg', 'assists.ini');
     const preset = difficulty ?? (config.ASSIST_PRESET.toUpperCase() as 'EASY' | 'PRO' | 'CUSTOM');
     const isEasy = preset === 'EASY';
     const isPro = preset === 'PRO';
+    // Gearbox is chosen independently of the difficulty preset — when set,
+    // it overrides AUTO_SHIFTER regardless of which preset was picked;
+    // otherwise falls back to the preset's own default (auto on EASY only).
+    const autoShifter = gearbox ? (gearbox === 'AUTO' ? 1 : 0) : isEasy ? 1 : 0;
 
     const lines = [
       '[ASSISTS]',
@@ -449,7 +455,7 @@ export class AcLauncher {
       'AUTO_BLIP=1',
       `STABILITY_CONTROL=${isEasy ? 100 : isPro ? 50 : 0}`,
       'AUTO_BRAKE=0',
-      `AUTO_SHIFTER=${isEasy ? 1 : 0}`,
+      `AUTO_SHIFTER=${autoShifter}`,
       `ABS=${isEasy ? 1 : isPro ? 1 : 0}`,
       `TRACTION_CONTROL=${isEasy ? 1 : isPro ? 1 : 0}`,
       `AUTO_CLUTCH=${isEasy ? 1 : isPro ? 1 : 0}`,
@@ -464,7 +470,7 @@ export class AcLauncher {
 
     try {
       await fs.writeFile(assistsIniPath, lines.join('\n'), 'utf-8');
-      this.logger.info({ path: assistsIniPath, preset }, 'assists.ini written');
+      this.logger.info({ path: assistsIniPath, preset, autoShifter }, 'assists.ini written');
     } catch (err) {
       this.logger.warn({ err }, 'Failed to write assists.ini');
     }

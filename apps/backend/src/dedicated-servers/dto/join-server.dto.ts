@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Difficulty } from '@simracing/shared';
+import { Difficulty, GearboxMode } from '@simracing/shared';
 
 export const joinPodSchema = z.object({
   stationId: z.string().min(1),
@@ -8,6 +8,7 @@ export const joinPodSchema = z.object({
   difficulty: z
     .enum([Difficulty.EASY, Difficulty.PRO, Difficulty.CUSTOM])
     .optional(),
+  gearbox: z.enum([GearboxMode.MANUAL, GearboxMode.AUTO]).optional(),
 });
 
 export const joinServerSchema = z.object({

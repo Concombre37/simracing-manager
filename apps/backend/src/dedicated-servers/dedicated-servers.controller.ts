@@ -142,6 +142,7 @@ export class DedicatedServersController {
           serverId: id,
           clientName: pod.clientName ?? null,
           difficulty: pod.difficulty ?? null,
+          gearbox: pod.gearbox ?? null,
           carAcId: pod.carAcId,
           track: server.track,
           trackLayout: server.trackLayout,
@@ -167,6 +168,7 @@ export class DedicatedServersController {
         durationMinutes: dto.durationMinutes,
         clientName: pod.clientName,
         difficulty: pod.difficulty,
+        gearbox: pod.gearbox,
         sessionId: session.id,
       });
     }

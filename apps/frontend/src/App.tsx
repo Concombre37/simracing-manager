@@ -13,6 +13,7 @@ import { JoinServer } from './pages/JoinServer';
 import { Users } from './pages/Users';
 import { Leaderboard } from './pages/Leaderboard';
 import { Sessions } from './pages/Sessions';
+import { SessionsKiosk } from './pages/SessionsKiosk';
 import { ContentPreviews } from './pages/ContentPreviews';
 import { BlankingMedia } from './pages/BlankingMedia';
 import { Settings } from './pages/Settings';
@@ -39,6 +40,27 @@ function ProtectedRoute({ children, adminOnly }: { children: JSX.Element; adminO
   }
 
   return <Layout>{children}</Layout>;
+}
+
+/** Same auth gate as ProtectedRoute but skips the sidebar `Layout` — meant
+ * to be pointed at a TV/wall monitor, where the nav chrome would only eat
+ * into the screen real estate a 10-POD grid needs. */
+function KioskRoute({ children }: { children: JSX.Element }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-dark-950">
+        <p className="text-gray-500">Chargement...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
 }
 
 function AnimatedRoutes() {
@@ -102,6 +124,14 @@ function AnimatedRoutes() {
             <ProtectedRoute>
               <Sessions />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/en-cours/kiosk"
+          element={
+            <KioskRoute>
+              <SessionsKiosk />
+            </KioskRoute>
           }
         />
         <Route

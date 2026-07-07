@@ -44,3 +44,10 @@ export enum Difficulty {
   PRO = 'PRO',
   CUSTOM = 'CUSTOM',
 }
+
+/** Independent of Difficulty: overrides the AUTO_SHIFTER assist regardless
+ * of which difficulty preset was chosen. */
+export enum GearboxMode {
+  MANUAL = 'MANUAL',
+  AUTO = 'AUTO',
+}

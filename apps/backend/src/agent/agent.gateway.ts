@@ -448,6 +448,7 @@ export class AgentGateway
       durationMinutes?: number;
       clientName?: string;
       difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
+      gearbox?: 'MANUAL' | 'AUTO';
       sessionId?: string;
     },
   ): Promise<void> {

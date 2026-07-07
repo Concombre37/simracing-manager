@@ -59,6 +59,7 @@ model Session {
   serverId        String?   @map("server_id") @db.Uuid
   clientName      String?   @map("client_name")
   difficulty      String?   @map("difficulty")
+  gearbox         String?   @map("gearbox")
   carAcId         String?   @map("car_ac_id")
   track           String?
   trackLayout     String?   @map("track_layout")

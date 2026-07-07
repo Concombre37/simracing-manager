@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.55 — Choix boîte manuelle/auto, redirection vers "En cours", mode kiosque
+
+### Ajouté
+
+- **Boîte de vitesses indépendante de la difficulté** : sur l'écran d'envoi des PODs vers un serveur dédié, chaque poste a maintenant un choix « Manuelle » / « Automatique » séparé de la difficulté (Easy/Pro/Custom). Avant, la boîte auto était rigidement liée à la difficulté Easy — un pilote pouvait donc vouloir jouer en Pro (aides réduites) mais rester bloqué en boîte manuelle, ou l'inverse. Câblé de bout en bout : DTO backend, colonne `gearbox` sur `Session`, jusqu'à l'agent qui force `AUTO_SHIFTER` dans `assists.ini` selon ce choix, quelle que soit la difficulté.
+- **Redirection automatique vers "En cours" après l'envoi** : cliquer sur "Envoyer" sur l'écran d'envoi des PODs redirige désormais directement vers `/en-cours` au lieu d'un écran de succès avec un bouton à cliquer manuellement.
+- **Mode kiosque pour "En cours"** (`/en-cours/kiosk`, bouton "Mode kiosque" sur la page `/en-cours`) : affichage plein écran sans menu de navigation, pensé pour un TV/moniteur mural — grille 5x2 affichant jusqu'à 10 PODs (les 10 sessions les plus récentes si plus sont actives), avec une carte simplifiée par poste (pilote, voiture/circuit, vitesse, temps restant/écoulé) au lieu des jauges et boutons d'action détaillés de la page normale.
+
 ## v2.2.54 — Écran de lancement (pilote / circuit / voiture) au lieu de l'écran d'attente générique
 
 ### Ajouté

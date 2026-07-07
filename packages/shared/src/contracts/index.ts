@@ -52,6 +52,7 @@ export interface ServerToAgentEvents {
     durationMinutes?: number;
     clientName?: string;
     difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
+    gearbox?: 'MANUAL' | 'AUTO';
     sessionId?: string;
   }) => void;
   'server:launch': (payload: LaunchDedicatedServerPayload) => void;

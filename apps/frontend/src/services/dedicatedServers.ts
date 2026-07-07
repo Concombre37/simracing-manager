@@ -74,7 +74,13 @@ export const dedicatedServersApi = {
   stop: (id: string) => api.post(`/dedicated-servers/${id}/stop`).then((res) => res.data),
   join: (
     id: string,
-    pods: { stationId: string; carAcId: string; clientName?: string; difficulty?: string }[],
+    pods: {
+      stationId: string;
+      carAcId: string;
+      clientName?: string;
+      difficulty?: string;
+      gearbox?: string;
+    }[],
     durationMinutes?: number,
   ) => api.post(`/dedicated-servers/${id}/join`, { pods, durationMinutes }).then((res) => res.data),
 };
