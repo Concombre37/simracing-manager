@@ -204,6 +204,25 @@ $window.Add_Loaded({
   }
 })
 
+# Setting Topmost=$true only inserts the window at the top of the topmost
+# z-order band at that instant — it does not keep it there. A window created
+# moments later that also marks itself topmost (Content Manager's own
+# launcher UI does this for its splash) is inserted above it, briefly
+# covering blanking right at session launch, before kioskManager's
+# fire-and-forget minimize pass (a separate PowerShell process that still
+# has to boot and JIT the Win32 interop) gets a chance to push it down.
+# Periodically toggling Topmost off/on forces Windows to re-sort this
+# window back to the very top of that band, self-healing the cover within
+# one tick instead of leaving it until the external minimize eventually runs.
+$keepOnTopTimer = New-Object System.Windows.Threading.DispatcherTimer
+$keepOnTopTimer.Interval = [System.TimeSpan]::FromMilliseconds(200)
+$keepOnTopTimer.Add_Tick({
+  $window.Topmost = $false
+  $window.Topmost = $true
+})
+$keepOnTopTimer.Start()
+$window.Add_Closed({ $keepOnTopTimer.Stop() })
+
 # The agent updates the results HTML in place (e.g. the leaderboard arriving
 # a few seconds after the initial "pending" display) rather than restarting
 # this whole process — restarting would kill and respawn the window, visible

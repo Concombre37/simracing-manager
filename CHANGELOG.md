@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.53 — Flicker au lancement encore visible malgré le v2.2.52
+
+### Corrigé
+
+- **Cause trouvée, cette fois côté fenêtre elle-même** : l'écran d'attente ne réaffirme son statut "toujours au premier plan" (`Topmost`) qu'une seule fois, à sa création. Or au lancement d'une session, Content Manager (ou AC) crée sa propre fenêtre de lancement — souvent elle-même marquée "toujours au premier plan" le temps de son chargement — ce qui la fait passer **devant** l'écran d'attente pendant un court instant, avant que l'action qui masque la taskbar et réduit les autres fenêtres (elle-même lancée dans un processus PowerShell séparé, qui doit d'abord démarrer) n'ait eu le temps de s'exécuter.
+- L'écran d'attente réaffirme désormais sa position au premier plan en continu (toutes les 200 ms) pendant toute sa durée d'affichage, au lieu d'une seule fois. Toute fenêtre qui apparaîtrait brièvement par-dessus est repoussée derrière quasi instantanément, au lieu d'attendre l'action externe de mise en kiosque.
+
 ## v2.2.52 — Léger flicker restant au lancement d'une session
 
 ### Corrigé
