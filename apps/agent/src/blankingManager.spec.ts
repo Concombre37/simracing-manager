@@ -209,15 +209,17 @@ describe('BlankingManager', () => {
   });
 
   it('ignores a stale exit event from a process already superseded by a restart', () => {
-    // restartIfActive() (called by setPodInGame(true)/setAuto()) kills the
-    // old window and spawns a replacement in the same synchronous pass, but
-    // in production the OS only delivers the old process' 'exit' event
-    // later, asynchronously — after the new one is already tracked and
-    // showing. Simulate that ordering by making the old process' kill()
-    // NOT auto-emit 'exit' (unlike the default fake process), so we can
-    // fire it manually once the replacement is already in place.
+    // restartIfActive() (called by showResults()/setAuto() when dropping a
+    // results screen) kills the old window and spawns a replacement in the
+    // same synchronous pass, but in production the OS only delivers the old
+    // process' 'exit' event later, asynchronously — after the new one is
+    // already tracked and showing. Simulate that ordering by making the old
+    // process' kill() NOT auto-emit 'exit' (unlike the default fake
+    // process), so we can fire it manually once the replacement is already
+    // in place.
     manager.setAuto();
     manager.setAcRunning(false);
+    manager.showResults({ clientName: 'Alice', carAcId: 'ks_porsche_911', bestLapMs: 95123 });
     expect(manager.isBlankingActive()).toBe(true);
 
     const oldProc = vi.mocked(spawn).mock.results[vi.mocked(spawn).mock.results.length - 1]
@@ -227,7 +229,7 @@ describe('BlankingManager', () => {
       return true; // no synchronous 'exit' — simulates the OS not having delivered it yet
     });
 
-    manager.setPodInGame(true); // triggers restartIfActive(): kills oldProc, spawns a new one
+    manager.setAuto(); // dropping the results screen triggers restartIfActive(): kills oldProc, spawns a new one
 
     const newProc = vi.mocked(spawn).mock.results[vi.mocked(spawn).mock.results.length - 1]
       .value as ReturnType<typeof createFakeProcess>;
@@ -273,6 +275,23 @@ describe('BlankingManager', () => {
     vi.advanceTimersByTime(10000);
     expect(manager.isBlankingActive()).toBe(false);
     vi.useRealTimers();
+  });
+
+  it('does not restart the window on session launch when already showing the plain waiting screen', () => {
+    // setPodInGame(true) fires right as a session launches, while blanking
+    // has typically been up (plain waiting screen) since the agent started.
+    // Killing and respawning the window here — as used to happen
+    // unconditionally — produced a brief but visible flicker at exactly
+    // that moment, with no actual content change to justify it.
+    manager.setAuto();
+    manager.setAcRunning(false);
+    expect(manager.isBlankingActive()).toBe(true);
+    const spawnCountBefore = vi.mocked(spawn).mock.calls.length;
+
+    manager.setPodInGame(true);
+
+    expect(vi.mocked(spawn).mock.calls.length).toBe(spawnCountBefore);
+    expect(manager.isBlankingActive()).toBe(true);
   });
 
   it('setPodInGame(true) alone clears a stale manual override', () => {

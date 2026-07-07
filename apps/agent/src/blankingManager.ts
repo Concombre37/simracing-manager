@@ -167,8 +167,18 @@ export class BlankingManager {
       // hide/show left over from maintenance (Escape, "Masquer écran") would
       // otherwise stick forever.
       this.override = 'auto';
+      // A restart is only actually needed to drop a results screen that was
+      // still up (its HTML/mode is fixed at spawn time, see showResults()).
+      // If blanking is already showing the plain waiting screen — the
+      // common case, since this fires right as a session launches while
+      // blanking has been up since the agent started — killing and
+      // respawning the window here achieves nothing but a visible flicker
+      // at exactly the moment the session starts.
+      const wasShowingResults = this.resultsHtmlPath !== null;
       this.clearResults();
-      this.restartIfActive();
+      if (wasShowingResults) {
+        this.restartIfActive();
+      }
       this.clearPendingHide();
     }
     this.logger.info({ podInGame: inGame }, 'POD in-game status changed');
@@ -191,11 +201,17 @@ export class BlankingManager {
   setAuto(): void {
     this.logger.info('Blanking override: auto');
     this.override = 'auto';
+    // Coming back from the results screen must force a fresh window:
+    // startBlanking() no-ops if a process is already up, so without this the
+    // results screen could stay stuck on-screen forever. But if blanking is
+    // already showing the plain waiting screen, there is nothing to drop —
+    // killing and respawning the window here would just be a visible
+    // flicker for no visual change.
+    const wasShowingResults = this.resultsHtmlPath !== null;
     this.clearResults();
-    // Coming back from the results screen (or any other content) must force
-    // a fresh window: startBlanking() no-ops if a process is already up, so
-    // without this the results screen could stay stuck on-screen forever.
-    this.restartIfActive();
+    if (wasShowingResults) {
+      this.restartIfActive();
+    }
     this.evaluate();
   }
 

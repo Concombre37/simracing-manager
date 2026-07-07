@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.52 — Léger flicker restant au lancement d'une session
+
+### Corrigé
+
+- **Cause trouvée** : au lancement d'une session (`setPodInGame(true)`, juste avant que le jeu apparaisse), l'agent forçait **systématiquement** un redémarrage complet de la fenêtre d'écran d'attente — même quand elle affichait déjà le simple écran d'attente et que rien à l'écran n'avait besoin de changer. Ce redémarrage inutile (fermeture puis recréation de la fenêtre WPF) provoquait le petit flicker visible pile au moment de l'envoi vers le poste, signalé après le correctif du v2.2.51.
+- Un redémarrage n'est en réalité utile que pour faire disparaître l'écran de résultats d'une session précédente (son contenu est figé au démarrage du processus, voir `showResults()`). L'agent ne redémarre désormais la fenêtre que dans ce cas précis ; si l'écran d'attente normal est déjà affiché, il reste simplement en place au lancement de la session, sans coupure visible.
+- Même correction appliquée à `setAuto()`, qui suivait la même logique inconditionnelle. Nouveau test verrouillant l'absence de redémarrage inutile.
+
 ## v2.2.51 — Statut "blanking" bloqué après un flicker au lancement (impossible à retirer depuis le site)
 
 ### Corrigé
