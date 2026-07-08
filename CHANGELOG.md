@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.2.57 — Nom des voitures corrigé (impactait aussi les aperçus manquants)
+
+### Corrigé
+
+- **Cause trouvée : le nom des voitures était cassé pour la quasi-totalité du contenu.** L'agent ne lisait `ui_car.json` qu'à la racine du dossier de la voiture (`content/cars/<voiture>/ui_car.json`), alors que la convention standard d'Assetto Corsa le range dans un sous-dossier `ui/` (`content/cars/<voiture>/ui/ui_car.json`). Cette lecture échouait silencieusement (pas d'erreur visible), et le nom affiché retombait sur l'identifiant technique brut (`ks_ferrari_488_gt3_2020` au lieu de son vrai nom) — présent sur la quasi-totalité du catalogue, pas seulement quelques voitures. La recherche vérifie désormais `ui/ui_car.json` en priorité, avec la racine en repli.
+- Ajout de `ui/` comme emplacement supplémentaire pour la photo de la voiture (en plus de la racine et des dossiers `skins/`), pour couvrir un peu plus de conventions de contenu.
+- Écrans d'envoi (`JoinServer.tsx`) et de création de serveur (`CreateDedicatedServer.tsx`) : le nom affiché repasse maintenant par le même formatage que `/en-cours`/`DedicatedServers.tsx` (mise en forme lisible à partir de l'identifiant technique quand le vrai nom est absent), au lieu d'afficher l'identifiant brut tel quel.
+- Version du cache de contenu à nouveau incrémentée pour forcer un nouveau scan avec la logique corrigée (les fichiers sur le disque n'ayant pas changé, un simple changement de code ne suffisait pas à invalider l'ancien cache).
+
+### Note sur les circuits sans photo signalés
+
+Vérifié directement en base : sur un POD déjà mis à jour en v2.2.56, les 21 circuits scannés ont désormais tous une photo (0 manquant), et les layouts multiples (Barcelone, Nürburgring, Silverstone, etc.) ont chacun leur propre vignette. Le correctif v2.2.56 fonctionne bien — le POD qui montrait encore des circuits sans photo tournait simplement une version plus ancienne (v2.2.50), pas encore mise à jour.
+
 ## v2.2.56 — Choix du layout avec visuel à la création du serveur + photos de circuits manquantes corrigées
 
 ### Corrigé

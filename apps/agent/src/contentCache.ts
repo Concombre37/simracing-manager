@@ -11,7 +11,11 @@ interface CachedTrack extends Track {
 }
 
 // v7: Track.layouts changed from string[] to TrackLayout[] (name + per-layout preview).
-const CACHE_VERSION = 7;
+// v8: car ui_car.json lookup fixed (was checking the car root only, missing
+// the standard `ui/` subfolder — every car's name/brand/category was wrong).
+// File mtimes on disk are unchanged, so without a version bump the old,
+// incorrect cached values would never get rescanned with the fixed logic.
+const CACHE_VERSION = 8;
 
 interface CacheData {
   version?: number;

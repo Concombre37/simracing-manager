@@ -4,6 +4,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { dedicatedServersApi, type Car as AcCar } from '../services/dedicatedServers';
 import { stationsApi, type Station } from '../services/stations';
+import { formatCarName } from '../utils/track';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -438,7 +439,7 @@ function DriverSetupCard({
                       {car?.preview ? (
                         <img
                           src={car.preview}
-                          alt={car.name}
+                          alt={formatCarName(car.name, acId)}
                           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           loading="lazy"
                         />
@@ -453,7 +454,7 @@ function DriverSetupCard({
                     </div>
                     <div className="p-2">
                       <p className="truncate text-xs font-semibold text-white">
-                        {car?.name ?? acId}
+                        {formatCarName(car?.name, acId)}
                       </p>
                     </div>
                   </button>

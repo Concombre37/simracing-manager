@@ -147,6 +147,9 @@ async function findCarPreview(
   const rootPreview = await findFirstImage(carDir, PREVIEW_NAMES, logger);
   if (rootPreview) return rootPreview;
 
+  const uiPreview = await findFirstImage(path.join(carDir, 'ui'), PREVIEW_NAMES, logger);
+  if (uiPreview) return uiPreview;
+
   const skinsDir = path.join(carDir, 'skins');
   try {
     const skins = await fs.readdir(skinsDir);
@@ -159,7 +162,14 @@ async function findCarPreview(
   }
 
   logger.warn(
-    { acId, tried: [path.join(carDir, 'preview.*'), path.join(skinsDir, '*', 'preview.*')] },
+    {
+      acId,
+      tried: [
+        path.join(carDir, 'preview.*'),
+        path.join(carDir, 'ui', 'preview.*'),
+        path.join(skinsDir, '*', 'preview.*'),
+      ],
+    },
     'No car preview found',
   );
   return undefined;
@@ -299,9 +309,17 @@ export class ContentScanner {
         const stat = await fs.stat(carDir).catch(() => null);
         if (!stat?.isDirectory()) continue;
 
-        const uiPath = path.join(carDir, 'ui_car.json');
+        // The standard AC convention nests this under a `ui` folder — a
+        // flat `ui_car.json` at the car root (previously the only path
+        // checked) essentially never matches real content, silently
+        // falling back to the raw acId as the display name for every car
+        // (e.g. "ks_ferrari_488_gt3_2020" instead of "Ferrari 488 GT3
+        // Evo 2020") without ever surfacing an error, since a missing
+        // name/brand/category isn't treated as a failure.
+        const uiPathNested = path.join(carDir, 'ui', 'ui_car.json');
+        const uiPathRoot = path.join(carDir, 'ui_car.json');
         const previewPaths = await this.getCarPreviewPaths(carDir);
-        const updatedAt = await maxMtime(uiPath, ...previewPaths);
+        const updatedAt = await maxMtime(uiPathNested, uiPathRoot, ...previewPaths);
         const cached = this.cache.getCar(entry);
 
         if (cached && cached.updatedAt === updatedAt && cached.preview !== undefined) {
@@ -315,11 +333,14 @@ export class ContentScanner {
           continue;
         }
 
-        const uiJson = await readJsonSafe<{
+        let uiJson = await readJsonSafe<{
           name?: string;
           brand?: string;
           class?: string;
-        }>(uiPath);
+        }>(uiPathNested);
+        if (!uiJson) {
+          uiJson = await readJsonSafe(uiPathRoot);
+        }
         const car: Car = {
           acId: entry,
           name: uiJson?.name || entry,
@@ -413,7 +434,10 @@ export class ContentScanner {
   }
 
   private async getCarPreviewPaths(carDir: string): Promise<string[]> {
-    const paths: string[] = PREVIEW_NAMES.map((n) => path.join(carDir, n));
+    const paths: string[] = [
+      ...PREVIEW_NAMES.map((n) => path.join(carDir, n)),
+      ...PREVIEW_NAMES.map((n) => path.join(carDir, 'ui', n)),
+    ];
     const skinsDir = path.join(carDir, 'skins');
     try {
       const skins = await fs.readdir(skinsDir);
