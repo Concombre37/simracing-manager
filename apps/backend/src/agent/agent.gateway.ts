@@ -38,6 +38,13 @@ interface AuthenticatedSocket extends Socket {
   stationName?: string;
   apiKey?: string;
   provisioning?: boolean;
+  /** Whether settings:updated/station:role have already been pushed on this
+   * connection. Deliberately independent of room membership: AgentAuthGuard
+   * itself joins `station:<id>` on the very first guarded message (before
+   * the handler body runs), so `!client.rooms.has(room)` is already false
+   * by the time handleHeartbeat's body executes even on a genuinely first
+   * heartbeat — checking that would silently never fire either. */
+  announced?: boolean;
 }
 
 @WebSocketGateway({
@@ -197,13 +204,15 @@ export class AgentGateway
   ): Promise<void> {
     client.stationId = payload.stationId;
     const room = `station:${payload.stationId}`;
-    // This is the actually-reliable "agent just connected" signal (see the
-    // comment on handleConnection) — the room join was already gated on it
-    // as a fallback; settings:updated/station:role now ride the same gate
-    // so they're pushed exactly once per connection, right when we first
-    // learn who's on the other end.
-    const isFirstHeartbeat = !client.rooms.has(room);
-    if (isFirstHeartbeat) {
+    // Room membership can't be used to detect "first heartbeat on this
+    // connection": AgentAuthGuard itself already joins this room on the
+    // very first guarded message, before this handler body ever runs. Use
+    // a dedicated flag instead so settings:updated/station:role are
+    // pushed exactly once per connection, right when we first learn who's
+    // on the other end.
+    const isFirstHeartbeat = !client.announced;
+    client.announced = true;
+    if (!client.rooms.has(room)) {
       await client.join(room);
       this.logger.log(`Agent joined room ${room} (heartbeat)`);
     }
