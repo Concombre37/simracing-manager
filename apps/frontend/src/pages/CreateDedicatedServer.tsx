@@ -29,7 +29,22 @@ import {
   Wifi,
   Flag,
   X,
+  Minus,
+  Layers,
+  ChevronDown,
+  Settings2,
+  Eraser,
 } from 'lucide-react';
+
+const DEFAULT_MAX_CLIENTS = 11;
+
+/** Turns a per-car quantity map into the flat, possibly-repeated array the
+ * backend expects — the dedicated server's entry list cycles through this
+ * array round-robin to fill every slot (serverLauncher.ts), so a car
+ * appearing N times here naturally ends up in ~N/total of the slots. */
+function flattenCarCounts(counts: Record<string, number>): string[] {
+  return Object.entries(counts).flatMap(([acId, count]) => Array(count).fill(acId) as string[]);
+}
 
 const STEPS = [
   { id: 1, label: 'Simulateur', icon: Monitor },
@@ -53,11 +68,40 @@ export function CreateDedicatedServer() {
   const [trackLayout, setTrackLayout] = useState('');
   const [trackSearch, setTrackSearch] = useState('');
   const [carSearch, setCarSearch] = useState('');
-  const [selectedCars, setSelectedCars] = useState<string[]>([]);
+  const [carCounts, setCarCounts] = useState<Record<string, number>>({});
   const [name, setName] = useState('');
-  const [maxClients, setMaxClients] = useState(10);
+  const [maxClients, setMaxClients] = useState(DEFAULT_MAX_CLIENTS);
   const [password, setPassword] = useState('');
   const [rconPassword, setRconPassword] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const totalSelectedCars = useMemo(
+    () => Object.values(carCounts).reduce((sum, n) => sum + n, 0),
+    [carCounts],
+  );
+
+  // A lower slot count picked in Advanced must never leave more cars
+  // selected than there is room for — trim the excess (highest counts
+  // first, arbitrarily but deterministically by object key order) rather
+  // than silently letting totalSelectedCars exceed maxClients.
+  useEffect(() => {
+    setCarCounts((prev) => {
+      let total = Object.values(prev).reduce((sum, n) => sum + n, 0);
+      if (total <= maxClients) return prev;
+      const next = { ...prev };
+      const keys = Object.keys(next);
+      let i = 0;
+      while (total > maxClients && keys.length > 0) {
+        const key = keys[i % keys.length];
+        if (next[key] > 0) {
+          next[key] -= 1;
+          total -= 1;
+        }
+        i += 1;
+      }
+      return next;
+    });
+  }, [maxClients]);
 
   const { data: stations, isLoading: stationsLoading } = useQuery({
     queryKey: ['stations'],
@@ -121,7 +165,7 @@ export function CreateDedicatedServer() {
     setStationId(id);
     setTrackId('');
     setTrackLayout('');
-    setSelectedCars([]);
+    setCarCounts({});
   }
 
   function selectTrack(track: Track) {
@@ -132,10 +176,30 @@ export function CreateDedicatedServer() {
     }
   }
 
-  function toggleCar(carAcId: string) {
-    setSelectedCars((prev) =>
-      prev.includes(carAcId) ? prev.filter((c) => c !== carAcId) : [...prev, carAcId],
-    );
+  function addCar(carAcId: string) {
+    setCarCounts((prev) => {
+      const total = Object.values(prev).reduce((sum, n) => sum + n, 0);
+      if (total >= maxClients) return prev;
+      return { ...prev, [carAcId]: (prev[carAcId] ?? 0) + 1 };
+    });
+  }
+
+  function removeCar(carAcId: string) {
+    setCarCounts((prev) => {
+      const current = prev[carAcId] ?? 0;
+      if (current <= 0) return prev;
+      const next = { ...prev, [carAcId]: current - 1 };
+      if (next[carAcId] <= 0) delete next[carAcId];
+      return next;
+    });
+  }
+
+  function fillAllSlotsWith(carAcId: string) {
+    setCarCounts({ [carAcId]: maxClients });
+  }
+
+  function clearCarSelection() {
+    setCarCounts({});
   }
 
   function goNext() {
@@ -156,7 +220,7 @@ export function CreateDedicatedServer() {
   }
 
   const canSubmit =
-    !!name.trim() && !!stationId && !!trackId && selectedCars.length > 0 && maxClients >= 1;
+    !!name.trim() && !!stationId && !!trackId && totalSelectedCars > 0 && maxClients >= 1;
 
   function handleSubmit() {
     if (!canSubmit) return;
@@ -165,7 +229,7 @@ export function CreateDedicatedServer() {
       stationId,
       track: trackId,
       ...(trackLayout && { trackLayout }),
-      cars: selectedCars,
+      cars: flattenCarCounts(carCounts),
       maxClients,
       ...(password && { password }),
       ...(rconPassword && { rconPassword }),
@@ -240,12 +304,16 @@ export function CreateDedicatedServer() {
                   onPassword={setPassword}
                   rconPassword={rconPassword}
                   onRconPassword={setRconPassword}
+                  showAdvanced={showAdvanced}
+                  onToggleAdvanced={() => setShowAdvanced((v) => !v)}
                   cars={filteredCars}
                   totalCars={content.cars.length}
-                  selectedCars={selectedCars}
-                  onToggleCar={toggleCar}
-                  onSelectAll={() => setSelectedCars(content.cars.map((c) => c.acId))}
-                  onSelectNone={() => setSelectedCars([])}
+                  carCounts={carCounts}
+                  totalSelectedCars={totalSelectedCars}
+                  onAddCar={addCar}
+                  onRemoveCar={removeCar}
+                  onFillAllWith={fillAllSlotsWith}
+                  onClearCars={clearCarSelection}
                   carSearch={carSearch}
                   onCarSearch={setCarSearch}
                   station={selectedStation}
@@ -592,12 +660,16 @@ interface StepConfigProps {
   onPassword: (v: string) => void;
   rconPassword: string;
   onRconPassword: (v: string) => void;
+  showAdvanced: boolean;
+  onToggleAdvanced: () => void;
   cars: AcCar[];
   totalCars: number;
-  selectedCars: string[];
-  onToggleCar: (id: string) => void;
-  onSelectAll: () => void;
-  onSelectNone: () => void;
+  carCounts: Record<string, number>;
+  totalSelectedCars: number;
+  onAddCar: (id: string) => void;
+  onRemoveCar: (id: string) => void;
+  onFillAllWith: (id: string) => void;
+  onClearCars: () => void;
   carSearch: string;
   onCarSearch: (v: string) => void;
   station?: Station;
@@ -614,90 +686,112 @@ function StepConfig({
   onPassword,
   rconPassword,
   onRconPassword,
+  showAdvanced,
+  onToggleAdvanced,
   cars,
   totalCars,
-  selectedCars,
-  onToggleCar,
-  onSelectAll,
-  onSelectNone,
+  carCounts,
+  totalSelectedCars,
+  onAddCar,
+  onRemoveCar,
+  onFillAllWith,
+  onClearCars,
   carSearch,
   onCarSearch,
   station,
   track,
   trackLayout,
 }: StepConfigProps) {
+  const atCapacity = totalSelectedCars >= maxClients;
+
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[1fr,280px]">
-      {/* Colonne principale : formulaire + voitures */}
+      {/* Colonne principale : voitures d'abord, options avancées repliées */}
       <div className="space-y-6">
-        <section className="space-y-4 rounded-xl border border-dark-600 bg-dark-900/50 p-4">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-            <Server className="h-5 w-5 text-accent-orange" />
-            Paramètres du serveur
-          </h3>
-
-          <div>
-            <Label htmlFor="server-name">Nom du serveur</Label>
-            <Input
-              id="server-name"
-              value={name}
-              onChange={(e) => onName(e.target.value)}
-              placeholder="Ex: Course du soir"
-              required
+        <section className="overflow-hidden rounded-xl border border-dark-600 bg-dark-900/50">
+          <button
+            type="button"
+            onClick={onToggleAdvanced}
+            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold text-white">
+              <Settings2 className="h-4 w-4 text-gray-400" />
+              Options avancées
+              <span className="font-normal text-gray-500">(nom, slots, mot de passe...)</span>
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-gray-500 transition-transform duration-200 ${
+                showAdvanced ? 'rotate-180' : ''
+              }`}
             />
-          </div>
+          </button>
 
-          <div>
-            <Label className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-gray-400" />
-              Slots joueurs ({maxClients}/12)
-            </Label>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => onMaxClients(n)}
-                  className={`h-10 w-10 rounded-lg text-sm font-bold transition-all ${
-                    maxClients === n
-                      ? 'scale-110 bg-accent-orange text-dark-900 shadow-lg shadow-accent-orange/30'
-                      : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
+          {showAdvanced && (
+            <div className="space-y-4 border-t border-dark-700 p-4">
+              <div>
+                <Label htmlFor="server-name">Nom du serveur</Label>
+                <Input
+                  id="server-name"
+                  value={name}
+                  onChange={(e) => onName(e.target.value)}
+                  placeholder="Ex: Course du soir"
+                  required
+                />
+              </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <Label htmlFor="password" className="flex items-center gap-2">
-                <Lock className="h-3.5 w-3.5 text-gray-400" />
-                Mot de passe (optionnel)
-              </Label>
-              <Input
-                id="password"
-                type="text"
-                value={password}
-                onChange={(e) => onPassword(e.target.value)}
-                placeholder="laisser vide = public"
-              />
+              <div>
+                <Label className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-gray-400" />
+                  Slots joueurs ({maxClients}/24)
+                </Label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => onMaxClients(n)}
+                      className={`h-9 w-9 rounded-lg text-sm font-bold transition-all ${
+                        maxClients === n
+                          ? 'scale-110 bg-accent-orange text-dark-900 shadow-lg shadow-accent-orange/30'
+                          : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                      }`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <Label htmlFor="password" className="flex items-center gap-2">
+                    <Lock className="h-3.5 w-3.5 text-gray-400" />
+                    Mot de passe (optionnel)
+                  </Label>
+                  <Input
+                    id="password"
+                    type="text"
+                    value={password}
+                    onChange={(e) => onPassword(e.target.value)}
+                    placeholder="laisser vide = public"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="rcon" className="flex items-center gap-2">
+                    <Radio className="h-3.5 w-3.5 text-gray-400" />
+                    Mot de passe RCON (optionnel)
+                  </Label>
+                  <Input
+                    id="rcon"
+                    type="text"
+                    value={rconPassword}
+                    onChange={(e) => onRconPassword(e.target.value)}
+                    placeholder="administration"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <Label htmlFor="rcon" className="flex items-center gap-2">
-                <Radio className="h-3.5 w-3.5 text-gray-400" />
-                Mot de passe RCON (optionnel)
-              </Label>
-              <Input
-                id="rcon"
-                type="text"
-                value={rconPassword}
-                onChange={(e) => onRconPassword(e.target.value)}
-                placeholder="administration"
-              />
-            </div>
-          </div>
+          )}
         </section>
 
         <section>
@@ -707,8 +801,10 @@ function StepConfig({
               Choix des voitures
             </h3>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="whitespace-nowrap text-sm text-gray-400">
-                {selectedCars.length} / {totalCars}
+              <span
+                className={`whitespace-nowrap font-mono text-sm ${atCapacity ? 'text-accent-orange' : 'text-gray-400'}`}
+              >
+                {totalSelectedCars} / {maxClients} slots
               </span>
               {totalCars > 0 && (
                 <div className="relative">
@@ -726,19 +822,11 @@ function StepConfig({
                 type="button"
                 size="sm"
                 variant="ghost"
-                onClick={onSelectAll}
-                disabled={totalCars === 0}
+                onClick={onClearCars}
+                disabled={totalSelectedCars === 0}
               >
-                Tout
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={onSelectNone}
-                disabled={selectedCars.length === 0}
-              >
-                Aucune
+                <Eraser className="h-3.5 w-3.5" />
+                Vider
               </Button>
             </div>
           </div>
@@ -749,44 +837,72 @@ function StepConfig({
               <p className="text-gray-400">Aucune voiture détectée sur ce poste.</p>
             </div>
           ) : (
-            <div className="grid max-h-72 grid-cols-2 gap-3 overflow-y-auto p-1 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid max-h-[28rem] grid-cols-2 gap-3 overflow-y-auto p-1 sm:grid-cols-3 lg:grid-cols-4">
               {cars.map((car) => {
-                const selected = selectedCars.includes(car.acId);
+                const count = carCounts[car.acId] ?? 0;
+                const canAddMore = !atCapacity;
                 return (
-                  <button
+                  <div
                     key={car.acId}
-                    type="button"
-                    onClick={() => onToggleCar(car.acId)}
-                    className={`group relative overflow-hidden rounded-xl border text-left transition-all duration-200 hover:scale-[1.03] ${
-                      selected
+                    className={`group relative overflow-hidden rounded-xl border transition-all duration-200 ${
+                      count > 0
                         ? 'border-accent-orange shadow-lg shadow-accent-orange/20 ring-2 ring-accent-orange'
                         : 'border-dark-600 bg-dark-800 hover:border-accent-orange/50'
                     }`}
                   >
-                    <div className="flex aspect-video items-center justify-center bg-dark-900">
-                      {car.preview ? (
-                        <img
-                          src={car.preview}
-                          alt={formatCarName(car.name, car.acId)}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <Car className="h-8 w-8 text-gray-600" />
-                      )}
-                      {selected && (
-                        <div className="absolute right-2 top-2 rounded-full bg-accent-orange p-1 text-dark-900">
-                          <Check className="h-3 w-3" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-2">
-                      <p className="truncate text-sm font-medium text-white">
-                        {formatCarName(car.name, car.acId)}
-                      </p>
-                      <p className="truncate text-[10px] text-gray-500">{car.acId}</p>
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => onAddCar(car.acId)}
+                      disabled={!canAddMore}
+                      title="Ajouter une voiture"
+                      className={`block w-full text-left ${!canAddMore && count === 0 ? 'cursor-not-allowed opacity-40' : ''}`}
+                    >
+                      <div className="flex aspect-video items-center justify-center bg-dark-900">
+                        {car.preview ? (
+                          <img
+                            src={car.preview}
+                            alt={formatCarName(car.name, car.acId)}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <Car className="h-8 w-8 text-gray-600" />
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <p className="truncate text-sm font-medium text-white">
+                          {formatCarName(car.name, car.acId)}
+                        </p>
+                        <p className="truncate text-[10px] text-gray-500">{car.acId}</p>
+                      </div>
+                    </button>
+
+                    {/* Remplir tous les slots avec cette voiture — visible au survol */}
+                    <button
+                      type="button"
+                      onClick={() => onFillAllWith(car.acId)}
+                      title={`Remplir les ${maxClients} slots avec cette voiture`}
+                      className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-dark-900/80 text-gray-300 opacity-0 backdrop-blur transition-opacity duration-150 hover:bg-accent-orange hover:text-dark-900 group-hover:opacity-100"
+                    >
+                      <Layers className="h-3 w-3" />
+                    </button>
+
+                    {/* Badge de quantité — cliquer retire un exemplaire */}
+                    {count > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => onRemoveCar(car.acId)}
+                        title="Retirer un exemplaire"
+                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-orange text-xs font-bold text-dark-900 shadow"
+                      >
+                        {count > 1 ? (
+                          <span className="font-mono">×{count}</span>
+                        ) : (
+                          <Minus className="h-3 w-3" />
+                        )}
+                      </button>
+                    )}
+                  </div>
                 );
               })}
               {cars.length === 0 && (
@@ -820,14 +936,14 @@ function StepConfig({
           <RecapItem
             icon={Car}
             label="Voitures"
-            value={`${selectedCars.length} sélectionnée${selectedCars.length > 1 ? 's' : ''}`}
+            value={`${totalSelectedCars} / ${maxClients} slots`}
           />
           <RecapItem icon={Users} label="Slots" value={String(maxClients)} />
           <RecapItem icon={Lock} label="Accès" value={password ? 'Protégé' : 'Public'} />
         </div>
         <div className="space-y-1.5 border-t border-dark-700 px-4 py-3">
           <CheckRow ok={!!name.trim()}>Nom défini</CheckRow>
-          <CheckRow ok={selectedCars.length > 0}>Au moins une voiture</CheckRow>
+          <CheckRow ok={totalSelectedCars > 0}>Au moins une voiture</CheckRow>
         </div>
       </aside>
     </div>

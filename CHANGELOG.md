@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.2.59 — Blanking toujours à l'écran hors jeu, jamais sur un poste admin, refonte du choix des voitures
+
+### Corrigé
+
+- **Le bureau Windows pouvait rester visible au démarrage de l'agent.** `resolveAcPath()` (scan de plusieurs dossiers Steam) et `ensureContentManagerPath()` (qui peut ouvrir une popup bloquante si Content Manager n'est pas trouvé) passaient avant le lancement du blanking. Le blanking démarre désormais en tout premier, avant toute autre initialisation.
+- **Le bureau pouvait rester visible pendant l'arrêt d'un lancement direct** (hors serveur dédié). `handleStop()` attendait la fin de `quit()` (jusqu'à 15s, et le jeu peut fermer sa fenêtre avant que le process soit confirmé mort) avant de réafficher le blanking. Il se réaffiche maintenant immédiatement, avant même de demander à AC de quitter — comme le fait déjà `endSession()` pour les sessions trackées.
+- **Un poste de type "Admin" (hébergement uniquement) ne doit jamais afficher le blanking.** Le backend pousse désormais le rôle de la station à l'agent (à la connexion, et en direct si le rôle change depuis le dashboard) ; `BlankingManager` bloque tout affichage tant que le rôle est `admin`. Le rôle est aussi mis en cache localement pour qu'un poste déjà connu comme admin ne montre jamais le blanking, pas même une fraction de seconde, dès le prochain démarrage.
+
+### Ajouté
+
+- **Choix des voitures en quantité, à la création d'un serveur dédié.** Cliquer sur une voiture l'ajoute (jusqu'à la limite de slots), un badge affiche le nombre d'exemplaires, cliquer sur le badge en retire un. Bouton "remplir tous les slots avec cette voiture" au survol de chaque carte. Le backend n'a pas changé : l'agent répartissait déjà les voitures en round-robin sur les slots à partir du tableau envoyé, donc les doublons dans la sélection se traduisent naturellement par plus de poids pour cette voiture.
+- **Étape "Configuration" simplifiée.** Nom, slots, mot de passe et mot de passe RCON sont désormais repliés dans "Options avancées" (masqué par défaut) — le nom se remplit automatiquement depuis le circuit choisi, et les slots sont à 11 par défaut.
+
 ## v2.2.58 — Diagnostic préventif du "Failed to handshake" en rejoignant un serveur dédié
 
 ### Corrigé

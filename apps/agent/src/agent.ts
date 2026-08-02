@@ -13,6 +13,7 @@ import {
   StationStatus,
   LaunchMode,
   TelemetrySnapshot,
+  StationRole,
 } from '@simracing/shared';
 import { config } from './config';
 import { VERSION } from './version';
@@ -216,13 +217,24 @@ export class SimRacingAgent {
   }
 
   async start(): Promise<void> {
+    // Blanking must be the very first thing on screen, before anything that
+    // can be slow or even block (resolveAcPath() scans multiple Steam
+    // directories; ensureContentManagerPath() can pop a blocking prompt if
+    // Content Manager isn't found) — otherwise the raw desktop is visible
+    // for however long those take right after Windows boot/login.
+    await this.blankingManager.init();
+    // Best-effort guess from the last role the backend told us about (see
+    // handleStationRole below) — real confirmation arrives over the socket
+    // moments later, but an admin station shouldn't even flash blanking
+    // once while waiting for that round-trip on every single boot.
+    this.blankingManager.setEnabled(config.STATION_ROLE !== StationRole.ADMIN);
+    this.blankingManager.setAuto();
+
     await this.resolveAcPath();
     await this.ensureContentManagerPath();
-    await this.blankingManager.init();
     await this.kioskManager.init();
     await this.acSharedMemory.init();
     await this.trayManager.init();
-    this.blankingManager.setAuto();
 
     if (!this.apiKey) {
       await this.provision();
@@ -436,6 +448,7 @@ export class SimRacingAgent {
     this.socket.on('settings:updated', (payload) =>
       this.blankingManager.setHideDelaySeconds(payload.blankingDelaySeconds),
     );
+    this.socket.on('station:role', (payload) => this.handleStationRole(payload));
     this.socket.on('system:shutdown', () => this.handleShutdown());
     this.socket.on('wol:send', (payload) => this.handleWakeOnLan(payload));
   }
@@ -698,6 +711,12 @@ export class SimRacingAgent {
       await this.endSession();
       return;
     }
+    // Cover the screen before asking AC to quit, the same way endSession()
+    // already does for tracked sessions: quit() can take up to 15s to close
+    // gracefully, and the game's own window can disappear well before the
+    // process is confirmed gone — leaving the raw desktop exposed for that
+    // whole stretch otherwise.
+    this.blankingManager.show();
     this.acSharedMemoryReader?.stop();
     await this.luaBridge.quit();
     await this.acLauncher.stop();
@@ -875,6 +894,19 @@ export class SimRacingAgent {
   private async handleRecenter(): Promise<void> {
     this.logger.info('Received VR recenter command');
     await this.luaBridge.recenterVR();
+  }
+
+  private handleStationRole(payload: { role: StationRole }): void {
+    this.logger.info({ role: payload.role }, 'Station role received');
+    this.blankingManager.setEnabled(payload.role !== StationRole.ADMIN);
+    if (config.STATION_ROLE !== payload.role) {
+      config.STATION_ROLE = payload.role;
+      try {
+        updateEnvValue('STATION_ROLE', payload.role);
+      } catch (err) {
+        this.logger.warn({ err }, 'Failed to persist STATION_ROLE to .env');
+      }
+    }
   }
 
   private async handleContentSync(): Promise<void> {

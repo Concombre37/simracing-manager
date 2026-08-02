@@ -24,6 +24,7 @@ import {
   StationStatus,
   StatusPayload,
   SessionStatus,
+  StationRole,
 } from '@simracing/shared';
 import { DashboardGateway } from '../dashboard/dashboard.gateway';
 import { TelemetryService } from '../telemetry/telemetry.service';
@@ -135,6 +136,12 @@ export class AgentGateway
       client.emit('settings:updated', {
         blankingDelaySeconds: settings.blankingDelaySeconds,
       });
+      const station = await this.stationsService.findByStationId(
+        client.stationId,
+      );
+      if (station) {
+        client.emit('station:role', { role: station.role as StationRole });
+      }
     } else {
       this.logger.log(`Agent connected: unknown station (socket ${client.id})`);
     }
@@ -417,6 +424,10 @@ export class AgentGateway
 
   async emitBlankingMediaUpdated(stationId: string): Promise<void> {
     this.server.to(`station:${stationId}`).emit('blanking:mediaUpdated');
+  }
+
+  async emitStationRole(stationId: string, role: StationRole): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('station:role', { role });
   }
 
   async emitShutdown(stationId: string): Promise<void> {

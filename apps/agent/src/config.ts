@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LaunchMode, ScreenMode, AssistPreset } from '@simracing/shared';
+import { LaunchMode, ScreenMode, AssistPreset, StationRole } from '@simracing/shared';
 import dotenv from 'dotenv';
 import path from 'path';
 import { existsSync, writeFileSync } from 'fs';
@@ -107,6 +107,11 @@ const configSchema = z.object({
   AUTO_DRIVE_HELPER: z.coerce.boolean().default(true),
   AUTO_START: z.coerce.boolean().default(false),
   TRAY_ICON: z.coerce.boolean().default(false),
+  // Cached locally from the backend's Station.role (see station:role in
+  // agent.ts) purely so the very next boot already knows whether to gate
+  // the blanking screen off before the socket has even connected. The
+  // backend is always the source of truth; this is just a fast-path cache.
+  STATION_ROLE: z.nativeEnum(StationRole).optional(),
 });
 
 const parsed = configSchema.safeParse(process.env);

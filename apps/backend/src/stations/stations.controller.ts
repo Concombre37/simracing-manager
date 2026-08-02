@@ -70,11 +70,15 @@ export class StationsController {
 
   @Patch(':id')
   @Roles(UserRole.ADMIN)
-  update(
+  async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateStationSchema)) dto: UpdateStationDto,
   ) {
-    return this.stationsService.update(id, dto);
+    const station = await this.stationsService.update(id, dto);
+    if (dto.role) {
+      await this.agentGateway.emitStationRole(station.stationId, dto.role);
+    }
+    return station;
   }
 
   @Delete(':id')

@@ -1,5 +1,5 @@
 import { StationConfig } from '../types';
-import { StationStatus } from '../enums';
+import { StationStatus, StationRole } from '../enums';
 
 export interface AgentToServerEvents {
   'agent:register': (payload: { stationId: string; stationName: string; version?: string }) => void;
@@ -61,6 +61,10 @@ export interface ServerToAgentEvents {
   'blanking:show': () => void;
   'blanking:mediaUpdated': () => void;
   'settings:updated': (payload: { blankingDelaySeconds: number }) => void;
+  /** Pushed on every connect and whenever an admin changes the station's role
+   * from the dashboard, so the agent can gate the blanking screen off
+   * entirely for hosting-only (admin) stations. */
+  'station:role': (payload: { role: StationRole }) => void;
 }
 
 export interface ServerToClientEvents {

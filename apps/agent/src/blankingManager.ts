@@ -71,6 +71,12 @@ export class BlankingManager {
   private pidFilePath: string | null = null;
   private hideDelaySeconds = 10;
   private pendingHideTimeout: NodeJS.Timeout | null = null;
+  /** Admin (hosting-only) stations never run AC themselves and must never
+   * show the blanking screen at all — gated centrally in startBlanking()
+   * rather than special-cased in every caller. Defaults to enabled so
+   * simulator stations (the common case) aren't held up waiting to learn
+   * their role over the network at startup. */
+  private enabled = true;
 
   constructor(
     private readonly logger: Logger,
@@ -148,6 +154,25 @@ export class BlankingManager {
         // ignore
       }
     }
+  }
+
+  /** Called at startup (from the cached role, before the socket even
+   * connects) and again whenever the backend pushes the station's real role.
+   * Disabling immediately kills any window currently up; re-enabling just
+   * re-runs the normal auto/override logic. */
+  setEnabled(enabled: boolean): void {
+    if (this.enabled === enabled) return;
+    this.enabled = enabled;
+    this.logger.info(
+      { enabled },
+      enabled ? 'Blanking screen enabled' : 'Blanking screen disabled (admin station)',
+    );
+    if (!enabled) {
+      this.clearPendingHide();
+      this.stopBlanking();
+      return;
+    }
+    this.evaluate();
   }
 
   setAcRunning(running: boolean): void {
@@ -758,6 +783,7 @@ export class BlankingManager {
   }
 
   private startBlanking(): void {
+    if (!this.enabled) return;
     if (this.process && !this.process.killed) return;
     if (!this.scriptPath) {
       this.logger.warn('Blanking script not extracted, cannot start');
