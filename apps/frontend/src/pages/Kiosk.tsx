@@ -17,12 +17,12 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Label } from '../components/ui/Input';
 import { SessionCard, type StationContent } from './Sessions';
+import { ClientNameInput } from '../components/ClientNameInput';
 import {
   Monitor,
   Server,
   Send,
   Check,
-  User,
   Car as CarIcon,
   Feather,
   Target,
@@ -575,7 +575,7 @@ function SendPodsModal({
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
-  const availableCars = useMemo(() => server.cars ?? [], [server]);
+  const availableCars = useMemo(() => Array.from(new Set(server.cars ?? [])), [server]);
   const carMap = useMemo(() => {
     const cars = (server.station.content as { cars?: AcCar[] } | undefined)?.cars ?? [];
     return new Map(cars.map((c) => [c.acId, c]));
@@ -804,16 +804,10 @@ function PodConfigCard({
         <div className="space-y-4">
           <div>
             <Label>Pilote</Label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-              <input
-                type="text"
-                value={config.clientName}
-                onChange={(e) => onChange({ clientName: e.target.value })}
-                placeholder="Nom du pilote"
-                className="w-full rounded-lg border border-dark-600 bg-dark-800 py-2 pl-9 pr-3 text-sm font-semibold uppercase tracking-wide text-white placeholder-gray-600 placeholder:normal-case placeholder:tracking-normal placeholder:font-normal focus:border-accent-orange focus:outline-none"
-              />
-            </div>
+            <ClientNameInput
+              value={config.clientName}
+              onChange={(clientName) => onChange({ clientName })}
+            />
           </div>
 
           <div>

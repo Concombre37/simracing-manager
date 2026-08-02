@@ -20,6 +20,7 @@ import {
 } from './dto/update-dedicated-server.dto';
 import { joinServerSchema, JoinServerDto } from './dto/join-server.dto';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClientsService } from '../clients/clients.service';
 import { AgentGateway } from '../agent/agent.gateway';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -36,6 +37,7 @@ export class DedicatedServersController {
     private readonly dedicatedServersService: DedicatedServersService,
     private readonly agentGateway: AgentGateway,
     private readonly prisma: PrismaService,
+    private readonly clientsService: ClientsService,
   ) {}
 
   @Post()
@@ -135,12 +137,17 @@ export class DedicatedServersController {
         continue;
       }
 
+      const client = pod.clientName?.trim()
+        ? await this.clientsService.findOrCreateByName(pod.clientName)
+        : null;
+
       const session = await this.prisma.session.create({
         data: {
           stationId: station.id,
           type: 'dedicated_join',
           serverId: id,
-          clientName: pod.clientName ?? null,
+          clientId: client?.id ?? null,
+          clientName: client?.name ?? pod.clientName ?? null,
           difficulty: pod.difficulty ?? null,
           gearbox: pod.gearbox ?? null,
           carAcId: pod.carAcId,

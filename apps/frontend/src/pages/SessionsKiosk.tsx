@@ -6,6 +6,8 @@ import { useSocket } from '../hooks/useSocket';
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { stationsApi } from '../services/stations';
 import { findCar, findTrackName, findTrackPreview, formatCarName } from '../utils/track';
+import { Modal } from '../components/ui/Modal';
+import { SessionCard } from './Sessions';
 
 const STALE_MS = 5000;
 const MAX_PODS = 10;
@@ -48,6 +50,7 @@ export function SessionsKiosk() {
   const { data: stations } = useQuery({ queryKey: ['stations'], queryFn: stationsApi.getAll });
   const [liveData, setLiveData] = useState<Record<string, TelemetrySnapshot>>({});
   const [now, setNow] = useState(Date.now());
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -91,6 +94,7 @@ export function SessionsKiosk() {
   }, [sessions]);
 
   const slots = Array.from({ length: MAX_PODS }, (_, i) => displayedSessions[i]);
+  const expandedSession = displayedSessions.find((s) => s.id === expandedSessionId);
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-dark-950 p-4">
@@ -124,6 +128,7 @@ export function SessionsKiosk() {
               telemetry={liveData[session.station.stationId]}
               now={now}
               content={contentByStationId.get(session.station.stationId)}
+              onClick={() => setExpandedSessionId(session.id)}
             />
           ) : (
             <div
@@ -133,6 +138,21 @@ export function SessionsKiosk() {
           ),
         )}
       </div>
+
+      {expandedSession && (
+        <Modal
+          title={expandedSession.clientName || expandedSession.station.name}
+          onClose={() => setExpandedSessionId(null)}
+          size="lg"
+        >
+          <SessionCard
+            session={expandedSession}
+            telemetry={liveData[expandedSession.station.stationId]}
+            now={now}
+            content={contentByStationId.get(expandedSession.station.stationId)}
+          />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -142,11 +162,13 @@ function KioskCard({
   telemetry,
   now,
   content,
+  onClick,
 }: {
   session: ActiveSession;
   telemetry?: TelemetrySnapshot;
   now: number;
   content: StationContent | null | undefined;
+  onClick: () => void;
 }) {
   const remainingSeconds =
     session.startedAt && session.durationMinutes
@@ -174,7 +196,8 @@ function KioskCard({
 
   return (
     <div
-      className={`relative flex flex-col justify-between overflow-hidden rounded-xl border bg-dark-800/70 ${
+      onClick={onClick}
+      className={`relative flex cursor-pointer flex-col justify-between overflow-hidden rounded-xl border bg-dark-800/70 transition-colors hover:border-accent-orange/50 ${
         critical ? 'border-red-500/50' : 'border-dark-600'
       }`}
       style={critical ? { boxShadow: '0 0 24px -10px rgba(255,51,51,0.6)' } : undefined}

@@ -57,6 +57,7 @@ model Session {
   stationId       String    @map("station_id") @db.Uuid
   type            String    @default("direct_launch") @map("type")
   serverId        String?   @map("server_id") @db.Uuid
+  clientId        String?   @map("client_id") @db.Uuid
   clientName      String?   @map("client_name")
   difficulty      String?   @map("difficulty")
   gearbox         String?   @map("gearbox")
@@ -73,10 +74,23 @@ model Session {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   station Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  client  Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   telemetryFiles TelemetryFile[]
 
   @@map("sessions")
+}
+
+model Client {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sessions Session[]
+
+  @@unique([name])
+  @@map("clients")
 }
 
 model TelemetryFile {

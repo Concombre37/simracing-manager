@@ -9,13 +9,13 @@ import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Label } from '../components/ui/Input';
+import { ClientNameInput } from '../components/ClientNameInput';
 import {
   ArrowLeft,
   Send,
   Check,
   Clock,
   Infinity as InfinityIcon,
-  User,
   Car as CarIcon,
   Feather,
   Target,
@@ -89,7 +89,7 @@ export function JoinServer() {
   const [configs, setConfigs] = useState<Record<string, PodConfig>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const availableCars = useMemo(() => server?.cars ?? [], [server]);
+  const availableCars = useMemo(() => Array.from(new Set(server?.cars ?? [])), [server]);
 
   const carMap = useMemo(() => {
     const cars = (server?.station.content as { cars?: AcCar[] } | undefined)?.cars ?? [];
@@ -342,16 +342,10 @@ function DriverSetupCard({
         <div className="space-y-5">
           <div>
             <Label>Pilote</Label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-              <input
-                type="text"
-                value={config.clientName}
-                onChange={(e) => onChange({ clientName: e.target.value })}
-                placeholder="Nom du pilote"
-                className="w-full rounded-lg border border-dark-600 bg-dark-900 py-2.5 pl-9 pr-3 font-semibold uppercase tracking-wide text-white placeholder-gray-600 placeholder:normal-case placeholder:tracking-normal placeholder:font-normal focus:border-accent-orange focus:outline-none"
-              />
-            </div>
+            <ClientNameInput
+              value={config.clientName}
+              onChange={(clientName) => onChange({ clientName })}
+            />
           </div>
 
           <div>

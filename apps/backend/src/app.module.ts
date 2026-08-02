@@ -18,6 +18,7 @@ import { DedicatedServersModule } from './dedicated-servers/dedicated-servers.mo
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { PowerManagementModule } from './power-management/power-management.module';
 import { SettingsModule } from './settings/settings.module';
+import { ClientsModule } from './clients/clients.module';
 import { envSchema } from './config/env.validation';
 
 @Module({
@@ -46,6 +47,7 @@ import { envSchema } from './config/env.validation';
     TelemetryModule,
     PowerManagementModule,
     SettingsModule,
+    ClientsModule,
   ],
 })
 export class AppModule {}
