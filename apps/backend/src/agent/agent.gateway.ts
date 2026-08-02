@@ -224,6 +224,9 @@ export class AgentGateway
         blankingDelaySeconds: settings.blankingDelaySeconds,
       });
       client.emit('station:role', { role: station.role as StationRole });
+      this.logger.log(
+        `Sent settings:updated + station:role (${station.role}) to ${station.stationId}`,
+      );
     }
     this.dashboardGateway.emitStationUpdated(
       station.stationId,
