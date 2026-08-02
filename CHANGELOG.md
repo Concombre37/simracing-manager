@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.62 — Un agent pouvait rester déconnecté indéfiniment après un redéploiement du backend
+
+### Corrigé
+
+- **Après un redémarrage du conteneur backend (redéploiement), un agent déjà connecté pouvait ne jamais se reconnecter tout seul.** La socket est créée avec `reconnection: false` (le code gère lui-même la reconnexion) ; la seule tentative de reprise était programmée sur l'événement `disconnect`, qui ne se déclenche que pour une connexion ayant déjà réussi au moins une fois. Si cette unique tentative de reconnexion (5s après la coupure) tombait pendant que le backend était encore en train de redémarrer, elle échouait avec `connect_error` — événement qui, avec `reconnection: false`, ne déclenche **aucune** nouvelle tentative. L'agent restait alors bloqué, silencieusement déconnecté, jusqu'à un redémarrage manuel — expliquant un serveur dédié créé depuis le mode kiosque qui ne démarrait jamais (la commande de lancement était bien émise côté backend mais n'atteignait aucun agent connecté). `connect_error` programme désormais lui aussi une nouvelle tentative (`scheduleReconnect()`, mêmes 5s, tentatives coalescées pour éviter les doublons), sauf en cas de clé API invalide (qui relance déjà une re-provision).
+
 ## v2.2.61 — La mise à jour automatique de l'agent ("MAJ agent") ne se terminait jamais
 
 ### Corrigé

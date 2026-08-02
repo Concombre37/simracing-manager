@@ -57,6 +57,7 @@ export class SimRacingAgent {
   private isProvisioning = false;
   private lastContentHash = '';
   private joinTimeout: NodeJS.Timeout | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private currentSession: {
     sessionId: string;
     /** null means unlimited ("Illimité" join) — no auto-end is scheduled. */
@@ -374,6 +375,10 @@ export class SimRacingAgent {
     });
 
     this.socket.on('connect', () => {
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
       this.logger.info(
         { stationId: config.STATION_ID, socketId: this.socket?.id },
         'Connected to backend',
@@ -399,6 +404,14 @@ export class SimRacingAgent {
       this.logger.error({ message }, 'Connection error');
       if (this.isApiKeyError(message)) {
         void this.handleInvalidApiKey();
+      } else {
+        // `reconnection: false` means socket.io-client gives up silently after
+        // a failed handshake — with no 'disconnect' event to trigger a retry
+        // (that only fires for a connection that was actually established).
+        // Without scheduling one here too, a single connect attempt racing a
+        // backend that's mid-restart (e.g. during a deploy) permanently
+        // stranded the agent until it was manually restarted.
+        this.scheduleReconnect();
       }
     });
 
@@ -417,11 +430,7 @@ export class SimRacingAgent {
       this.stopTelemetry();
       // Reconnect using the same API key after a short delay unless the key was invalidated.
       if (this.apiKey && reason !== 'io client disconnect') {
-        setTimeout(() => {
-          if (this.apiKey) {
-            void this.connectWithApiKey(this.apiKey);
-          }
-        }, 5000);
+        this.scheduleReconnect();
       }
     });
 
@@ -457,6 +466,19 @@ export class SimRacingAgent {
     return message.includes('Invalid agent API key') || message.includes('Missing agent API key');
   }
 
+  /** Retries a dropped/failed connection after a short delay, coalescing
+   * multiple triggers (e.g. 'disconnect' then a subsequent 'connect_error')
+   * into a single pending timer. */
+  private scheduleReconnect(delayMs = 5000): void {
+    if (!this.apiKey || this.reconnectTimer) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.apiKey) {
+        void this.connectWithApiKey(this.apiKey);
+      }
+    }, delayMs);
+  }
+
   private async handleInvalidApiKey(): Promise<void> {
     if (this.isProvisioning) {
       this.logger.warn('Already re-provisioning after invalid API key, skipping');
@@ -465,6 +487,10 @@ export class SimRacingAgent {
     this.logger.warn(
       'API key is invalid or missing on server, clearing local key and re-provisioning',
     );
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.apiKey = undefined;
     try {
       updateEnvValue('API_KEY', '');
