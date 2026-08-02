@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { dedicatedServersApi, type Car as AcCar, type Track } from '../services/dedicatedServers';
@@ -54,6 +54,11 @@ const STEPS = [
 
 export function CreateDedicatedServer() {
   const navigate = useNavigate();
+  const location = useLocation();
+  // Also mounted at /kiosk/dedicated-servers/create (no sidebar, see
+  // App.tsx) — must return there instead of the admin page, or "Annuler"/a
+  // successful creation would drop the operator out of the kiosk shell.
+  const backPath = location.pathname.startsWith('/kiosk') ? '/kiosk' : '/dedicated-servers';
   const queryClient = useQueryClient();
 
   const [step, setStep] = useState(1);
@@ -157,7 +162,7 @@ export function CreateDedicatedServer() {
     mutationFn: dedicatedServersApi.create,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['dedicated-servers'] });
-      navigate('/dedicated-servers');
+      navigate(backPath);
     },
   });
 
@@ -248,7 +253,7 @@ export function CreateDedicatedServer() {
       accent="serveur"
       subtitle="Configure un serveur dédié Assetto Corsa en 3 étapes"
       actions={
-        <Button variant="ghost" onClick={() => navigate('/dedicated-servers')}>
+        <Button variant="ghost" onClick={() => navigate(backPath)}>
           <X className="h-4 w-4" />
           Annuler
         </Button>

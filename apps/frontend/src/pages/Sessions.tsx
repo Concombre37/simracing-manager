@@ -15,6 +15,9 @@ import {
   Square,
   Gauge,
   Tv,
+  LineChart,
+  Cog,
+  Home,
 } from 'lucide-react';
 import type { TelemetrySnapshot } from '@simracing/shared';
 import { useSocket } from '../hooks/useSocket';
@@ -36,7 +39,7 @@ const DIFFICULTY_STYLE: Record<string, { label: string; variant: 'green' | 'blue
   CUSTOM: { label: 'Custom', variant: 'purple' },
 };
 
-type StationContent = {
+export type StationContent = {
   tracks?: { acId: string; name: string; preview?: string }[];
   cars?: { acId: string; name: string; preview?: string }[];
 };
@@ -190,6 +193,9 @@ export function Sessions() {
                 telemetry={liveData[session.station.stationId]}
                 now={now}
                 content={contentByStationId.get(session.station.stationId)}
+                onCommand={(command) =>
+                  socket?.emit('station:command', { stationId: session.station.stationId, command })
+                }
               />
             </motion.div>
           ))}
@@ -240,16 +246,23 @@ function StatChip({
   );
 }
 
-function SessionCard({
+export function SessionCard({
   session,
   telemetry,
   now,
   content,
+  onCommand,
 }: {
   session: ActiveSession;
   telemetry?: TelemetrySnapshot;
   now: number;
   content: StationContent | null | undefined;
+  /** Fires an in-game command at the agent (ideal line, auto shifter
+   * toggle, teleport to pits...) — same 'station:command' socket event
+   * Stations.tsx's expanded panel already uses, just surfaced directly on
+   * the card so switching gearbox mode etc. doesn't require leaving the
+   * live session view. */
+  onCommand?: (command: string) => void;
 }) {
   const queryClient = useQueryClient();
   const [remainingSeconds, setRemainingSeconds] = useState<number | undefined>();
@@ -481,6 +494,32 @@ function SessionCard({
               </button>
             ))}
           </div>
+          {onCommand && (
+            <div className="inline-flex divide-x divide-dark-600 overflow-hidden rounded-lg border border-dark-600">
+              <button
+                onClick={() => onCommand('idealLine')}
+                title="Ligne idéale"
+                className="flex items-center gap-1 bg-dark-800/80 px-3 py-2 text-xs font-bold text-gray-300 transition-colors hover:bg-dark-700 hover:text-white"
+              >
+                <LineChart className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => onCommand('autoShifter')}
+                title="Boîte auto (bascule)"
+                className="flex items-center gap-1 bg-dark-800/80 px-3 py-2 text-xs font-bold text-gray-300 transition-colors hover:bg-dark-700 hover:text-white"
+              >
+                <Cog className="h-3.5 w-3.5" />
+                Boîte auto
+              </button>
+              <button
+                onClick={() => onCommand('teleportToPits')}
+                title="Retour aux stands"
+                className="flex items-center gap-1 bg-dark-800/80 px-3 py-2 text-xs font-bold text-gray-300 transition-colors hover:bg-dark-700 hover:text-white"
+              >
+                <Home className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
           <Button
             size="sm"
             variant="danger"

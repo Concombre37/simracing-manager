@@ -14,6 +14,7 @@ import { Users } from './pages/Users';
 import { Leaderboard } from './pages/Leaderboard';
 import { Sessions } from './pages/Sessions';
 import { SessionsKiosk } from './pages/SessionsKiosk';
+import { Kiosk } from './pages/Kiosk';
 import { ContentPreviews } from './pages/ContentPreviews';
 import { BlankingMedia } from './pages/BlankingMedia';
 import { Settings } from './pages/Settings';
@@ -131,6 +132,22 @@ function AnimatedRoutes() {
           element={
             <KioskRoute>
               <SessionsKiosk />
+            </KioskRoute>
+          }
+        />
+        <Route
+          path="/kiosk"
+          element={
+            <KioskRoute>
+              <Kiosk />
+            </KioskRoute>
+          }
+        />
+        <Route
+          path="/kiosk/dedicated-servers/create"
+          element={
+            <KioskRoute>
+              <CreateDedicatedServer />
             </KioskRoute>
           }
         />

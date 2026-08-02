@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TelemetrySnapshot } from '@simracing/shared';
 import { useSocket } from '../hooks/useSocket';
@@ -97,12 +98,20 @@ export function SessionsKiosk() {
         <h1 className="text-2xl font-black uppercase tracking-wide text-white">
           SimRacing Manager <span className="text-accent-orange">En cours</span>
         </h1>
-        <div className="flex items-center gap-2 rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ring-pulse rounded-full bg-green-400" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
-          </span>
-          {displayedSessions.length}/{MAX_PODS} PODs en session
+        <div className="flex items-center gap-3">
+          <Link
+            to="/kiosk"
+            className="rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400 transition-colors hover:border-accent-orange/50 hover:text-white"
+          >
+            Gérer les PODs
+          </Link>
+          <div className="flex items-center gap-2 rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ring-pulse rounded-full bg-green-400" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-green-400" />
+            </span>
+            {displayedSessions.length}/{MAX_PODS} PODs en session
+          </div>
         </div>
       </header>
 
