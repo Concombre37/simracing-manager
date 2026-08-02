@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.60 — Corrige le rôle admin jamais reçu par l'agent + le blanking pas encore affiché avant de fermer le jeu
+
+### Corrigé
+
+- **Le rôle de la station (admin/simulateur) n'atteignait en réalité jamais l'agent, donc un poste admin continuait d'afficher le blanking.** `station:role` (et `settings:updated`, déjà présent) était émis depuis `handleConnection`, en s'appuyant sur `client.stationId` — qui n'est en pratique **jamais renseigné** à ce stade (confirmé en production : chaque connexion réelle logue "Agent connected: unknown station"). `AgentAuthGuard` ne s'exécute qu'en amont des handlers `@SubscribeMessage`, pas de ce hook de cycle de vie. Les deux émissions sont déplacées sur le premier heartbeat (`isFirstHeartbeat`), le seul point où l'identité de la station est réellement connue — c'est d'ailleurs déjà là que le rejoin de room avait un repli pour cette même raison.
+- **Le bureau pouvait encore apparaître brièvement en fermant le jeu**, malgré le fix v2.2.59 : afficher le blanking puis enchaîner immédiatement sur `quit()`/`stop()` ne garantit pas que la fenêtre WPF soit réellement affichée à l'écran — le démarrage à froid de PowerShell/WPF peut prendre plusieurs centaines de ms. `blanking.ps1` signale maintenant précisément le moment où sa fenêtre est chargée (`BLANKING_WINDOW_READY` sur stdout, dans `Add_Loaded`), et l'agent attend ce signal (`BlankingManager.waitUntilShown()`, avec un filet de sécurité de 4s) avant de continuer vers `quit()`/`stop()` — aussi bien pour l'arrêt d'une session trackée (`endSession()`) que pour un lancement direct (`handleStop()`).
+
 ## v2.2.59 — Blanking toujours à l'écran hors jeu, jamais sur un poste admin, refonte du choix des voitures
 
 ### Corrigé

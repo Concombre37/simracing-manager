@@ -77,6 +77,13 @@ export class BlankingManager {
    * simulator stations (the common case) aren't held up waiting to learn
    * their role over the network at startup. */
   private enabled = true;
+  /** Resolves once the *current* spawn's window has actually fired WPF's
+   * `Loaded` event (see BLANKING_WINDOW_READY in blanking.ps1) — a process
+   * existing is not proof it's rendered/topmost yet. Callers that need the
+   * screen genuinely covered before doing something irreversible (closing
+   * the game) await waitUntilShown() instead of guessing with a delay. */
+  private readyPromise: Promise<void> | null = null;
+  private resolveReady: (() => void) | null = null;
 
   constructor(
     private readonly logger: Logger,
@@ -270,6 +277,24 @@ export class BlankingManager {
 
   isBlankingActive(): boolean {
     return this.process !== null && !this.process.killed;
+  }
+
+  /**
+   * Waits until blanking is genuinely visible on screen — not just "a
+   * process exists" (which can be true for hundreds of ms before the WPF
+   * window actually renders and goes topmost, cold PowerShell/.NET startup
+   * being what it is). Resolves immediately if disabled (admin station,
+   * nothing will ever show) or if there's no spawn to wait on (blanking was
+   * already up, e.g. the readyPromise from that earlier spawn already
+   * resolved). `timeoutMs` is a safety net only, in case the ready marker
+   * is ever lost — it should not normally be hit.
+   */
+  async waitUntilShown(timeoutMs = 4000): Promise<void> {
+    if (!this.enabled || !this.readyPromise) return;
+    await Promise.race([
+      this.readyPromise,
+      new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
   }
 
   showResults(summary: SessionResultsSummary): void {
@@ -826,12 +851,19 @@ export class BlankingManager {
     });
     this.process = proc;
     const spawnedAt = Date.now();
+    this.readyPromise = new Promise<void>((resolve) => {
+      this.resolveReady = resolve;
+    });
 
     // Otherwise a PowerShell/WPF exception right after spawn (the scenario
     // the crash-restart logic below reacts to) would leave no trace at all
     // — these now also land in the persisted log file / local console.
     proc.stdout?.on('data', (chunk: Buffer) => {
-      this.logger.debug({ output: chunk.toString('utf-8').trim() }, 'Blanking screen stdout');
+      const output = chunk.toString('utf-8').trim();
+      this.logger.debug({ output }, 'Blanking screen stdout');
+      if (this.process === proc && output.includes('BLANKING_WINDOW_READY')) {
+        this.resolveReady?.();
+      }
     });
     proc.stderr?.on('data', (chunk: Buffer) => {
       this.logger.warn({ output: chunk.toString('utf-8').trim() }, 'Blanking screen stderr');
@@ -860,6 +892,10 @@ export class BlankingManager {
         this.logger.debug({ code }, 'Stale blanking process exit ignored (already superseded)');
         return;
       }
+      // This spawn is done for — its ready marker (if any) is never coming.
+      // Unblocks any waitUntilShown() call still racing its timeout instead
+      // of making it wait the full timeout for nothing.
+      this.resolveReady?.();
 
       const upDurationMs = Date.now() - spawnedAt;
       this.process = null;

@@ -197,6 +197,10 @@ $window.Add_Closed({
 $window.Add_Loaded({
   $this.Topmost = $true
   $this.Activate() | Out-Null
+  # Precise "actually on screen now" signal for the agent — it needs to know
+  # this happened before it's safe to close the game/quit AC, rather than
+  # guessing with a fixed delay that's wrong on both slow and fast machines.
+  Write-Host 'BLANKING_WINDOW_READY'
   if ($webBrowser -ne $null) {
     $webBrowser.Navigate([System.Uri]::new($ResultsHtmlPath))
   } elseif ($items.Count -gt 0) {

@@ -126,22 +126,19 @@ export class AgentGateway
       this.logger.log(`Agent provisioning: ${client.stationId}`);
       return;
     }
+    // client.stationId is not actually populated at this point in practice —
+    // AgentAuthGuard only runs ahead of @SubscribeMessage handlers, not this
+    // lifecycle hook, so this branch was effectively dead code (confirmed:
+    // every real connection logs "unknown station" below). The reliable
+    // place to detect "just connected" is the first heartbeat, see
+    // handleHeartbeat's isFirstHeartbeat branch, which is where the room
+    // join and the settings:updated/station:role pushes now actually live.
     if (client.stationId) {
       await client.join(`station:${client.stationId}`);
       this.connectedStationIds.add(client.stationId);
       this.logger.log(
         `Agent connected and joined room station:${client.stationId} (socket ${client.id})`,
       );
-      const settings = await this.settingsService.get();
-      client.emit('settings:updated', {
-        blankingDelaySeconds: settings.blankingDelaySeconds,
-      });
-      const station = await this.stationsService.findByStationId(
-        client.stationId,
-      );
-      if (station) {
-        client.emit('station:role', { role: station.role as StationRole });
-      }
     } else {
       this.logger.log(`Agent connected: unknown station (socket ${client.id})`);
     }
@@ -200,12 +197,25 @@ export class AgentGateway
   ): Promise<void> {
     client.stationId = payload.stationId;
     const room = `station:${payload.stationId}`;
-    if (!client.rooms.has(room)) {
+    // This is the actually-reliable "agent just connected" signal (see the
+    // comment on handleConnection) — the room join was already gated on it
+    // as a fallback; settings:updated/station:role now ride the same gate
+    // so they're pushed exactly once per connection, right when we first
+    // learn who's on the other end.
+    const isFirstHeartbeat = !client.rooms.has(room);
+    if (isFirstHeartbeat) {
       await client.join(room);
       this.logger.log(`Agent joined room ${room} (heartbeat)`);
     }
     this.connectedStationIds.add(payload.stationId);
     const station = await this.stationsService.updateHeartbeat(payload);
+    if (isFirstHeartbeat) {
+      const settings = await this.settingsService.get();
+      client.emit('settings:updated', {
+        blankingDelaySeconds: settings.blankingDelaySeconds,
+      });
+      client.emit('station:role', { role: station.role as StationRole });
+    }
     this.dashboardGateway.emitStationUpdated(
       station.stationId,
       station.status,

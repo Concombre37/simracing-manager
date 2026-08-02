@@ -715,8 +715,12 @@ export class SimRacingAgent {
     // already does for tracked sessions: quit() can take up to 15s to close
     // gracefully, and the game's own window can disappear well before the
     // process is confirmed gone — leaving the raw desktop exposed for that
-    // whole stretch otherwise.
+    // whole stretch otherwise. Actually wait for the window to be on screen
+    // first — a process merely existing isn't enough, cold PowerShell/WPF
+    // startup can take a moment, and closing the game before that moment
+    // passes just moves the exposure window instead of removing it.
     this.blankingManager.show();
+    await this.blankingManager.waitUntilShown();
     this.acSharedMemoryReader?.stop();
     await this.luaBridge.quit();
     await this.acLauncher.stop();
@@ -1089,9 +1093,7 @@ export class SimRacingAgent {
     // Show the results screen right away, before asking AC to quit: quit()
     // waits up to 15s for the game to close gracefully, and leaving that
     // time dead (last frame frozen, nothing shown) is exactly the gap users
-    // saw between the session ending and the results appearing. The
-    // blanking window is topmost, so it already covers the still-running
-    // game — no need to wait for it to actually exit first.
+    // saw between the session ending and the results appearing.
     if (session) {
       this.blankingManager.showResults({
         clientName: session.clientName,
@@ -1105,6 +1107,12 @@ export class SimRacingAgent {
     } else {
       this.blankingManager.show();
     }
+    // ...but a freshly (re)spawned window isn't topmost/rendered the
+    // instant the process exists — cold PowerShell/WPF startup takes a
+    // moment. Confirm it's actually on screen before quitting, otherwise
+    // the exposure gap this was meant to close just moves a few hundred ms
+    // later instead of disappearing.
+    await this.blankingManager.waitUntilShown();
 
     try {
       await this.acLauncher.quit();
