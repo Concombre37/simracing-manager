@@ -43,41 +43,52 @@ export class Updater {
     const currentExe = process.execPath;
     const baseDir = path.dirname(currentExe);
     const zipPath = path.join(baseDir, 'update.zip');
-    const batPath = path.join(baseDir, 'update-agent.bat');
+    const scriptPath = path.join(baseDir, 'update-agent.ps1');
     const finalExePath = path.join(baseDir, 'sim-center-agent-win.exe');
+    const launcherPath = path.join(baseDir, 'start-agent.vbs');
 
     await this.downloadFile(asset.browser_download_url, zipPath);
     this.logger.info({ path: zipPath }, 'New agent archive downloaded');
 
-    const batContent = [
-      '@echo off',
-      'echo Mise a jour de SimRacing Manager Agent...',
-      'set /a waitTime=0',
-      ':wait',
-      `tasklist /FI "PID eq ${process.pid}" /FO CSV | find "${process.pid}" >nul`,
-      'if %errorlevel% == 0 (',
-      '  timeout /t 1 /nobreak >nul',
-      '  set /a waitTime+=1',
-      '  if %waitTime% GTR 30 goto force',
-      '  goto wait',
-      ')',
-      ':force',
-      `powershell -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${baseDir}' -Force"`,
-      `if exist "${zipPath}" del /f "${zipPath}"`,
-      `if exist "${batPath}" del /f "${batPath}"`,
-      `start "" "${finalExePath}"`,
-      'exit',
-    ].join('\r\n');
+    // PowerShell (Wait-Process) instead of a hand-rolled cmd.exe polling
+    // loop: cmd's `if (...)` blocks parse %var% once up front, so a `set`
+    // inside the same block doesn't reflect until the *next* iteration — a
+    // well-known footgun that left the old wait loop effectively stuck, on
+    // top of cmd.exe's console window not reliably staying hidden. Params
+    // are passed as real PowerShell arguments (not interpolated into the
+    // script text) to avoid any quoting/injection concerns from the paths.
+    const assetScript = path.join(__dirname, '..', 'assets', 'update-agent.ps1');
+    const scriptContent = await fs.readFile(assetScript, 'utf-8');
+    await fs.writeFile(scriptPath, scriptContent, 'utf-8');
+    this.logger.info({ path: scriptPath }, 'Update script extracted');
 
-    await fs.writeFile(batPath, batContent, 'utf-8');
-    this.logger.info({ path: batPath }, 'Update batch script created');
-
-    spawn('cmd.exe', ['/c', batPath], {
-      cwd: baseDir,
-      detached: true,
-      stdio: 'ignore',
-      windowsHide: true,
-    });
+    spawn(
+      'powershell.exe',
+      [
+        '-WindowStyle',
+        'Hidden',
+        '-ExecutionPolicy',
+        'Bypass',
+        '-File',
+        scriptPath,
+        '-AgentPid',
+        String(process.pid),
+        '-ZipPath',
+        zipPath,
+        '-BaseDir',
+        baseDir,
+        '-FinalExePath',
+        finalExePath,
+        '-LauncherPath',
+        launcherPath,
+      ],
+      {
+        cwd: baseDir,
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+      },
+    );
 
     this.logger.info('Agent update started, exiting current process');
     // Child processes (blanking window) don't die with the agent on

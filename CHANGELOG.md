@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.61 — La mise à jour automatique de l'agent ("MAJ agent") ne se terminait jamais
+
+### Corrigé
+
+- **Le script de mise à jour généré (`update-agent.bat`) restait bloqué dans sa boucle d'attente.** Il attendait la fin du processus de l'ancien agent via `tasklist | find` dans un `if (...)` de `cmd.exe` — or `cmd` évalue les variables `%var%` d'un bloc parenthésé une seule fois, au moment où le bloc est lu : le `set /a waitTime+=1` fait à l'intérieur ne se reflétait donc jamais dans la même itération, un classique piège de scripting batch qui faussait le compteur et pouvait laisser la boucle tourner indéfiniment. Le mécanisme est réécrit en PowerShell (`Wait-Process -Timeout 30`), sans ce genre de piège.
+- **La fenêtre de la mise à jour n'était pas fiablement masquée** (`cmd.exe` + `windowsHide` n'est pas garanti sur Windows), et le nouvel agent était relancé directement (`start "" agent.exe`) au lieu de passer par `start-agent.vbs` — le lanceur silencieux déjà utilisé pour le démarrage automatique — ce qui aurait de toute façon fait apparaître une fenêtre de console après la mise à jour (un exécutable `pkg` est une app console par défaut). Le nouveau script PowerShell tourne avec `-WindowStyle Hidden` (le même mécanisme déjà utilisé et éprouvé pour l'écran de blanking) et relance l'agent via `start-agent.vbs`, donc de façon réellement silencieuse.
+
 ## v2.2.60 — Corrige le rôle admin jamais reçu par l'agent + le blanking pas encore affiché avant de fermer le jeu
 
 ### Corrigé
