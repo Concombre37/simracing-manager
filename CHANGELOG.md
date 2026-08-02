@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.58 — Diagnostic préventif du "Failed to handshake" en rejoignant un serveur dédié
+
+### Corrigé
+
+- **Cause identifiée : un serveur dédié pouvait être signalé "running" alors que son port UDP n'était en réalité pas accessible**, laissant les PODs qui le rejoignaient échouer avec "Failed to handshake" côté Assetto Corsa sans aucune trace côté dashboard/agent. `serverLauncher.ts` ne vérifiait que la survie du processus `acServer.exe` (2.5s après le lancement), pas que son socket UDP était effectivement ouvert — un pare-feu Windows bloquant le port, ou un port déjà tenu par un autre processus au niveau OS malgré la vérification préalable, laissaient le process tourner sans que personne ne puisse s'y connecter.
+- Ajout d'une vérification via `netstat` après le lancement (jusqu'à 5s) confirmant que le PID d'`acServer.exe` détient bien le port UDP annoncé ; sinon le lancement échoue explicitement avec un message clair au lieu de rapporter silencieusement "running".
+- Ajout d'une règle de pare-feu Windows entrante automatique pour `acServer.exe` (créée une fois, program-scoped donc valable pour tous les ports dynamiques 9600-9700 utilisés au fil des lancements) afin de prévenir la cause la plus fréquente de ce blocage.
+
 ## v2.2.57 — Nom des voitures corrigé (impactait aussi les aperçus manquants)
 
 ### Corrigé

@@ -1,11 +1,19 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess, execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
 import net from 'net';
 import dgram from 'dgram';
+import { promisify } from 'util';
 import { Logger } from 'pino';
 import { config } from './config';
 import { LaunchDedicatedServerPayload } from '@simracing/shared';
+
+const execFileAsync = promisify(execFile);
+
+/** Windows Firewall rule name for acServer.exe — a single program-wide rule
+ * covers every dynamic port a server ever binds, so it only needs to exist
+ * once rather than being recreated per launch/per port. */
+const FIREWALL_RULE_NAME = 'SimCenterManager-acServer';
 
 export interface LaunchedServerInfo {
   serverDir: string;
@@ -37,6 +45,8 @@ export class ServerLauncher {
     } catch {
       throw new Error(`Serveur dédié AC non trouvé: ${serverExe}. Vérifie AC_PATH dans le .env.`);
     }
+
+    await this.ensureFirewallRule(serverExe);
 
     // Ports libres pour éviter les conflits avec d'autres serveurs AC/CM
     const requestedMainPort = payload.udpPort ?? payload.tcpPort;
@@ -88,6 +98,21 @@ export class ServerLauncher {
 
     // Vérifier que le processus ne meurt pas immédiatement (erreur de config, port...)
     await this.verifyProcessAlive(child, payload.serverId, logPath);
+
+    // Le processus vivant ne prouve pas que le port UDP est réellement ouvert
+    // (pare-feu, port déjà pris par un autre processus au niveau OS malgré la
+    // vérif préalable...) — c'est exactement ce qui produit un "Failed to
+    // handshake" côté client sans que rien ne le signale ici. On vérifie donc
+    // explicitement avant de considérer le lancement comme réussi.
+    if (!child.pid) {
+      throw new Error('acServer.exe a démarré sans PID');
+    }
+    try {
+      await this.waitForPortBound(child.pid, mainPort);
+    } catch (err) {
+      await this.stop(payload.serverId);
+      throw err;
+    }
 
     this.logger.info(
       { serverId: payload.serverId, serverDir, udpPort: mainPort, tcpPort: mainPort, httpPort },
@@ -155,6 +180,86 @@ export class ServerLauncher {
     throw new Error(
       `Assetto Corsa non trouvé. Définis AC_PATH dans le .env à côté de l'exécutable.`,
     );
+  }
+
+  /**
+   * Adds a Windows Firewall inbound rule for acServer.exe, scoped to the
+   * program rather than a specific port — servers use a different dynamic
+   * port per launch (9600-9700), so a per-port rule would need to be
+   * recreated every time. Best-effort: a failure here (e.g. non-admin
+   * process) only logs a warning, it never blocks the launch — this is a
+   * preventive measure, not a hard requirement to reach acServer.exe.
+   */
+  private async ensureFirewallRule(serverExe: string): Promise<void> {
+    if (process.platform !== 'win32') return;
+
+    try {
+      const { stdout } = await execFileAsync('netsh', [
+        'advfirewall',
+        'firewall',
+        'show',
+        'rule',
+        `name=${FIREWALL_RULE_NAME}`,
+      ]).catch(() => ({ stdout: '' }));
+      if (stdout.includes(FIREWALL_RULE_NAME)) return;
+
+      await execFileAsync('netsh', [
+        'advfirewall',
+        'firewall',
+        'add',
+        'rule',
+        `name=${FIREWALL_RULE_NAME}`,
+        'dir=in',
+        'action=allow',
+        `program=${serverExe}`,
+        'enable=yes',
+        'protocol=any',
+      ]);
+      this.logger.info(
+        { rule: FIREWALL_RULE_NAME, program: serverExe },
+        'Windows Firewall rule created for acServer.exe',
+      );
+    } catch (err) {
+      this.logger.warn(
+        { err },
+        'Could not create/verify the Windows Firewall rule for acServer.exe — clients may fail to handshake if the firewall blocks it',
+      );
+    }
+  }
+
+  /**
+   * A process that hasn't exited isn't proof its UDP socket is actually
+   * bound — a port already held by something else at the OS level (despite
+   * the pre-launch availability check) or a firewall silently dropping
+   * inbound packets both leave acServer.exe running while every client gets
+   * "Failed to handshake". Polls netstat for the PID actually owning the
+   * port before the launch is considered successful.
+   */
+  private async waitForPortBound(pid: number, port: number, timeoutMs = 5000): Promise<void> {
+    if (process.platform !== 'win32') return; // no netstat-based check outside Windows (dev/CI)
+
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (await this.isPortBoundByPid(pid, port)) return;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    throw new Error(
+      `acServer.exe (PID ${pid}) n'a pas ouvert le port UDP ${port} après ${timeoutMs / 1000}s. ` +
+        `Vérifie le pare-feu Windows ou qu'aucun autre processus n'utilise déjà ce port.`,
+    );
+  }
+
+  private async isPortBoundByPid(pid: number, port: number): Promise<boolean> {
+    try {
+      const { stdout } = await execFileAsync('netstat', ['-ano', '-p', 'UDP']);
+      const needle = `:${port}`;
+      return stdout
+        .split('\n')
+        .some((line) => line.includes(needle) && line.trim().endsWith(String(pid)));
+    } catch {
+      return false;
+    }
   }
 
   private isTcpPortAvailable(port: number): Promise<boolean> {
