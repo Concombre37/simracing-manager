@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.72 — La télémétrie partagée mourait silencieusement dès la première reconnexion
+
+### Corrigé
+
+- **Trouvé pendant une re-vérification complète en conditions réelles** : après toute reconnexion agent↔backend (Wi-Fi instable, redémarrage backend...), `AcSharedMemoryReader` était recréé à neuf (`agent.ts`, handler `socket.on('connect')`) et réenregistrait ses trois types `koffi.pack('SPageFilePhysics'/'SPageFileGraphic'/'SPageFileStatic', ...)` dans le constructeur — sauf que le registre de types de koffi est **global au process**, pas par instance. Le second enregistrement jetait `Duplicate type name 'SPageFilePhysics'`, silencieusement avalé par un `catch` qui se contentait de logger une erreur — **toute lecture de télémétrie partagée restait cassée pour le reste de la vie du process**, sans aucun signal visible à part ce log. Repéré via les logs distants : `AC shared memory state changed` s'affichait bien (mécanisme indépendant) mais zéro paquet de télémétrie n'atteignait le backend.
+- **Fix** : les trois `koffi.pack(...)` sont maintenant enregistrés **une seule fois au chargement du module** (avant la classe), pas dans le constructeur — chaque nouvelle instance de `AcSharedMemoryReader` réutilise le même type déjà enregistré au lieu de le redéclarer. Le chargement `kernel32.dll`/déclaration des fonctions reste par instance (pas concerné, aucune erreur observée à ce sujet).
+
 ## v2.2.71 — Le balayage des fenêtres ne doit jamais tourner sans session, ni sur un poste admin
 
 ### Corrigé
