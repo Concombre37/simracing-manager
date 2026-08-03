@@ -11,7 +11,7 @@ import {
 } from '../services/dedicatedServers';
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { useSocket } from '../hooks/useSocket';
-import { findTrackName, formatCarName } from '../utils/track';
+import { findCar, findTrackName, findTrackPreview, formatCarName } from '../utils/track';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
@@ -36,12 +36,29 @@ import {
   Users,
   Square,
   Clock4,
-  Activity,
 } from 'lucide-react';
 
 type Tab = 'servers' | 'stations';
 type Difficulty = 'EASY' | 'PRO' | 'CUSTOM';
 type Gearbox = 'MANUAL' | 'AUTO';
+
+/** Realistic site max — the POD grid always reserves this many slots so the
+ * layout stays fixed and structured instead of reflowing as PODs come and
+ * go; unused slots render as empty placeholders (same idea as
+ * SessionsKiosk.tsx's 5x2 wall grid). Admin (hosting-only) stations are
+ * never PODs an operator sends, so they're excluded entirely here. */
+const MAX_PODS = 10;
+const STALE_MS = 5000;
+
+function formatClock(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
+  }
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
 
 interface PodConfig {
   clientName: string;
@@ -458,126 +475,224 @@ function StationsTab({
     return map;
   }, [sessions]);
 
-  const { inSession, others } = useMemo(() => {
-    const inSession: Station[] = [];
-    const others: Station[] = [];
-    [...stations]
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .forEach((s) => {
-        if (sessionByStationId.has(s.stationId)) inSession.push(s);
-        else others.push(s);
-      });
-    return { inSession, others };
-  }, [stations, sessionByStationId]);
+  // Admin (hosting-only) stations never send/receive PODs, and there are at
+  // most MAX_PODS simulators on site — the grid always reserves that many
+  // cells (padded with empty placeholders) so it stays fixed and structured
+  // instead of reflowing as PODs connect/disconnect.
+  const pods = useMemo(
+    () =>
+      stations.filter((s) => s.role === 'simulator').sort((a, b) => a.name.localeCompare(b.name)),
+    [stations],
+  );
+  const slots = Array.from({ length: MAX_PODS }, (_, i) => pods[i]);
 
-  if (stations.length === 0) {
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
+  const expandedSession = sessions.find((s) => s.id === expandedSessionId);
+
+  if (pods.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-dark-600 bg-dark-900/50 py-16 text-center">
         <Monitor className="mx-auto mb-3 h-10 w-10 text-gray-600" />
-        <p className="text-gray-400">Aucun poste enregistré.</p>
+        <p className="text-gray-400">Aucun poste simulateur enregistré.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8">
-      {inSession.length > 0 && (
-        <section>
-          <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
-            <Activity className="h-4 w-4 text-accent-orange" />
-            En session ({inSession.length})
-          </h2>
-          <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2">
-            {inSession.map((station) => {
-              const session = sessionByStationId.get(station.stationId);
-              if (!session) return null;
-              return (
-                <SessionCard
-                  key={station.id}
-                  session={session}
-                  telemetry={liveData[station.stationId]}
-                  now={now}
-                  content={content.get(station.stationId)}
-                  onCommand={(command) => onCommand(station.stationId, command)}
-                />
-              );
-            })}
-          </div>
-        </section>
-      )}
+    <>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        {slots.map((station, i) => {
+          if (!station) {
+            return (
+              <div
+                key={`empty-${i}`}
+                className="flex min-h-[160px] items-center justify-center rounded-xl border border-dashed border-dark-700 bg-dark-900/30"
+              >
+                <Monitor className="h-6 w-6 text-dark-700" />
+              </div>
+            );
+          }
+          const session = sessionByStationId.get(station.stationId);
+          return session ? (
+            <PodSessionCell
+              key={station.id}
+              station={station}
+              session={session}
+              telemetry={liveData[station.stationId]}
+              now={now}
+              content={content.get(station.stationId)}
+              onClick={() => setExpandedSessionId(session.id)}
+            />
+          ) : (
+            <PodAvailableCell
+              key={station.id}
+              station={station}
+              canSend={canSend}
+              onSend={() => onSend(station.stationId)}
+            />
+          );
+        })}
+      </div>
 
-      <section>
-        {inSession.length > 0 && (
-          <h2 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
-            <Monitor className="h-4 w-4 text-gray-500" />
-            Autres postes ({others.length})
-          </h2>
-        )}
-        {others.length === 0 ? (
-          inSession.length === 0 && (
-            <div className="rounded-xl border border-dashed border-dark-600 bg-dark-900/50 py-16 text-center">
-              <Monitor className="mx-auto mb-3 h-10 w-10 text-gray-600" />
-              <p className="text-gray-400">Aucun poste enregistré.</p>
-            </div>
-          )
+      {expandedSession && (
+        <Modal
+          title={expandedSession.clientName || expandedSession.station.name}
+          onClose={() => setExpandedSessionId(null)}
+          size="lg"
+        >
+          <SessionCard
+            session={expandedSession}
+            telemetry={liveData[expandedSession.station.stationId]}
+            now={now}
+            content={content.get(expandedSession.station.stationId)}
+            onCommand={(command) => onCommand(expandedSession.station.stationId, command)}
+          />
+        </Modal>
+      )}
+    </>
+  );
+}
+
+function PodAvailableCell({
+  station,
+  canSend,
+  onSend,
+}: {
+  station: Station;
+  canSend: boolean;
+  onSend: () => void;
+}) {
+  const sendable = station.status === 'online' || station.status === 'in_game';
+  return (
+    <div
+      onClick={() => sendable && onSend()}
+      className={`flex min-h-[160px] flex-col justify-between rounded-xl border border-dark-600 bg-dark-800/70 p-4 transition-colors ${
+        sendable ? 'cursor-pointer hover:border-accent-orange/50' : 'cursor-not-allowed opacity-60'
+      }`}
+    >
+      <div className="mb-3 min-w-0">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <Monitor className="h-5 w-5 shrink-0 text-gray-500" />
+          <StationStatusBadge status={station.status} />
+        </div>
+        <p className="truncate font-bold text-white">{station.name}</p>
+        <p className="truncate font-mono text-[10px] text-gray-500">{station.stationId}</p>
+      </div>
+      <Button
+        variant="success"
+        size="sm"
+        disabled={!sendable}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSend();
+        }}
+      >
+        {canSend ? (
+          <>
+            <Send className="h-4 w-4" />
+            Envoyer
+          </>
         ) : (
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
-            {others.map((station) => {
-              const validPod =
-                station.role === 'simulator' &&
-                (station.status === 'online' || station.status === 'in_game');
-              return (
-                <div
-                  key={station.id}
-                  onClick={() => validPod && onSend(station.stationId)}
-                  className={`flex flex-col justify-between rounded-xl border border-dark-600 bg-dark-800/70 p-4 transition-colors ${
-                    validPod
-                      ? 'cursor-pointer hover:border-accent-orange/50'
-                      : 'cursor-not-allowed opacity-60'
-                  }`}
-                >
-                  <div className="mb-3 min-w-0">
-                    <div className="mb-2 flex items-center justify-between gap-2">
-                      <Monitor className="h-5 w-5 shrink-0 text-gray-500" />
-                      <StationStatusBadge status={station.status} />
-                    </div>
-                    <p className="truncate font-bold text-white">{station.name}</p>
-                    <p className="truncate font-mono text-[10px] text-gray-500">
-                      {station.stationId}
-                    </p>
-                    <div className="mt-2">
-                      <Badge variant={station.role === 'admin' ? 'purple' : 'gray'}>
-                        {station.role === 'admin' ? 'Admin' : 'Simulateur'}
-                      </Badge>
-                    </div>
-                  </div>
-                  <Button
-                    variant="success"
-                    size="sm"
-                    disabled={!validPod}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSend(station.stationId);
-                    }}
-                  >
-                    {canSend ? (
-                      <>
-                        <Send className="h-4 w-4" />
-                        Envoyer
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="h-4 w-4" />
-                        Créer un serveur
-                      </>
-                    )}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
+          <>
+            <Plus className="h-4 w-4" />
+            Créer un serveur
+          </>
         )}
-      </section>
+      </Button>
+    </div>
+  );
+}
+
+function PodSessionCell({
+  station,
+  session,
+  telemetry,
+  now,
+  content,
+  onClick,
+}: {
+  station: Station;
+  session: ActiveSession;
+  telemetry?: TelemetrySnapshot;
+  now: number;
+  content: StationContent | null | undefined;
+  onClick: () => void;
+}) {
+  const remainingSeconds =
+    session.startedAt && session.durationMinutes
+      ? Math.max(
+          0,
+          Math.round(
+            (new Date(session.startedAt).getTime() + session.durationMinutes * 60 * 1000 - now) /
+              1000,
+          ),
+        )
+      : undefined;
+  const elapsedSeconds = Math.max(
+    0,
+    Math.round((now - new Date(session.startedAt).getTime()) / 1000),
+  );
+  const expired = remainingSeconds !== undefined && remainingSeconds <= 0;
+  const critical = !expired && remainingSeconds !== undefined && remainingSeconds <= 60;
+  const stale = !telemetry || now - telemetry.timestamp > STALE_MS;
+  const trackPreview = findTrackPreview(session.track, content);
+  const car = findCar(session.carAcId, content);
+  const carName = session.carAcId ? formatCarName(car?.name, session.carAcId) : undefined;
+
+  return (
+    <div
+      onClick={onClick}
+      className={`relative flex min-h-[160px] cursor-pointer flex-col justify-between overflow-hidden rounded-xl border bg-dark-800/70 transition-colors hover:border-accent-orange/50 ${
+        critical ? 'border-red-500/50' : 'border-dark-600'
+      }`}
+      style={critical ? { boxShadow: '0 0 24px -10px rgba(255,51,51,0.6)' } : undefined}
+    >
+      {trackPreview ? (
+        <img
+          src={trackPreview}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-20"
+        />
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-accent-orange/10 via-dark-900 to-dark-950" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-dark-900/95 via-dark-900/50 to-transparent" />
+
+      <div className="relative z-10 flex h-full flex-col justify-between p-3">
+        <div className="min-w-0">
+          <p className="truncate text-[9px] font-bold uppercase tracking-widest text-accent-orange">
+            {station.name}
+          </p>
+          <h3 className="truncate text-base font-black uppercase leading-tight text-white">
+            {session.clientName || station.name}
+          </h3>
+          <p className="truncate text-[11px] text-gray-400">{carName ?? '—'}</p>
+        </div>
+
+        <div className="mt-2 flex items-end justify-between">
+          <div>
+            <p className="text-[9px] uppercase tracking-wide text-gray-500">Vitesse</p>
+            <p
+              className={`font-mono text-xl font-bold tabular-nums ${stale ? 'text-gray-500' : 'text-accent-blue'}`}
+            >
+              {stale ? '—' : Math.round(telemetry!.speedKmh)}
+              <span className="ml-1 text-[10px] text-gray-500">km/h</span>
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[9px] uppercase tracking-wide text-gray-500">
+              {remainingSeconds !== undefined ? 'Restant' : 'Écoulé'}
+            </p>
+            <p
+              className={`font-mono text-xl font-bold tabular-nums ${
+                expired ? 'text-red-500' : critical ? 'animate-blink text-red-400' : 'text-white'
+              }`}
+            >
+              {expired ? '00:00' : formatClock(remainingSeconds ?? elapsedSeconds)}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
