@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.69 — Désactive l'enregistrement au lobby public Kunos (cause probable des crashs ~29-30s)
+
+### Corrigé
+
+- **`REGISTER_TO_LOBBY=1` → `0` dans `server_cfg.ini`.** Constaté en conditions réelles (2 incidents distincts, un client réel bloqué) : `acServer.exe` démarre, passe les vérifications, puis quitte tout seul systématiquement ~29-30s après — un timing bien trop régulier pour un crash aléatoire. Ce venue n'a aucun besoin d'un serveur listé publiquement (les joueurs rejoignent uniquement via le dashboard, jamais via une liste de serveurs publics) — désactiver l'enregistrement retire toute dépendance à la joignabilité du master server Kunos, plausiblement la cause du crash. Le signalement du crash lui-même (v2.2.68) reste en place comme filet de sécurité si ce n'était pas (ou pas la seule) cause réelle.
+
 ## v2.2.68 — Détecte un crash tardif d'acServer.exe (cause réelle de "Failed to handshake" silencieux)
 
 ### Corrigé

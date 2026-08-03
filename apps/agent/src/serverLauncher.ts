@@ -416,7 +416,15 @@ export class ServerLauncher {
       'RACE_GAS_PENALTY_DISABLED=1',
       'MAX_CONTACTS_PER_KM=3',
       'MINIMUM_SECURITY_LEVEL=1',
-      'REGISTER_TO_LOBBY=1',
+      // Never register with Kunos' public lobby — this is a private venue,
+      // players only ever join via the dashboard's direct join, never by
+      // browsing a public server list. Strongly suspected cause of the
+      // repeated "server dies ~29-30s after launch" crashes (v2.2.68):
+      // acServer.exe appears to self-terminate after a lobby-registration
+      // timeout when that registration can't complete, and the timing
+      // matched exactly across every crash observed. Also removes any
+      // dependency on Kunos' master server being reachable at all.
+      'REGISTER_TO_LOBBY=0',
       '',
       '[PRACTICE]',
       'NAME=Practice',
