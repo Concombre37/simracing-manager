@@ -63,7 +63,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  const crumbs = BREADCRUMBS[location.pathname] ?? ['Manager'];
+  const crumbs =
+    BREADCRUMBS[location.pathname] ??
+    (/^\/dedicated-servers\/.+\/join$/.test(location.pathname)
+      ? ['Serveurs', 'Envoyer les POD']
+      : ['Manager']);
   const initials = user.email.slice(0, 2).toUpperCase();
 
   return (
