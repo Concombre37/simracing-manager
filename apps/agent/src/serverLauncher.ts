@@ -384,13 +384,22 @@ export class ServerLauncher {
     const entryListPath = path.join(serverDir, 'entry_list.ini');
 
     const carIds = payload.cars.length > 0 ? payload.cars : ['ks_mazda_mx5_cup'];
+    // CARS= lists the *distinct* models allowed on the server, not one entry
+    // per grid slot — entry_list.ini below is what assigns a specific model
+    // to each slot (including repeats). Since the car-mixing picker started
+    // allowing several slots to share the same model, payload.cars can
+    // contain duplicates (e.g. a car picked 3 times); feeding that straight
+    // into CARS= produced "CARS=bmw_m3_e30;bmw_m3_e30;bmw_m3_e30;..." on a
+    // real launch, which acServer.exe rejected outright (exits within ~1s,
+    // code 2, before even attempting to bind its port).
+    const uniqueCarIds = [...new Set(carIds)];
 
     const serverCfg = [
       '[SERVER]',
       `NAME=${payload.name}`,
       `TRACK=${payload.track}`,
       `CONFIG_TRACK=${payload.trackLayout ?? ''}`,
-      `CARS=${carIds.join(';')}`,
+      `CARS=${uniqueCarIds.join(';')}`,
       `MAX_CLIENTS=${payload.maxClients}`,
       `PASSWORD=${payload.password ?? ''}`,
       `WELCOME_MESSAGE=Bienvenue sur ${payload.name}`,

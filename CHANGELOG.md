@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.74 — `CARS=` avec des doublons faisait crasher acServer.exe instantanément sur un mix de voitures
+
+### Corrigé
+
+- **Un serveur dédié avec plusieurs voitures différentes (fonctionnalité de mix ajoutée cette session) échouait à chaque lancement réel**, `acServer.exe` quittant en moins d'une seconde (code 2), avant même de tenter d'ouvrir son port. Signalé par l'utilisateur juste après avoir testé la nouvelle grille de voitures en conditions réelles pour la première fois. Cause : `serverLauncher.ts#writeServerConfig()` écrivait le champ `CARS=` de `server_cfg.ini` (qui doit lister les modèles de voitures **distincts** autorisés) directement à partir du tableau brut par-emplacement — désormais capable de contenir des doublons (une voiture choisie 3 fois donne 3 entrées identiques) depuis que le sélecteur permet de mélanger plusieurs voitures. `entry_list.ini` (l'assignation par emplacement, avec doublons légitimes) n'était pas concerné. Fix : `CARS=` est maintenant dédupliqué (`[...new Set(carIds)]`) avant écriture.
+
 ## v2.2.73 — Le jeu mettait jusqu'à 1 minute à apparaître, et le bureau flashait brièvement au lancement
 
 ### Corrigé
