@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.71`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.72`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -317,6 +317,7 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 - **`reconnection: false` sur le client socket.io** — la reconnexion est gérée manuellement. Deux points de déclenchement : sur `'disconnect'` (déjà connecté puis coupé) ET sur `'connect_error'` (jamais réussi à se connecter — corrigé en **v2.2.62**, avant ça un `connect_error` isolé pendant un redémarrage backend laissait l'agent bloqué déconnecté indéfiniment). `scheduleReconnect()` coalesce les tentatives multiples dans un seul timer (5s), annulé sur connexion réussie ou re-provisioning.
 - **`waitForServerReachable()`** ping `SERVER_URL` (jusqu'à 10s) avant d'ouvrir le WebSocket, log un warning clair si injoignable — aide au diagnostic réseau/DNS.
 - **Statut station auto-réparé** (v2.2.43) : `reconcileReportedStatus()` à chaque heartbeat compare l'état réel `acRunning` au dernier statut envoyé, corrige après 2 ticks discordants consécutifs (immédiat à la première observation post-connexion).
+- **Chaque reconnexion cassait silencieusement la télémétrie partagée, jusqu'à v2.2.72** — trouvé pendant une re-vérification complète en conditions réelles : `agent.ts`'s handler `socket.on('connect')` recrée un `AcSharedMemoryReader` à chaque reconnexion (Wi-Fi instable, redémarrage backend...), dont le constructeur réenregistrait ses 3 types `koffi.pack(...)` — sauf que le registre de types koffi est **global au process**, pas par instance. La 2ᵉ reconnexion (et toutes les suivantes) jetait `Duplicate type name 'SPageFilePhysics'`, avalé par un `catch` qui logue juste une erreur : toute lecture de télémétrie partagée restait cassée pour le reste de la vie du process, sans autre signal visible (le check "state changed"/`packetId` continue de fonctionner, lui, car indépendant). Fix : les 3 `koffi.pack(...)` sont désormais enregistrés **une seule fois au chargement du module**, pas dans le constructeur — voir `acSharedMemoryReader.ts`.
 
 ### 5.7 Mise à jour à distance (`updater.ts` + `assets/update-agent.ps1`)
 
