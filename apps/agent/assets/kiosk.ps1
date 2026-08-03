@@ -40,6 +40,12 @@ public class SimRacingKiosk {
 
   [DllImport("user32.dll")]
   public static extern IntPtr GetForegroundWindow();
+
+  [DllImport("user32.dll")]
+  public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+  [DllImport("kernel32.dll")]
+  public static extern uint GetCurrentThreadId();
 }
 '@
 
@@ -115,27 +121,62 @@ function Minimize-OtherWindows {
   [SimRacingKiosk]::EnumWindows($callback, [IntPtr]::Zero) | Out-Null
 }
 
+function Force-SetForeground {
+  param([IntPtr]$TargetHwnd)
+
+  # Plain SetForegroundWindow routinely gets silently denied by Windows when
+  # the calling process isn't itself the current foreground process and
+  # hasn't processed recent user input (the exact situation for a background
+  # PowerShell script) — this was the actual cause of a ~1 minute stall
+  # bringing the game up after every launch: the window existed and was
+  # already loaded well before that, SetForegroundWindow was being called
+  # every 300ms, it just kept failing. The standard, documented workaround
+  # is to attach this thread's input queue to both the current foreground
+  # window's thread and the target window's thread before calling it — that
+  # makes Windows treat the request as if it came from the already-focused
+  # thread, which it always allows.
+  $dummyPid = 0
+  $currentThreadId = [SimRacingKiosk]::GetCurrentThreadId()
+  $fgHwnd = [SimRacingKiosk]::GetForegroundWindow()
+  $fgThreadId = [SimRacingKiosk]::GetWindowThreadProcessId($fgHwnd, [ref]$dummyPid)
+  $targetThreadId = [SimRacingKiosk]::GetWindowThreadProcessId($TargetHwnd, [ref]$dummyPid)
+
+  $attachedFg = $false
+  $attachedTarget = $false
+  if ($fgThreadId -ne 0 -and $fgThreadId -ne $currentThreadId) {
+    $attachedFg = [SimRacingKiosk]::AttachThreadInput($currentThreadId, $fgThreadId, $true)
+  }
+  if ($targetThreadId -ne 0 -and $targetThreadId -ne $currentThreadId -and $targetThreadId -ne $fgThreadId) {
+    $attachedTarget = [SimRacingKiosk]::AttachThreadInput($currentThreadId, $targetThreadId, $true)
+  }
+
+  try {
+    [SimRacingKiosk]::ShowWindow($TargetHwnd, $SW_RESTORE) | Out-Null
+    [SimRacingKiosk]::SetForegroundWindow($TargetHwnd) | Out-Null
+    return [SimRacingKiosk]::GetForegroundWindow() -eq $TargetHwnd
+  } finally {
+    if ($attachedFg) { [SimRacingKiosk]::AttachThreadInput($currentThreadId, $fgThreadId, $false) | Out-Null }
+    if ($attachedTarget) { [SimRacingKiosk]::AttachThreadInput($currentThreadId, $targetThreadId, $false) | Out-Null }
+  }
+}
+
 function Set-GameForeground {
   param([string]$ProcessName, [int]$TimeoutMs)
 
   # Returns $true only once the game window is actually confirmed as the
   # foreground window (GetForegroundWindow), not just once SetForegroundWindow
-  # was called — that call can silently fail (Windows' foreground-lock
-  # heuristics) even when the window handle is valid, so the caller must not
-  # take "we asked" as proof it worked. Keeps retrying both finding the
-  # window and re-asserting foreground within the same timeout budget.
+  # was called — that call can silently fail even when the window handle is
+  # valid (see Force-SetForeground), so the caller must not take "we asked"
+  # as proof it worked. Keeps retrying both finding the window and
+  # re-asserting foreground within the same timeout budget.
   $elapsed = 0
   $intervalMs = 300
   while ($elapsed -lt $TimeoutMs) {
     $proc = Get-Process -Name $ProcessName -ErrorAction SilentlyContinue |
       Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
       Select-Object -First 1
-    if ($proc) {
-      [SimRacingKiosk]::ShowWindow($proc.MainWindowHandle, $SW_RESTORE) | Out-Null
-      [SimRacingKiosk]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
-      if ([SimRacingKiosk]::GetForegroundWindow() -eq $proc.MainWindowHandle) {
-        return $true
-      }
+    if ($proc -and (Force-SetForeground -TargetHwnd $proc.MainWindowHandle)) {
+      return $true
     }
     Start-Sleep -Milliseconds $intervalMs
     $elapsed += $intervalMs

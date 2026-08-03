@@ -225,7 +225,7 @@ export class BlankingManager {
       const wasShowingResults = this.resultsHtmlPath !== null;
       this.clearResults();
       if (wasShowingResults) {
-        this.restartIfActive();
+        this.crossfadeRestart();
       }
       this.clearPendingHide();
     }
@@ -262,7 +262,7 @@ export class BlankingManager {
     this.clearResults();
     this.clearLaunching();
     if (wasShowingCustomContent) {
-      this.restartIfActive();
+      this.crossfadeRestart();
     }
     this.evaluate();
   }
@@ -278,8 +278,7 @@ export class BlankingManager {
 
     // If currently blanking, restart with new playlist
     if (this.override !== 'hide' && this.process && !this.process.killed) {
-      this.restartIfActive();
-      this.startBlanking();
+      this.crossfadeRestart();
     }
   }
 
@@ -318,10 +317,11 @@ export class BlankingManager {
     this.override = 'show';
     if (!alreadyShowingResults) {
       // The plain waiting screen may already be up at this point (e.g. it
-      // came back briefly while we were reading race_out.json). startBlanking()
-      // no-ops if a process is already running, so without a forced restart
-      // the results HTML would never actually be displayed.
-      this.restartIfActive();
+      // came back briefly while we were reading race_out.json). A plain
+      // startBlanking() no-ops if a process is already running, so without
+      // a forced restart the results HTML would never actually be
+      // displayed — crossfadeRestart() does that restart without a gap.
+      this.crossfadeRestart();
     }
     this.evaluate();
   }
@@ -345,18 +345,9 @@ export class BlankingManager {
     this.generateLaunchingHtml(info);
     this.resultsHtmlPath = null;
     if (!alreadyShowingLaunching) {
-      this.restartIfActive();
+      this.crossfadeRestart();
     }
     this.evaluate();
-  }
-
-  /** Forces the current blanking window to relaunch so it picks up new content
-   * (results HTML, or dropping it). No-op if blanking isn't currently shown. */
-  private restartIfActive(): void {
-    if (this.process && !this.process.killed) {
-      this.stopBlanking();
-      this.process = null;
-    }
   }
 
   clearResults(): void {
@@ -816,6 +807,45 @@ export class BlankingManager {
   private startBlanking(): void {
     if (!this.enabled) return;
     if (this.process && !this.process.killed) return;
+    this.spawnBlankingProcess();
+  }
+
+  /**
+   * Spawns a replacement blanking window *before* tearing down the one
+   * currently up, instead of killing first and spawning after — so there is
+   * no gap where neither window is on screen and whatever's behind it
+   * (desktop, a stray dialog) can flash through for the second or so a cold
+   * PowerShell/WPF startup takes. Waits for the new window's own `Loaded`
+   * signal (or a timeout safety net) before killing the old one. No-ops to
+   * a plain startBlanking() when nothing is currently up — there's nothing
+   * to overlap with, so a gap can't happen either way.
+   */
+  private crossfadeRestart(): void {
+    if (!this.enabled) return;
+    const oldProc = this.process;
+    if (!oldProc || oldProc.killed) {
+      this.startBlanking();
+      return;
+    }
+    this.spawnBlankingProcess();
+    const newReady = this.readyPromise;
+    void Promise.race([
+      newReady ?? Promise.resolve(),
+      new Promise<void>((resolve) => setTimeout(resolve, 4000).unref()),
+    ]).then(() => {
+      if (oldProc && !oldProc.killed) {
+        oldProc.kill('SIGTERM');
+        setTimeout(() => {
+          if (oldProc && !oldProc.killed) oldProc.kill('SIGKILL');
+        }, 2000).unref();
+      }
+    });
+  }
+
+  /** Unconditional spawn — the actual PowerShell/WPF process launch, shared
+   * by startBlanking() (guarded, no-op if one is already up) and
+   * crossfadeRestart() (deliberately spawns a second, overlapping one). */
+  private spawnBlankingProcess(): void {
     if (!this.scriptPath) {
       this.logger.warn('Blanking script not extracted, cannot start');
       return;

@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.73 — Le jeu mettait jusqu'à 1 minute à apparaître, et le bureau flashait brièvement au lancement
+
+### Corrigé
+
+- **`SetForegroundWindow` échouait silencieusement pendant ~1 minute à chaque lancement, alors que le jeu était prêt en ~15s.** Constaté en conditions réelles via les logs distants : la mémoire partagée AC confirmait `acLoaded=true` ~13s après le lancement d'`acs.exe` (le "bruit de portière" que l'utilisateur entend), mais `revealThenStop()` épuisait ses 3 tentatives (chacune avec un budget de 20s dans `Set-GameForeground`) avant d'abandonner et de retirer l'écran d'attente de force — environ 71 secondes plus tard. Cause : Windows refuse silencieusement `SetForegroundWindow` quand l'appelant (un script PowerShell en arrière-plan) n'est pas déjà le process au premier plan et n'a pas traité d'entrée utilisateur récente — la fenêtre du jeu était bien trouvée à chaque itération de la boucle, l'appel échouait juste systématiquement. `kiosk.ps1` utilise maintenant la technique standard `AttachThreadInput` (attacher la file d'entrée de ce thread à celle de la fenêtre au premier plan et à celle de la cible avant l'appel) pour forcer un succès fiable.
+- **Le bureau (ou tout ce qui était derrière) pouvait flasher 1-2 secondes pendant les transitions de l'écran d'attente** (ex: passage de l'écran "en attente" à l'écran "lancement en cours" au début d'une session). Cause : `restartIfActive()` tuait la fenêtre PowerShell/WPF actuelle _avant_ d'en relancer une nouvelle — le démarrage à froid de PowerShell/WPF prend facilement 1-2s, pendant lesquelles rien ne couvrait l'écran. Remplacé par `crossfadeRestart()` : la nouvelle fenêtre est lancée et confirmée visible (`BLANKING_WINDOW_READY`) _avant_ que l'ancienne soit fermée, donc l'écran reste toujours couvert par l'une des deux.
+
 ## v2.2.72 — La télémétrie partagée mourait silencieusement dès la première reconnexion
 
 ### Corrigé
