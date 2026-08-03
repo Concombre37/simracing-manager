@@ -184,6 +184,12 @@ export function CreateDedicatedServer() {
   function addCar(carAcId: string) {
     setCarCounts((prev) => {
       const total = Object.values(prev).reduce((sum, n) => sum + n, 0);
+      // Picking a first car is the common case ("un seul type de voiture") —
+      // fill every slot with it right away instead of leaving it at a count
+      // of 1 and requiring a separate "remplir tous les slots" click.
+      // Mixing multiple cars still works: once something is already
+      // selected, further clicks just add one more of that car.
+      if (total === 0) return { [carAcId]: maxClients };
       if (total >= maxClients) return prev;
       return { ...prev, [carAcId]: (prev[carAcId] ?? 0) + 1 };
     });
