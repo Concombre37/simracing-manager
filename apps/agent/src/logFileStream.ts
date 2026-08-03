@@ -46,13 +46,39 @@ export class LogFileStream extends Writable {
     const line = chunk.toString('utf-8').trim();
     if (!line) return;
     try {
-      const parsed = JSON.parse(line) as { time?: string; level?: string; msg?: string };
+      const parsed = JSON.parse(line) as Record<string, unknown> & {
+        time?: string;
+        level?: string;
+        msg?: string;
+      };
       const time = typeof parsed.time === 'string' ? parsed.time.slice(11, 19) : '';
       const level = typeof parsed.level === 'string' ? parsed.level : '';
       const msg = typeof parsed.msg === 'string' ? parsed.msg : '';
-      agentLogRingBuffer.push(`[${time}] ${level} ${msg}`.trim());
+      const extras = this.formatExtras(parsed);
+      agentLogRingBuffer.push(`[${time}] ${level} ${msg}${extras}`.trim());
     } catch {
       // not a JSON line (shouldn't happen without pino-pretty) — skip it
     }
+  }
+
+  /** Pino keeps structured fields (code, serverId, err...) separate from
+   * `msg` — the ring buffer used to drop them entirely, which meant a line
+   * like "Server process exited" gave no way to tell a clean stop from a
+   * crash without ssh-ing in to read the raw NDJSON file. Surface the
+   * handful of fields that matter for remote debugging inline instead. */
+  private formatExtras(parsed: Record<string, unknown>): string {
+    const skip = new Set(['time', 'level', 'msg', 'pid', 'hostname']);
+    const parts: string[] = [];
+    for (const [key, value] of Object.entries(parsed)) {
+      if (skip.has(key) || value === undefined) continue;
+      if (key === 'err' && value && typeof value === 'object') {
+        const err = value as { message?: string };
+        if (err.message) parts.push(`err=${err.message}`);
+        continue;
+      }
+      if (typeof value === 'object') continue;
+      parts.push(`${key}=${String(value)}`);
+    }
+    return parts.length > 0 ? ` (${parts.join(', ')})` : '';
   }
 }

@@ -31,8 +31,12 @@ interface RunningServer {
 
 export class ServerLauncher {
   private servers = new Map<string, RunningServer>();
+  private intentionalStops = new Set<string>();
 
-  constructor(private readonly logger: Logger) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly onUnexpectedExit?: (serverId: string, code: number | null) => void,
+  ) {}
 
   async launch(payload: LaunchDedicatedServerPayload): Promise<LaunchedServerInfo> {
     this.logger.info({ serverId: payload.serverId }, 'Launching dedicated server');
@@ -94,6 +98,8 @@ export class ServerLauncher {
     child.on('exit', (code) => {
       this.logger.info({ code, serverId: payload.serverId }, 'Server process exited');
       this.servers.delete(payload.serverId);
+      if (this.intentionalStops.delete(payload.serverId)) return;
+      this.onUnexpectedExit?.(payload.serverId, code);
     });
 
     // Vérifier que le processus ne meurt pas immédiatement (erreur de config, port...)
@@ -135,6 +141,7 @@ export class ServerLauncher {
     }
 
     this.logger.info({ serverId }, 'Stopping dedicated server');
+    this.intentionalStops.add(serverId);
     if (!running.process.killed) {
       running.process.kill('SIGTERM');
     }

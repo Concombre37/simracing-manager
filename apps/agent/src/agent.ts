@@ -99,7 +99,21 @@ export class SimRacingAgent {
     this.luaBridge = new LuaBridge(logger);
     this.contentSync = new ContentSync(logger);
     this.contentScanner = new ContentScanner(logger);
-    this.serverLauncher = new ServerLauncher(logger);
+    this.serverLauncher = new ServerLauncher(logger, (serverId, code) => {
+      // acServer.exe can die well after its initial launch checks passed
+      // (observed in production: alive + port bound at t+3s, gone at t+29s
+      // with no OS-level signal) — without this, the backend keeps
+      // believing the server is "running" forever, and every client that
+      // tries to join it just sits at a silently frozen AC shared memory
+      // with no error anywhere. Report it the same way a launch failure
+      // already is, so the dashboard shows "error" instead of a phantom
+      // "running" server.
+      this.logger.warn({ serverId, code }, 'Dedicated server exited unexpectedly');
+      this.socket?.emit('server:stopped', {
+        serverId,
+        error: `acServer.exe s'est arrêté de façon inattendue (code ${code ?? 'inconnu'}).`,
+      });
+    });
     this.updater = new Updater(logger);
     this.watchdogManager = new WatchdogManager(logger);
     this.processMonitor = new ProcessMonitor(logger);

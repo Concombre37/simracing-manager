@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.68 — Détecte un crash tardif d'acServer.exe (cause réelle de "Failed to handshake" silencieux)
+
+### Corrigé
+
+- **Un serveur dédié qui crashe après son démarrage restait "running" en base pour toujours.** Constaté en conditions réelles cette session : `acServer.exe` démarrait, passait les vérifications (process vivant + port UDP bound), puis quittait tout seul ~29s plus tard sans qu'aucun signal ne remonte nulle part. Le POD qui tentait de rejoindre ce serveur restait bloqué avec une mémoire partagée AC "frozen" indéfiniment — exactement le symptôme "Failed to handshake" déjà chassé plusieurs fois cette session, mais avec une cause différente (le serveur hôte, pas le `race.ini` du client). `ServerLauncher` accepte maintenant un callback `onUnexpectedExit` déclenché quand le process meurt sans être passé par `stop()` ; l'agent émet alors `server:stopped` avec une erreur, ce que le backend traduit déjà en statut `error` (libérant le port au passage, cf. v2.2.66).
+- **Le ring buffer de logs distants perdait tous les champs structurés** (`code`, `err`, `serverId`...) et ne gardait que `msg` — ce qui a empêché de voir directement le code de sortie d'`acServer.exe` pendant cet investigation. Les champs pertinents sont maintenant ajoutés en suffixe de la ligne (`msg (code=1, serverId=...)`).
+
 ## v2.2.67 — Ajoute un watchdog indépendant qui relance l'agent s'il disparaît
 
 ### Ajouté
