@@ -148,8 +148,13 @@ export class DedicatedServersService {
   }
 
   private async getUsedPorts(): Promise<Set<number>> {
+    // Only servers still actually holding their port (starting/running)
+    // should reserve it — without the status filter, every server ever
+    // created keeps its port "used" forever, including long-stopped ones,
+    // eventually exhausting the 9600-9700 / 8081-8181 ranges for no reason.
     const servers = await this.prisma.dedicatedServer.findMany({
       where: {
+        status: { in: ['starting', 'running'] },
         OR: [
           { udpPort: { not: null } },
           { tcpPort: { not: null } },

@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.66 — Vérifié en conditions réelles : handshake corrigé, ports libérés, MAJ agent testée
+
+### Corrigé
+
+- **Confirmé en production que le fix du handshake (v2.2.64) fonctionne** : test réel (création serveur + envoi POD), la mémoire partagée de `acs.exe` ne reste plus gelée et près de 500 paquets de télémétrie ont été reçus en 2 minutes (contre zéro avant le fix).
+- `writeJoinRaceIni()` inclut maintenant aussi `[LIGHTING]` (déjà présent dans `writeRaceIni()`, le lancement direct/solo), par cohérence entre les deux chemins.
+- **Backend : les ports des serveurs dédiés arrêtés restaient réservés indéfiniment.** `getUsedPorts()` ne filtrait pas par statut — un serveur arrêté ou en erreur gardait son port occupé pour toujours, épuisant progressivement les plages 9600-9700/8081-8181 sans raison. Ne compte maintenant que les serveurs `starting`/`running`.
+
 ## v2.2.65 — Une mise à jour ratée pouvait laisser l'agent complètement arrêté
 
 ### Corrigé

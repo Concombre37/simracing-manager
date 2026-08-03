@@ -460,6 +460,11 @@ export class AcLauncher {
       'SPEED_KMH_MIN=0',
       'SPEED_KMH_MAX=0',
       '',
+      '[LIGHTING]',
+      'SUN_ANGLE=-48',
+      'TIME_MULT=1',
+      'CLOUD_SPEED=0.2',
+      '',
     ];
     await fs.writeFile(raceIniPath, lines.join('\n'), 'utf-8');
     this.logger.info({ path: raceIniPath }, 'race.ini written for direct join');
