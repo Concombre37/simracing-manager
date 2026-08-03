@@ -37,6 +37,7 @@ import {
   Users,
   Square,
   Clock4,
+  Home,
 } from 'lucide-react';
 
 type Tab = 'servers' | 'stations';
@@ -196,6 +197,13 @@ export function Kiosk() {
           SimRacing Manager <span className="text-accent-orange">Kiosque</span>
         </h1>
         <div className="flex items-center gap-3">
+          <Link
+            to="/"
+            className="flex items-center gap-2 rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400 transition-colors hover:border-accent-orange/50 hover:text-white"
+          >
+            <Home className="h-4 w-4" />
+            Accueil
+          </Link>
           <Link
             to="/en-cours/kiosk"
             className="rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400 transition-colors hover:border-accent-orange/50 hover:text-white"

@@ -8,6 +8,7 @@ import { stationsApi } from '../services/stations';
 import { findCar, findTrackName, findTrackPreview, formatCarName } from '../utils/track';
 import { Modal } from '../components/ui/Modal';
 import { SessionCard } from './Sessions';
+import { Home } from 'lucide-react';
 
 const STALE_MS = 5000;
 const MAX_PODS = 10;
@@ -103,6 +104,13 @@ export function SessionsKiosk() {
           SimRacing Manager <span className="text-accent-orange">En cours</span>
         </h1>
         <div className="flex items-center gap-3">
+          <Link
+            to="/"
+            className="flex items-center gap-2 rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400 transition-colors hover:border-accent-orange/50 hover:text-white"
+          >
+            <Home className="h-4 w-4" />
+            Accueil
+          </Link>
           <Link
             to="/kiosk"
             className="rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400 transition-colors hover:border-accent-orange/50 hover:text-white"
