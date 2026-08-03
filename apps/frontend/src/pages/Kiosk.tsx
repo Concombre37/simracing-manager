@@ -31,6 +31,7 @@ import {
   Clock,
   Infinity as InfinityIcon,
   Plus,
+  ArrowLeft,
   ArrowRight,
   MapPin,
   Users,
@@ -789,125 +790,140 @@ function SendPodsModal({
   });
 
   return (
-    <Modal title={`Envoyer sur ${server.name}`} onClose={onClose} size="xl">
-      <div className="space-y-6">
-        <section>
-          <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
-            <Clock className="h-4 w-4 text-accent-orange" />
-            Durée de session
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {DURATION_OPTIONS.map((option) => (
-              <button
-                key={option.label}
-                type="button"
-                onClick={() => setDurationMinutes(option.value)}
-                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition-all ${
-                  durationMinutes === option.value
-                    ? 'bg-accent-orange text-dark-900'
-                    : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
-                }`}
-              >
-                {option.value === undefined && <InfinityIcon className="h-4 w-4" />}
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </section>
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-dark-950">
+      <header className="flex shrink-0 items-center gap-4 border-b border-dark-700 bg-dark-900/60 px-6 py-4">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-dark-700 hover:text-white"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
+        <h2 className="text-xl font-black uppercase tracking-wide text-white">
+          Envoyer sur <span className="text-accent-orange">{server.name}</span>
+        </h2>
+      </header>
 
-        <section>
-          <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
-            <Monitor className="h-4 w-4 text-accent-orange" />
-            Postes
-          </h3>
-          {onlineStations.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-dark-600 bg-dark-900/50 py-6 text-center text-sm text-gray-500">
-              Aucun POD en ligne
-            </p>
-          ) : (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
-              {onlineStations.map((station) => {
-                const selected = selectedIds.includes(station.stationId);
-                return (
-                  <button
-                    key={station.stationId}
-                    type="button"
-                    onClick={() => toggleStation(station.stationId)}
-                    className={`relative rounded-lg border p-3 text-left transition-all ${
-                      selected
-                        ? 'border-accent-orange bg-dark-900 ring-1 ring-accent-orange'
-                        : 'border-dark-600 bg-dark-800 hover:border-accent-orange/50'
-                    }`}
-                  >
-                    {selected && (
-                      <div className="absolute right-1.5 top-1.5 rounded-full bg-accent-orange p-0.5 text-dark-900">
-                        <Check className="h-3 w-3" />
-                      </div>
-                    )}
-                    <p className="truncate text-sm font-bold text-white">{station.name}</p>
-                    <div className="mt-1">
-                      <Badge variant={station.status === 'in_game' ? 'blue' : 'green'}>
-                        {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
-                      </Badge>
-                    </div>
-                  </button>
-                );
-              })}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="mx-auto max-w-5xl space-y-6">
+          <section>
+            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
+              <Clock className="h-4 w-4 text-accent-orange" />
+              Durée de session
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {DURATION_OPTIONS.map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  onClick={() => setDurationMinutes(option.value)}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition-all ${
+                    durationMinutes === option.value
+                      ? 'bg-accent-orange text-dark-900'
+                      : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                  }`}
+                >
+                  {option.value === undefined && <InfinityIcon className="h-4 w-4" />}
+                  {option.label}
+                </button>
+              ))}
             </div>
+          </section>
+
+          <section>
+            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
+              <Monitor className="h-4 w-4 text-accent-orange" />
+              Postes
+            </h3>
+            {onlineStations.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-dark-600 bg-dark-900/50 py-6 text-center text-sm text-gray-500">
+                Aucun POD en ligne
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+                {onlineStations.map((station) => {
+                  const selected = selectedIds.includes(station.stationId);
+                  return (
+                    <button
+                      key={station.stationId}
+                      type="button"
+                      onClick={() => toggleStation(station.stationId)}
+                      className={`relative rounded-lg border p-3 text-left transition-all ${
+                        selected
+                          ? 'border-accent-orange bg-dark-900 ring-1 ring-accent-orange'
+                          : 'border-dark-600 bg-dark-800 hover:border-accent-orange/50'
+                      }`}
+                    >
+                      {selected && (
+                        <div className="absolute right-1.5 top-1.5 rounded-full bg-accent-orange p-0.5 text-dark-900">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      )}
+                      <p className="truncate text-sm font-bold text-white">{station.name}</p>
+                      <div className="mt-1">
+                        <Badge variant={station.status === 'in_game' ? 'blue' : 'green'}>
+                          {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
+                        </Badge>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <AnimatePresence initial={false}>
+            {selectedIds.map((stationId) => {
+              const station = onlineStations.find((s) => s.stationId === stationId);
+              const cfg = configs[stationId];
+              if (!station || !cfg) return null;
+              return (
+                <motion.div
+                  key={stationId}
+                  layout
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <PodConfigCard
+                    station={station}
+                    config={cfg}
+                    cars={availableCars}
+                    carMap={carMap}
+                    onChange={(patch) => updateConfig(stationId, patch)}
+                  />
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+
+          {error && (
+            <p className="rounded-lg border border-red-900/40 bg-red-900/20 p-3 text-sm text-red-400">
+              {error}
+            </p>
           )}
-        </section>
-
-        <AnimatePresence initial={false}>
-          {selectedIds.map((stationId) => {
-            const station = onlineStations.find((s) => s.stationId === stationId);
-            const cfg = configs[stationId];
-            if (!station || !cfg) return null;
-            return (
-              <motion.div
-                key={stationId}
-                layout
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <PodConfigCard
-                  station={station}
-                  config={cfg}
-                  cars={availableCars}
-                  carMap={carMap}
-                  onChange={(patch) => updateConfig(stationId, patch)}
-                />
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-
-        {error && (
-          <p className="rounded-lg border border-red-900/40 bg-red-900/20 p-3 text-sm text-red-400">
-            {error}
-          </p>
-        )}
-
-        <div className="flex items-center justify-between gap-4 border-t border-dark-700 pt-4">
-          <p className="text-sm text-gray-400">
-            <span className="text-lg font-black text-white">{selectedIds.length}</span> pilote
-            {selectedIds.length > 1 ? 's' : ''} prêt{selectedIds.length > 1 ? 's' : ''}
-          </p>
-          <Button
-            variant="success"
-            size="lg"
-            onClick={() => joinMutation.mutate()}
-            disabled={selectedIds.length === 0 || joinMutation.isPending}
-            isLoading={joinMutation.isPending}
-          >
-            <Send className="h-4 w-4" />
-            Envoyer {selectedIds.length > 0 && `(${selectedIds.length})`}
-          </Button>
         </div>
       </div>
-    </Modal>
+
+      <div className="flex shrink-0 items-center justify-between gap-4 border-t border-dark-700 bg-dark-900/80 px-6 py-4">
+        <p className="text-sm text-gray-400">
+          <span className="text-lg font-black text-white">{selectedIds.length}</span> pilote
+          {selectedIds.length > 1 ? 's' : ''} prêt{selectedIds.length > 1 ? 's' : ''}
+        </p>
+        <Button
+          variant="success"
+          size="lg"
+          onClick={() => joinMutation.mutate()}
+          disabled={selectedIds.length === 0 || joinMutation.isPending}
+          isLoading={joinMutation.isPending}
+        >
+          <Send className="h-4 w-4" />
+          Envoyer {selectedIds.length > 0 && `(${selectedIds.length})`}
+        </Button>
+      </div>
+    </div>
   );
 }
 
