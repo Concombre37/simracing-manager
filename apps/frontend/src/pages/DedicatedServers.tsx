@@ -9,6 +9,7 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input, Label } from '../components/ui/Input';
 import { findTrackName } from '../utils/track';
+import { useContentLabelMap } from '../services/contentLabels';
 import {
   Server,
   Plus,
@@ -32,6 +33,7 @@ function findTrackPreview(trackAcId: string, content: unknown): string | undefin
 
 export function DedicatedServers() {
   const queryClient = useQueryClient();
+  const labelMap = useContentLabelMap();
   const { data: servers, isLoading } = useQuery({
     queryKey: ['dedicated-servers'],
     queryFn: dedicatedServersApi.getAll,
@@ -87,6 +89,7 @@ export function DedicatedServers() {
               const trackName = findTrackName(
                 server.track,
                 server.station.content as { tracks?: { acId: string; name: string }[] } | undefined,
+                labelMap,
               );
               return (
                 <motion.div

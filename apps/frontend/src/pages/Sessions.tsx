@@ -30,6 +30,7 @@ import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { stationsApi } from '../services/stations';
 import { formatDuration } from '../utils/time';
 import { findCar, findTrackName, findTrackPreview, formatCarName } from '../utils/track';
+import { useContentLabelMap } from '../services/contentLabels';
 
 const STALE_MS = 5000;
 
@@ -265,6 +266,7 @@ export function SessionCard({
   onCommand?: (command: string) => void;
 }) {
   const queryClient = useQueryClient();
+  const labelMap = useContentLabelMap();
   const [remainingSeconds, setRemainingSeconds] = useState<number | undefined>();
 
   useEffect(() => {
@@ -303,9 +305,9 @@ export function SessionCard({
       : 0;
 
   const trackPreview = findTrackPreview(session.track, content);
-  const trackName = session.track ? findTrackName(session.track, content) : undefined;
+  const trackName = session.track ? findTrackName(session.track, content, labelMap) : undefined;
   const car = findCar(session.carAcId, content);
-  const carName = session.carAcId ? formatCarName(car?.name, session.carAcId) : undefined;
+  const carName = session.carAcId ? formatCarName(car?.name, session.carAcId, labelMap) : undefined;
   const difficulty = session.difficulty ? DIFFICULTY_STYLE[session.difficulty] : undefined;
 
   return (

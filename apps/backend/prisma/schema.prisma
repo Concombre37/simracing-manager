@@ -161,6 +161,18 @@ model ContentPreview {
   @@map("content_previews")
 }
 
+model ContentLabel {
+  id          String   @id @default(uuid()) @db.Uuid
+  type        String
+  acId        String   @map("ac_id")
+  displayName String   @map("display_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([type, acId])
+  @@map("content_labels")
+}
+
 model BlankingMedia {
   id        String   @id @default(uuid()) @db.Uuid
   stationId String   @map("station_id") @db.Uuid

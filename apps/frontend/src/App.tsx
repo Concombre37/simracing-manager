@@ -16,6 +16,7 @@ import { Sessions } from './pages/Sessions';
 import { SessionsKiosk } from './pages/SessionsKiosk';
 import { Kiosk } from './pages/Kiosk';
 import { ContentPreviews } from './pages/ContentPreviews';
+import { ContentNames } from './pages/ContentNames';
 import { BlankingMedia } from './pages/BlankingMedia';
 import { Settings } from './pages/Settings';
 
@@ -164,6 +165,14 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute adminOnly>
               <ContentPreviews />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/content-names"
+          element={
+            <ProtectedRoute adminOnly>
+              <ContentNames />
             </ProtectedRoute>
           }
         />

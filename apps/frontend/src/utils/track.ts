@@ -1,3 +1,5 @@
+import type { ContentLabelMap } from '../services/contentLabels';
+
 export function cleanTrackName(name: string): string {
   return name
     .replace(/\s+-\s*layout\s*$/i, '')
@@ -13,7 +15,13 @@ export function formatTrackAcId(acId: string): string {
     .trim();
 }
 
-export function formatTrackName(name: string | undefined, acId: string): string {
+export function formatTrackName(
+  name: string | undefined,
+  acId: string,
+  labelMap?: ContentLabelMap,
+): string {
+  const override = labelMap?.track?.[acId];
+  if (override) return override;
   const cleaned = cleanTrackName(name || '');
   if (cleaned && cleaned.toLowerCase() !== acId.toLowerCase()) {
     return cleaned;
@@ -29,9 +37,10 @@ export interface TrackLike {
 export function findTrackName(
   trackAcId: string,
   content: { tracks?: TrackLike[] } | null | undefined,
+  labelMap?: ContentLabelMap,
 ): string {
   const track = content?.tracks?.find((t) => t.acId === trackAcId);
-  return formatTrackName(track?.name, trackAcId);
+  return formatTrackName(track?.name, trackAcId, labelMap);
 }
 
 export function findTrackPreview(
@@ -48,7 +57,13 @@ export interface CarLike {
   preview?: string;
 }
 
-export function formatCarName(name: string | undefined, acId: string): string {
+export function formatCarName(
+  name: string | undefined,
+  acId: string,
+  labelMap?: ContentLabelMap,
+): string {
+  const override = labelMap?.car?.[acId];
+  if (override) return override;
   const cleaned = (name || '').trim();
   if (cleaned && cleaned.toLowerCase() !== acId.toLowerCase()) {
     return cleaned;

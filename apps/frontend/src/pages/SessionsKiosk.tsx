@@ -6,6 +6,7 @@ import { useSocket } from '../hooks/useSocket';
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { stationsApi } from '../services/stations';
 import { findCar, findTrackName, findTrackPreview, formatCarName } from '../utils/track';
+import { useContentLabelMap } from '../services/contentLabels';
 import { Modal } from '../components/ui/Modal';
 import { SessionCard } from './Sessions';
 import { Home } from 'lucide-react';
@@ -178,6 +179,7 @@ function KioskCard({
   content: StationContent | null | undefined;
   onClick: () => void;
 }) {
+  const labelMap = useContentLabelMap();
   const remainingSeconds =
     session.startedAt && session.durationMinutes
       ? Math.max(
@@ -197,9 +199,9 @@ function KioskCard({
 
   const stale = !telemetry || now - telemetry.timestamp > STALE_MS;
   const trackPreview = findTrackPreview(session.track, content);
-  const trackName = session.track ? findTrackName(session.track, content) : undefined;
+  const trackName = session.track ? findTrackName(session.track, content, labelMap) : undefined;
   const car = findCar(session.carAcId, content);
-  const carName = session.carAcId ? formatCarName(car?.name, session.carAcId) : undefined;
+  const carName = session.carAcId ? formatCarName(car?.name, session.carAcId, labelMap) : undefined;
   const difficulty = session.difficulty ? DIFFICULTY_STYLE[session.difficulty] : undefined;
 
   return (

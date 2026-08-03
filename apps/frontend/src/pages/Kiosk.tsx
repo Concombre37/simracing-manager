@@ -12,6 +12,7 @@ import {
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { useSocket } from '../hooks/useSocket';
 import { findCar, findTrackName, findTrackPreview, formatCarName } from '../utils/track';
+import { useContentLabelMap } from '../services/contentLabels';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
@@ -335,6 +336,7 @@ function ServersTab({
   onStop: (id: string) => void;
   stoppingId?: string;
 }) {
+  const labelMap = useContentLabelMap();
   const runningCount = servers.filter((s) => s.status === 'running').length;
   return (
     <div>
@@ -383,6 +385,7 @@ function ServersTab({
               const trackName = findTrackName(
                 server.track,
                 server.station.content as { tracks?: { acId: string; name: string }[] } | undefined,
+                labelMap,
               );
               return (
                 <motion.div
@@ -627,6 +630,7 @@ function PodSessionCell({
   content: StationContent | null | undefined;
   onClick: () => void;
 }) {
+  const labelMap = useContentLabelMap();
   const remainingSeconds =
     session.startedAt && session.durationMinutes
       ? Math.max(
@@ -646,7 +650,7 @@ function PodSessionCell({
   const stale = !telemetry || now - telemetry.timestamp > STALE_MS;
   const trackPreview = findTrackPreview(session.track, content);
   const car = findCar(session.carAcId, content);
-  const carName = session.carAcId ? formatCarName(car?.name, session.carAcId) : undefined;
+  const carName = session.carAcId ? formatCarName(car?.name, session.carAcId, labelMap) : undefined;
 
   return (
     <div
@@ -948,6 +952,7 @@ function PodConfigCard({
   carMap: Map<string, AcCar>;
   onChange: (patch: Partial<PodConfig>) => void;
 }) {
+  const labelMap = useContentLabelMap();
   return (
     <div className="overflow-hidden rounded-xl border border-dark-600 bg-dark-900/60">
       <div className="flex items-center justify-between border-b border-dark-700 bg-gradient-to-r from-accent-orange/10 to-transparent px-4 py-2.5">
@@ -1045,7 +1050,7 @@ function PodConfigCard({
                       {car?.preview ? (
                         <img
                           src={car.preview}
-                          alt={formatCarName(car.name, acId)}
+                          alt={formatCarName(car.name, acId, labelMap)}
                           className="h-full w-full object-cover"
                           loading="lazy"
                         />
@@ -1059,7 +1064,7 @@ function PodConfigCard({
                       )}
                     </div>
                     <p className="truncate p-1.5 text-[10px] font-semibold text-white">
-                      {formatCarName(car?.name, acId)}
+                      {formatCarName(car?.name, acId, labelMap)}
                     </p>
                   </button>
                 );

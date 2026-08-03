@@ -16,6 +16,7 @@ import {
   MonitorPlay,
   Flag,
   Tv,
+  Tag,
 } from 'lucide-react';
 
 const navItems = [
@@ -29,6 +30,7 @@ const navItems = [
 const adminNavItems = [
   { path: '/users', label: 'Utilisateurs', icon: Users },
   { path: '/content-previews', label: 'Images', icon: Image },
+  { path: '/content-names', label: 'Noms', icon: Tag },
   { path: '/blanking-media', label: 'Écrans', icon: MonitorPlay },
   { path: '/settings', label: 'Paramètres', icon: Settings },
 ];
@@ -42,6 +44,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/en-cours': ['Sessions en cours'],
   '/users': ['Utilisateurs'],
   '/content-previews': ['Images'],
+  '/content-names': ['Noms'],
   '/blanking-media': ['Écrans'],
   '/settings': ['Paramètres'],
 };

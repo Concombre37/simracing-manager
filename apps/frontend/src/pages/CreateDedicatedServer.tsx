@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { dedicatedServersApi, type Car as AcCar, type Track } from '../services/dedicatedServers';
 import { stationsApi, type Station } from '../services/stations';
 import { formatTrackName, formatCarName } from '../utils/track';
+import { useContentLabelMap } from '../services/contentLabels';
 import { setWizardBackgroundStep } from '../components/PageBackground';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
@@ -60,6 +61,7 @@ export function CreateDedicatedServer() {
   // successful creation would drop the operator out of the kiosk shell.
   const backPath = location.pathname.startsWith('/kiosk') ? '/kiosk' : '/dedicated-servers';
   const queryClient = useQueryClient();
+  const labelMap = useContentLabelMap();
 
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
@@ -141,9 +143,10 @@ export function CreateDedicatedServer() {
     const q = trackSearch.trim().toLowerCase();
     if (!q) return content.tracks;
     return content.tracks.filter(
-      (t) => formatTrackName(t.name, t.acId).toLowerCase().includes(q) || t.acId.includes(q),
+      (t) =>
+        formatTrackName(t.name, t.acId, labelMap).toLowerCase().includes(q) || t.acId.includes(q),
     );
-  }, [content.tracks, trackSearch]);
+  }, [content.tracks, trackSearch, labelMap]);
 
   const filteredCars = useMemo(() => {
     const q = carSearch.trim().toLowerCase();
@@ -177,7 +180,7 @@ export function CreateDedicatedServer() {
     setTrackId(track.acId);
     setTrackLayout(track.layouts.length > 0 ? track.layouts[0].name : '');
     if (!name) {
-      setName(`Serveur ${formatTrackName(track.name, track.acId)}`);
+      setName(`Serveur ${formatTrackName(track.name, track.acId, labelMap)}`);
     }
   }
 
@@ -529,6 +532,7 @@ function StepTrack({
   onSync: () => void;
   isSyncing: boolean;
 }) {
+  const labelMap = useContentLabelMap();
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
@@ -599,7 +603,7 @@ function StepTrack({
                   </div>
                   <div className="p-3">
                     <p className="truncate font-semibold text-white">
-                      {formatTrackName(track.name, track.acId)}
+                      {formatTrackName(track.name, track.acId, labelMap)}
                     </p>
                     <p className="truncate text-xs text-gray-500">{track.acId}</p>
                   </div>
@@ -713,6 +717,7 @@ function StepConfig({
   track,
   trackLayout,
 }: StepConfigProps) {
+  const labelMap = useContentLabelMap();
   const atCapacity = totalSelectedCars >= maxClients;
 
   return (
@@ -872,7 +877,7 @@ function StepConfig({
                         {car.preview ? (
                           <img
                             src={car.preview}
-                            alt={formatCarName(car.name, car.acId)}
+                            alt={formatCarName(car.name, car.acId, labelMap)}
                             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                             loading="lazy"
                           />
@@ -882,7 +887,7 @@ function StepConfig({
                       </div>
                       <div className="p-2">
                         <p className="truncate text-sm font-medium text-white">
-                          {formatCarName(car.name, car.acId)}
+                          {formatCarName(car.name, car.acId, labelMap)}
                         </p>
                         <p className="truncate text-[10px] text-gray-500">{car.acId}</p>
                       </div>
@@ -940,7 +945,7 @@ function StepConfig({
             label="Circuit"
             value={
               track
-                ? `${formatTrackName(track.name, track.acId)}${trackLayout ? ` (${trackLayout})` : ''}`
+                ? `${formatTrackName(track.name, track.acId, labelMap)}${trackLayout ? ` (${trackLayout})` : ''}`
                 : '—'
             }
           />
