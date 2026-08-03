@@ -567,7 +567,7 @@ function StepTrack({
         </div>
       ) : (
         <>
-          <div className="grid max-h-[22rem] grid-cols-1 gap-4 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid max-h-[65vh] grid-cols-1 gap-4 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">
             {tracks.map((track) => {
               const selected = selectedTrack?.acId === track.acId;
               return (
@@ -853,7 +853,7 @@ function StepConfig({
               <p className="text-gray-400">Aucune voiture détectée sur ce poste.</p>
             </div>
           ) : (
-            <div className="grid max-h-[28rem] grid-cols-2 gap-3 overflow-y-auto p-1 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid max-h-[65vh] grid-cols-2 gap-3 overflow-y-auto p-1 sm:grid-cols-3 lg:grid-cols-4">
               {cars.map((car) => {
                 const count = carCounts[car.acId] ?? 0;
                 const canAddMore = !atCapacity;
