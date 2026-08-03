@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.67`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.68`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -120,6 +120,12 @@ sim-center-manager/
 - `GET /content/previews/:id`
 - `DELETE /content/previews/:id`
 
+**`ContentLabelsController` (`/api/content/labels`, v2.2.68)**
+
+- `GET /content/labels/known` (admin) — agrège tous les `acId` de voitures/circuits déjà vus dans `Station.content` (toutes stations confondues, dédupliqués), joints avec le `ContentLabel` existant s'il y en a un.
+- `GET /content/labels/map` (tout utilisateur authentifié) — `{ car: Record<acId, displayName>, track: Record<acId, displayName> }`, consommé par le hook frontend `useContentLabelMap()`.
+- `PUT /content/labels` (admin) — upsert `{ type: 'car'|'track', acId, displayName }` ; `displayName` vide = suppression du label (retour au nom technique).
+
 **`BlankingMediaController`**
 
 - `GET /stations/:id/blanking-media`
@@ -144,6 +150,7 @@ sim-center-manager/
 - **`ContentPackage`**: `id, type, name, version, archiveUrl, checksum, isRequired`, unique sur `(type, name, version)`.
 - **`DedicatedServer`**: `id, name, stationId (FK Station, l'hôte), track, trackLayout?, cars (String[]), maxClients (défaut 10), password?, rconPassword?, config (json), status (stopped|starting|running|error), serverDir?, udpPort?, tcpPort?, httpPort?, startedAt?, endedAt?`.
 - **`ContentPreview`**: `id, stationId (FK), type, acId, name, data (base64)`, unique sur `(stationId, type, acId)`.
+- **`ContentLabel`** (v2.2.68) : `id, type ('car'|'track'), acId, displayName, createdAt, updatedAt`, unique sur `(type, acId)`. **Global** (pas de FK station — un `acId` désigne le même contenu AC partout), contrairement à `ContentPreview` qui est scopé par station.
 - **`BlankingMedia`**: `id, stationId (FK), filename, mimeType, sizeBytes, order`, unique sur `(stationId, order)`.
 - **`AppSettings`**: singleton (`id: 'singleton'`), `blankingDelaySeconds (défaut 10)`.
 
@@ -155,6 +162,7 @@ sim-center-manager/
 - `AdminOrStationAuthGuard` accepte soit un JWT admin, soit une clé API station ; importer `AuthModule` (pas `JwtModule` brut) dans le module qui l'utilise, pour que la vérification JWT utilise le bon secret.
 - **`emitLaunchDedicatedServer` n'a historiquement aucune vérification/log de socket présent** (contrairement à `emitJoinServer` qui logue le nombre de sockets trouvés) — si l'agent hôte n'est pas connecté, la commande de lancement de serveur dédié disparaît silencieusement, sans aucune trace. Vérifier `getConnectedStationIds()`/les logs backend en cas de serveur bloqué en `starting`.
 - **`getUsedPorts()` (dedicated-servers.service.ts) ne filtrait pas par statut avant v2.2.66** — chaque serveur jamais créé gardait son port "réservé" pour toujours, même arrêté, épuisant progressivement les plages `9600-9700`/`8081-8181`. Corrigé : seuls les statuts `starting`/`running` comptent.
+- **Un `acServer.exe` qui crashe _après_ son lancement laissait le serveur "running" en base pour toujours, avant v2.2.68** — trouvé en conditions réelles : le process passe les vérifications de lancement (vivant + port UDP bound) puis quitte tout seul ~30s plus tard, sans qu'aucun événement ne remonte. Tout POD qui tente de rejoindre ce serveur "fantôme" reste bloqué avec une mémoire partagée AC gelée pour toujours — même symptôme que "Failed to handshake", cause différente (serveur hôte mort, pas `race.ini` du client). Voir 5.9.
 - **Rôles station (`simulator` vs `admin`)**: `Station.role` (enum `StationRole` dans `@simracing/shared`), défaut `simulator`. **Simulator** = POD joueur (peut lancer en direct, peut rejoindre un serveur dédié). **Admin** = PC hébergeur uniquement (peut héberger `acServer.exe`, ne peut ni lancer ni rejoindre). Le frontend filtre déjà (host picker de `CreateDedicatedServer.tsx` ne liste que les `admin` ; picker de join ne liste que les `simulator` ; bouton "Lancer" caché pour les `admin` dans `Stations.tsx`) mais le backend le réapplique systématiquement, donc impossible à contourner via appel API direct.
 
 ## 4. Frontend (`apps/frontend`)
@@ -182,6 +190,7 @@ sim-center-manager/
 | `/kiosk/dedicated-servers/create` | `CreateDedicatedServer` | `KioskRoute`                  | même composant que `/dedicated-servers/create`, `backPath` adapté |
 | `/users`                          | `Users`                 | `ProtectedRoute`, admin       |                                                                   |
 | `/content-previews`               | `ContentPreviews`       | `ProtectedRoute`, admin       |                                                                   |
+| `/content-names`                  | `ContentNames`          | `ProtectedRoute`, admin       | renommage cars/tracks, v2.2.68 — voir 4.2                         |
 | `/blanking-media`                 | `BlankingMediaPage`     | `ProtectedRoute`, admin       |                                                                   |
 | `/settings`                       | `SettingsPage`          | `ProtectedRoute`, admin       |                                                                   |
 
@@ -205,6 +214,7 @@ sim-center-manager/
   - **Écran d'envoi (`SendPodsModal`) en page entière** (pas une `Modal` centrée) — header avec flèche retour, contenu scrollable, footer fixe avec compteur de pilotes + bouton Envoyer.
   - Header : liens "Accueil" (`/`) et "Voir les sessions" (`/en-cours/kiosk`), tous en même onglet.
 - **`ClientNameInput.tsx`** (composant partagé, `JoinServer.tsx` + `Kiosk.tsx`) : input pilote avec dropdown de suggestions débattu 250ms sur `GET /clients?search=`.
+- **`ContentNames.tsx`** (`/content-names`, admin, v2.2.68) : page de renommage — liste tous les `acId` connus (`GET /content/labels/known`), un input par ligne + bouton Enregistrer (`PUT /content/labels`) + bouton reset (↺, réapparaît si un label existe déjà) qui envoie `displayName: ''` pour revenir au nom technique. Le mapping est résolu **côté client** : `utils/track.ts#formatCarName`/`formatTrackName`/`findTrackName` acceptent maintenant un 3ᵉ paramètre optionnel `labelMap` (prioritaire sur le nom AC brut), alimenté par le hook partagé `useContentLabelMap()` (`services/contentLabels.ts`, React Query, clé `['content-labels-map']` — un seul fetch réseau même appelé depuis plusieurs composants). Câblé dans `CreateDedicatedServer.tsx`, `JoinServer.tsx`, `Kiosk.tsx`, `Sessions.tsx`, `SessionsKiosk.tsx`, `DedicatedServers.tsx` — partout où un nom de voiture/circuit est affiché. L'acId technique brut reste visible en légende secondaire (pas masqué, juste plus discret) dans les grilles de sélection.
 
 ## 5. Agent (`apps/agent`)
 
@@ -340,7 +350,7 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 - **`race.ini` du join direct incomplet (v2.2.64, fix du "Failed to handshake" #2, le vrai fix pour le join)** : `writeJoinRaceIni()` n'écrivait que `[RACE]`/`[CAR_0]`/`[REMOTE]`, contrairement à `agent-legacy` (référence connue pour fonctionner) et à `writeRaceIni()` (lancement direct/solo, juste à côté dans le même fichier, qui fonctionne bien) qui écrivent en plus `[AUTOSPAWN]`, `[SESSION_0]`, `[TEMPERATURE]`, `[WEATHER]`, `[WIND]`, `[LIGHTING]` (v2.2.66) et plusieurs champs `[CAR_0]`/`[REMOTE]` (`DRIVERNAME`, `TEAM`, `GUID`, `RESTRICTOR`, `SPECTATOR_MODE`, `SPAWN_POINT`, `NAME`, `__CM_EXTENDED`). Symptôme diagnostiqué via les logs distants (5.11) : `acs.exe` se lance, la mémoire partagée se mappe, mais reste "gelée" en boucle (`packetId` n'avance jamais) — le client n'entre jamais réellement en course. **Confirmé réparé en conditions réelles** (créé un serveur + envoyé un POD réel) : la mémoire partagée passe de "gelée" à "state changed" en ~15s, centaines de paquets de télémétrie reçus en quelques minutes.
 - `server:join` envoie `host`, `port`, `httpPort`, `password`, `carAcId`, `track`, `trackLayout`, `serverName`, `durationMinutes?`, `clientName?`, `difficulty?`, `gearbox?`, `sessionId?`.
 - `acLauncher.ts` gère le join soit via Content Manager (`acmanager://race/online/join`), soit en direct (`acs.exe` + `race.ini`).
-- L'agent ne scanne **pas** les process `acServer.exe` en cours — le statut du serveur dédié dépend uniquement de `server:started`/`server:stopped`.
+- L'agent ne scanne **pas** activement les process `acServer.exe` en cours — le statut du serveur dédié dépend uniquement de `server:started`/`server:stopped`, ce dernier étant émis soit sur arrêt volontaire, soit sur crash tardif détecté par le listener `exit` du child process (v2.2.68, voir 5.12).
 - `pkg` embarque `lua_app/**/*`, `assets/**/*`, `node_modules/koffi/**/*`. Binaires natifs koffi copiés à côté de l'exécutable par `postpackage:win`.
 - koffi est **Windows uniquement**. Sur Linux/macOS le lecteur mémoire partagée ne fait rien, la télémétrie retombe sur UDP/HTTP/fichier Lua.
 - **Aperçus (previews)**: `contentScanner.ts` envoie les images en base64 brut (jusqu'à 2 Mo/image). DDS converties en PNG via ImageMagick si disponible.
@@ -363,6 +373,13 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 - Endpoint : `GET /api/stations/:id/logs` (voir 3.1).
 - Frontend : bouton "Logs" sur `Stations.tsx` (groupe Maintenance) → `LogsModal` (fetch + bouton Actualiser, affichage monospace scrollable).
 - **A servi à diagnostiquer en conditions réelles** le bug de `race.ini` de join (5.10) sans accès physique aux PC.
+- **Ne gardait que `msg`, perdant tous les champs structurés pino (`code`, `err`, `serverId`...) avant v2.2.68** — ce qui a directement gêné le diagnostic du bug 5.12 (impossible de voir le code de sortie d'`acServer.exe` à distance). `LogFileStream#formatExtras()` ajoute maintenant les champs pertinents en suffixe (`msg (code=1, serverId=...)`), sauf `pid`/`hostname`/`time`/`level`/`msg` (déjà affichés) ; `err.message` est extrait spécifiquement plutôt que d'afficher l'objet entier.
+
+### 5.12 Détection de crash tardif du serveur dédié (v2.2.68)
+
+- **Bug réel trouvé en conditions réelles pendant cette session de re-vérification** : `acServer.exe` passe les vérifications de lancement (`verifyProcessAlive` 2.5s + `waitForPortBound` 5s dans `serverLauncher.ts`) puis **quitte tout seul plus tard** (observé : ~29s après un lancement par ailleurs réussi), sans qu'aucun événement ne remonte nulle part. Le `DedicatedServer` restait `running` en base indéfiniment ; tout POD qui tentait de le rejoindre restait bloqué avec une mémoire partagée AC "gelée" pour toujours — **même symptôme que "Failed to handshake" (5.10), cause différente** (serveur hôte mort, pas `race.ini` du client). Cause racine du crash d'`acServer.exe` lui-même **non identifiée** (pas d'accès au `server.log` de la station à distance) — seule la détection/le signalement du crash est corrigé pour l'instant.
+- **Fix** : `ServerLauncher` prend un callback optionnel `onUnexpectedExit(serverId, code)`, appelé depuis le listener `exit` du child process **sauf** si l'arrêt a été déclenché par notre propre `stop()` (tracké via un `Set<string> intentionalStops`, ajouté avant le `kill()` et consommé dans le listener `exit`). `agent.ts` câble ce callback pour émettre `server:stopped` avec un `error`, exactement comme le fait déjà l'échec de lancement — le backend transforme ça en statut `error` (`agent.gateway.ts#handleServerStopped`), ce qui libère aussi le port (`getUsedPorts()`, v2.2.66) et remonte visuellement dans `DedicatedServers.tsx`/`Kiosk.tsx` (badge "error" déjà supporté par les deux, aucun changement frontend nécessaire).
+- **Piste de suite si le crash se reproduit** : exposer `server.log` (écrit par `pipeToLog()` dans `serverDir`) via un endpoint dédié, sur le même principe que les logs distants de l'agent (5.11) — pas encore fait, le ring buffer de l'agent ne capture que ses propres logs pino, pas la sortie stdout/stderr d'`acServer.exe`.
 
 ## 6. Contrats partagés (`packages/shared`)
 
