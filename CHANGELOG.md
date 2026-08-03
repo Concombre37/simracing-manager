@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.65 — Une mise à jour ratée pouvait laisser l'agent complètement arrêté
+
+### Corrigé
+
+- **Le script de mise à jour n'avait aucune gestion d'erreur : si `Expand-Archive` échouait pour une raison quelconque (fichier verrouillé, zip corrompu, etc.), l'agent restait purement et simplement arrêté** — plus aucun contrôle à distance jusqu'à une intervention physique sur le PC. Constaté en conditions réelles : après avoir déclenché "MAJ agent" sur les deux postes, aucun des deux n'est jamais revenu en ligne. Le script sauvegarde maintenant l'exécutable et le module natif (`build/`) actuels avant d'extraire la nouvelle version ; si l'extraction échoue, il restaure cette sauvegarde ; et il tente **toujours** de relancer l'agent à la fin (nouvelle version si l'extraction a réussi, ancienne sinon) plutôt que de s'arrêter en silence si une étape échoue. Toutes les étapes sont maintenant journalisées dans `update-agent.log` à côté de l'exécutable, pour diagnostiquer un futur échec sans accès physique.
+
 ## v2.2.64 — Corrige les "Failed to handshake" intermittents en rejoignant un serveur dédié
 
 ### Corrigé
