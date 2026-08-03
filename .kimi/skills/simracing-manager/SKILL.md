@@ -1,215 +1,395 @@
 # SimRacing Manager — Skill
 
-Project-scope knowledge for working on the `simracing-manager` monorepo.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.67`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
-## 1. Project Overview
+## 1. Vue d'ensemble
 
-- **Repo**: `/root/sim-center-manager`
+- **Repo local**: `/root/sim-center-manager`
 - **GitHub**: `Concombre37/simracing-manager`
-- **Production**: `https://simracing.hytlabs.com`
-- **Architecture**: NestJS backend + React/Vite frontend + Node.js Windows agent, all in npm workspaces.
-- **Current version**: `2.2.57` (agent version is the source of truth; root `package.json` may lag).
+- **Production**: `https://simracing.hytlabs.com` (derrière Cloudflare Tunnel — voir mémoire `hytlabs-cloudflare-tunnel`)
+- **Architecture**: NestJS 10 (backend) + React 18/Vite (frontend) + agent Windows Node.js (`pkg`), le tout en npm workspaces.
+- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.67`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
+- **Deux stations réelles connues** (hytlabs) : `concombre` (rôle `admin`, hôte de serveurs dédiés, IP `192.168.1.63`) et `desktop-gl3t50t` (rôle `simulator`, POD joueur, IP `192.168.1.64`).
 
-### Active agent
+### Agents
 
-| Path            | Role                                                                                                          | Version  | Released?              |
-| --------------- | ------------------------------------------------------------------------------------------------------------- | -------- | ---------------------- |
-| `apps/agent/`   | New monorepo agent, uses `@simracing/shared`, auto-provisioning + API-key auth, koffi shared-memory telemetry | `2.2.57` | Released               |
-| `agent-legacy/` | Legacy standalone agent (archived, do not use or release)                                                     | —        | Legacy, do not release |
+| Path            | Rôle                                                                                                           | Statut                                                                                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/agent/`   | Agent monorepo actuel, `@simracing/shared`, auto-provisioning + clé API, télémétrie mémoire partagée via koffi | **Utilisé, release actif**                                                                                                                                 |
+| `agent-legacy/` | Ancien agent standalone, archivé                                                                               | Ne jamais release ni utiliser — sert uniquement de référence historique (ex: `joinServer.ts`'s `buildRaceIni()` a servi à corriger un bug réel en v2.2.64) |
 
-## 2. Monorepo Layout
+## 2. Structure du monorepo
 
 ```
 sim-center-manager/
 ├── apps/
 │   ├── backend/          # NestJS 10 + Prisma 5 + PostgreSQL 16
 │   ├── frontend/         # React 18 + Vite + Tailwind 3.4
-│   └── agent/            # Windows agent (Node 20, pkg)
+│   └── agent/            # Agent Windows (Node 20, packagé avec pkg)
 ├── packages/
-│   └── shared/           # Shared types, enums, Socket.IO contracts
-├── agent-legacy/         # LEGACY agent (archived, do not use)
+│   └── shared/           # Types, enums, contrats Socket.IO partagés
+├── agent-legacy/         # Agent LEGACY (archivé, ne pas utiliser)
 ├── docker-compose.yml
 ├── nginx-simracing.hytlabs.com.conf
 ├── CHANGELOG.md
-└── .kimi/skills/simracing-manager/SKILL.md  (this file)
+├── CLAUDE.md              # Copie miroir de ce skill, chargée automatiquement par Claude Code
+└── .kimi/skills/simracing-manager/SKILL.md   (ce fichier)
 ```
 
 ## 3. Backend (`apps/backend`)
 
-- **Framework**: NestJS 10, global prefix `/api`, port `3002` in production/Docker.
-- **Real-time**: two Socket.IO gateways:
-  - `/agent` — agent provisioning, heartbeat, commands (`AgentGateway`, guarded by `AgentAuthGuard`).
-  - root namespace `/` — dashboard gateway for frontend, emits `station:updated`.
-- **Auth**: JWT (`accessToken`) for users; SHA-256 hashed API keys for agents.
-- **Key modules**: `Auth`, `Users`, `Stations`, `Sessions`, `DedicatedServers`, `Agent`, `Dashboard`, `Content`, `ContentPreviews`, `BlankingMedia`, `PowerManagement`, `Telemetry`.
-- **Prisma**: schema at `apps/backend/prisma/schema.prisma`. **Migrations are manual** — not run by Docker. Always run `npx prisma migrate deploy --schema=apps/backend/prisma/schema.prisma` after schema changes.
-- **Static files**: backend serves built frontend from `apps/frontend/dist` via `@nestjs/serve-static`.
-- **Agent socket buffer**: `AgentGateway` uses `maxHttpBufferSize: 1 * 1024 * 1024 * 1024` to accept large content payloads with previews.
+- **Framework**: NestJS 10, préfixe global `/api`, port `3002` en production/Docker.
+- **Temps réel**: deux gateways Socket.IO :
+  - namespace `/agent` — provisioning, heartbeat, commandes agent (`AgentGateway`, protégé par `AgentAuthGuard`).
+  - namespace racine `/` — gateway dashboard pour le frontend (`DashboardGateway`), émet `station:updated`, `station:telemetry`, `session:updated`.
+- **Auth**: JWT (`accessToken`) pour les utilisateurs ; clés API hashées SHA-256 pour les agents.
+- **Modules**: `Auth`, `Users`, `Stations`, `Sessions`, `DedicatedServers`, `Agent`, `Dashboard`, `Content`, `ContentPreviews`, `BlankingMedia`, `PowerManagement`, `Telemetry`, `Settings`, `Clients`.
+- **Prisma**: schéma dans `apps/backend/prisma/schema.prisma`. **Migrations manuelles** — jamais lancées par Docker. Toujours `npx prisma migrate deploy --schema=apps/backend/prisma/schema.prisma` après un changement de schéma.
+- **Fichiers statiques**: le backend sert le frontend buildé (`apps/frontend/dist`) via `@nestjs/serve-static`.
+- **Buffer WebSocket agent**: `AgentGateway` utilise `maxHttpBufferSize: 1 * 1024 * 1024 * 1024` pour accepter les gros payloads de contenu (previews en base64).
 
-### Important backend endpoints
+### 3.1 Endpoints REST — liste exhaustive
 
-- `GET /api/stations` — list stations (admin/technician).
-- `POST /api/stations/:id/wake` — Wake-on-LAN via a relay POD on the same subnet (admin/technician).
-- `POST /api/stations/:id/shutdown` — remote shutdown via agent WebSocket (admin/technician).
-- `POST /api/stations/:id/launch`, `POST /api/stations/:id/stop` — session control. `launch` is rejected (400) unless the station's `role` is `simulator`.
-- `POST /api/stations/:id/sync-content` — force agent content rescan.
-- `GET /api/content/previews`, `GET /api/content/previews/:id`, `DELETE /api/content/previews/:id`.
-- `GET|POST /api/stations/:id/blanking-media` — per-station blanking media.
-- `POST /api/blanking-media/bulk` — upload one file to multiple stations.
-- `POST /api/dedicated-servers` — create a dedicated server; rejected (400) unless the host station's `role` is `admin`.
-- `POST /api/dedicated-servers/:id/join` — join PODs to a server; any pod whose station `role` isn't `simulator` is skipped (logged warning, not a hard error since it's a batch of PODs). Per-pod body accepts an optional `gearbox` (`'MANUAL' | 'AUTO'`, `GearboxMode` enum, v2.2.55) alongside `difficulty` — stored on `Session.gearbox` (plain nullable `String`, like `difficulty`) and forwarded to the agent's `server:join` payload; see the agent gotcha on `AUTO_SHIFTER` below for why this is a separate field rather than folded into difficulty.
+**`AuthController` (`/api/auth`)**
 
-### Station roles (`simulator` vs `admin`)
+- `POST /auth/login`
+- `POST /auth/register`
+- `GET /auth/me`
 
-- `Station.role` (`'simulator' | 'admin'`, `StationRole` enum in `@simracing/shared`), defaults to `simulator`. Set at creation (`CreateStationModal.tsx`) or changed later from the Stations page (expanded panel → "Type de poste").
-- **Simulator** = player-facing POD (wheel/pedals): can run a direct/solo launch and can join a dedicated server as a POD.
-- **Admin** = hosting-only PC: can host a dedicated server (`acServer.exe`), cannot launch/join sessions itself.
-- Frontend enforces this via filtering (host picker in `CreateDedicatedServer.tsx` only lists `admin` stations; join picker in `DedicatedServers.tsx` only lists `simulator` stations; "Lancer" button hidden for `admin` stations in `Stations.tsx`); the backend enforces it again (see endpoints above) so this can't be bypassed by calling the API directly.
+**`UsersController` (`/api/users`)**
 
-### Important backend gotchas
+- `POST /users` (admin)
+- `GET /users` (admin)
+- `GET /users/me`
+- `GET /users/:id` (admin)
+- `PATCH /users/:id` (admin)
+- `DELETE /users/:id` (admin)
 
-- `AgentAuthGuard` joins authenticated sockets to room `station:<stationId>` only if not already present. All agent-targeted commands use `this.server.to('station:<id>').emit(...)`.
-- **`Session.stationId` is the internal Station UUID (Prisma FK), not the business `stationId` the agent's socket room is named after.** Always navigate through the relation (`session.station.stationId`) when emitting to the agent gateway — using the raw `session.stationId` silently emits to a room nobody has joined (found and fixed in `sessions.controller.ts`'s `extend()`/`stop()` in v2.2.30; `stop()` also needs `include: { station: true }` in `sessions.service.ts`, it didn't have it originally). Every other controller (`stations.controller.ts`, `dedicated-servers.controller.ts`) already does this correctly by going through `station.stationId`.
-- `AGENT_API_KEY_SALT` env var is validated but **not used** in code (plain SHA-256).
-- Migrations are applied manually; the Docker image does not run migrations on startup.
-- Dashboard `station:command` accepts `shutdown`/`wake` but Wake-on-LAN is handled by the `power-management` REST endpoint.
-- `AdminOrStationAuthGuard` allows either an admin JWT or a station API key; when used in a module, import `AuthModule` (not raw `JwtModule`) so JWT verification uses the configured secret.
+**`StationsController` (`/api/stations`)**
+
+- `POST /stations` (admin) — crée une station
+- `GET /stations` (admin/technician)
+- `GET /stations/connected` — liste des `stationId` réellement connectés (socket)
+- `GET /stations/:id`
+- `GET /stations/:id/telemetry`
+- `PATCH /stations/:id` (admin) — si `role` est présent dans le body, pousse `station:role` à l'agent via `agentGateway.emitStationRole()`
+- `DELETE /stations/:id` (admin)
+- `POST /stations/:id/regenerate-api-key` (admin)
+- `POST /stations/:id/launch` — rejeté (400) si `role !== 'simulator'`
+- `POST /stations/:id/stop`
+- `POST /stations/:id/update-agent` (admin/technician) — déclenche `system:update`
+- `POST /stations/:id/sync-content` (admin) — déclenche `content:sync`
+- `GET /stations/:id/logs` (admin/technician, **v2.2.63**) — aller-retour WebSocket `logs:request`/`agent:logs` (timeout 4s), retourne `{ lines: string[] }` (vide si l'agent n'est pas connecté ou ne répond pas)
+
+**`PowerManagementController` (`/api/stations`)**
+
+- `POST /stations/:id/wake` (admin/technician) — Wake-on-LAN via un POD relais du même sous-réseau
+- `POST /stations/:id/shutdown` (admin/technician) — arrêt distant via WebSocket agent
+
+**`SessionsController` (`/api/sessions`)**
+
+- `POST /sessions`
+- `GET /sessions/station/:stationId`
+- `GET /sessions/active`
+- `POST /sessions/:id/extend`
+- `POST /sessions/:id/stop`
+
+**`DedicatedServersController` (`/api/dedicated-servers`)**
+
+- `POST /dedicated-servers` (admin) — rejeté (400) si la station hôte n'a pas `role: 'admin'`
+- `GET /dedicated-servers` (admin/technician)
+- `GET /dedicated-servers/:id` (admin/technician)
+- `PATCH /dedicated-servers/:id` (admin)
+- `DELETE /dedicated-servers/:id` (admin)
+- `POST /dedicated-servers/:id/stop` (admin)
+- `POST /dedicated-servers/:id/join` (admin) — envoie une liste de PODs ; tout POD dont la station n'a pas `role: 'simulator'` est ignoré (warning loggé, pas d'erreur bloquante). Body par POD : `stationId`, `carAcId`, `clientName?`, `difficulty?` (`EASY|PRO|CUSTOM`), `gearbox?` (`MANUAL|AUTO`). `clientName`, s'il est fourni, déclenche un find-or-create dans `Client` (insensible à la casse) et relie `Session.clientId`.
+
+**`ClientsController` (`/api/clients`, v2.2.63)**
+
+- `GET /clients?search=` (admin/technician) — jusqu'à 10 résultats, `contains` insensible à la casse, utilisé par l'autocomplete `ClientNameInput.tsx`.
+
+**`ContentController` (`/api/content`)**
+
+- `POST /content/packages`
+- `GET /content/catalog`
+- `GET /content/packages/:id/download`
+
+**`ContentPreviewsController` (`/api/content/previews`)**
+
+- `GET /content/previews`
+- `GET /content/previews/:id`
+- `DELETE /content/previews/:id`
+
+**`BlankingMediaController`**
+
+- `GET /stations/:id/blanking-media`
+- `POST /stations/:id/blanking-media`
+- `PATCH /stations/:id/blanking-media/reorder`
+- `DELETE /stations/:stationId/blanking-media/:mediaId`
+- `POST /blanking-media/bulk` — upload un fichier vers plusieurs stations
+- `GET /blanking-media/:id/download`
+
+**`SettingsController` (`/api/settings`)**
+
+- `GET /settings`
+- `PATCH /settings` (admin) — émet `settings.updated` (EventEmitter interne) → poussé à tous les agents via `settings:updated`
+
+### 3.2 Modèle de données (Prisma)
+
+- **`User`**: `id, email (unique), password, role (technician|admin), createdAt, updatedAt`.
+- **`Station`**: `id, stationId (unique, business id), name, role (simulator|admin), apiKeyHash, version, localIp, macAddress, lastSeenAt, status, blankingActive, config (json), content (json — cars/tracks scannés), createdAt, updatedAt`. Relations: `sessions[]`, `dedicatedServers[]`, `contentPreviews[]`, `blankingMedia[]`.
+- **`Session`**: `id, stationId (FK Station.id — PAS la business stationId, voir gotcha 3.3), type (direct_launch|dedicated_join), serverId?, clientId? (FK Client), clientName?, difficulty?, gearbox?, carAcId?, track?, trackLayout?, durationMinutes?, config (json), status (pending|running|finished), startedAt?, endedAt?, result (json — race_out.json nettoyé), createdAt, updatedAt`. Relations: `station`, `client?`, `telemetryFiles[]`.
+- **`Client`** (v2.2.63) : `id, name (unique), createdAt, updatedAt`. Relation: `sessions[]`. Find-or-create insensible à la casse dans `ClientsService`.
+- **`TelemetryFile`**: `id, sessionId (FK), fileName, sizeBytes, content (bytes?), createdAt`.
+- **`ContentPackage`**: `id, type, name, version, archiveUrl, checksum, isRequired`, unique sur `(type, name, version)`.
+- **`DedicatedServer`**: `id, name, stationId (FK Station, l'hôte), track, trackLayout?, cars (String[]), maxClients (défaut 10), password?, rconPassword?, config (json), status (stopped|starting|running|error), serverDir?, udpPort?, tcpPort?, httpPort?, startedAt?, endedAt?`.
+- **`ContentPreview`**: `id, stationId (FK), type, acId, name, data (base64)`, unique sur `(stationId, type, acId)`.
+- **`BlankingMedia`**: `id, stationId (FK), filename, mimeType, sizeBytes, order`, unique sur `(stationId, order)`.
+- **`AppSettings`**: singleton (`id: 'singleton'`), `blankingDelaySeconds (défaut 10)`.
+
+### 3.3 Gotchas backend importants
+
+- `AgentAuthGuard` rejoint la room `station:<stationId>` seulement si le socket n'y est pas déjà. Toute commande vers un agent utilise `this.server.to('station:<id>').emit(...)`.
+- **`Session.stationId` est l'UUID interne de `Station` (FK Prisma), pas la `stationId` métier** sur laquelle la room WebSocket de l'agent est nommée. Toujours passer par la relation (`session.station.stationId`) pour émettre vers l'agent — utiliser la `session.stationId` brute émet silencieusement vers une room que personne n'a rejointe (bug trouvé et corrigé dans `sessions.controller.ts`'s `extend()`/`stop()` en v2.2.30 ; `stop()` a aussi eu besoin de `include: { station: true }` dans `sessions.service.ts`). Tous les autres contrôleurs (`stations.controller.ts`, `dedicated-servers.controller.ts`) le font déjà correctement.
+- `AGENT_API_KEY_SALT` est validé mais **jamais utilisé** dans le code (SHA-256 en clair).
+- `AdminOrStationAuthGuard` accepte soit un JWT admin, soit une clé API station ; importer `AuthModule` (pas `JwtModule` brut) dans le module qui l'utilise, pour que la vérification JWT utilise le bon secret.
+- **`emitLaunchDedicatedServer` n'a historiquement aucune vérification/log de socket présent** (contrairement à `emitJoinServer` qui logue le nombre de sockets trouvés) — si l'agent hôte n'est pas connecté, la commande de lancement de serveur dédié disparaît silencieusement, sans aucune trace. Vérifier `getConnectedStationIds()`/les logs backend en cas de serveur bloqué en `starting`.
+- **`getUsedPorts()` (dedicated-servers.service.ts) ne filtrait pas par statut avant v2.2.66** — chaque serveur jamais créé gardait son port "réservé" pour toujours, même arrêté, épuisant progressivement les plages `9600-9700`/`8081-8181`. Corrigé : seuls les statuts `starting`/`running` comptent.
+- **Rôles station (`simulator` vs `admin`)**: `Station.role` (enum `StationRole` dans `@simracing/shared`), défaut `simulator`. **Simulator** = POD joueur (peut lancer en direct, peut rejoindre un serveur dédié). **Admin** = PC hébergeur uniquement (peut héberger `acServer.exe`, ne peut ni lancer ni rejoindre). Le frontend filtre déjà (host picker de `CreateDedicatedServer.tsx` ne liste que les `admin` ; picker de join ne liste que les `simulator` ; bouton "Lancer" caché pour les `admin` dans `Stations.tsx`) mais le backend le réapplique systématiquement, donc impossible à contourner via appel API direct.
 
 ## 4. Frontend (`apps/frontend`)
 
 - **Stack**: React 18 + TypeScript + Vite + Tailwind 3.4 + TanStack Query + Axios + Socket.IO.
-- **Routes**: `/login`, `/`, `/stations`, `/dedicated-servers`, `/dedicated-servers/create`, `/dedicated-servers/:id/join`, `/leaderboard`, `/en-cours`, `/en-cours/kiosk` (no sidebar, see below), `/users` (admin), `/content-previews` (admin), `/blanking-media` (admin), `/settings` (admin).
-- **API base**: `import.meta.env.VITE_API_URL` or `/api`.
-- **Real-time**: `useSocket.ts` connects to root namespace with JWT; listens to `station:updated`.
-- **Auth context**: stores JWT in `localStorage.accessToken`, fetches `/api/auth/me` on mount.
+- **Base API**: `import.meta.env.VITE_API_URL` ou `/api`.
+- **Temps réel**: `useSocket.ts` se connecte au namespace racine avec le JWT ; écoute `station:updated`, `station:telemetry`, `session:updated`.
+- **Auth**: JWT stocké dans `localStorage.accessToken`, `GET /api/auth/me` au montage.
+- **Build**: sortie dans `apps/frontend/dist` ; servi par le backend en production.
 
-### Frontend gotchas
+### 4.1 Routes — liste exhaustive
 
-- `Stations.tsx` registers `socket.on('station:updated', ...)` directly in render, causing duplicate listeners. Wrap in `useEffect` when modifying.
-- `Leaderboard` is a placeholder.
-- `/settings` (menu "Paramètres") shows network info (IP/MAC) and WoL/shutdown controls.
-- `/blanking-media` (menu "Écrans") allows multi-station bulk upload of blanking media.
-- Build outputs to `apps/frontend/dist`; backend serves it in production.
-- `Stations.tsx` has both a status filter and a role filter (Tous types/Simulateurs/Admin) as separate pill rows; both apply together (AND, not OR).
-- **`JoinServer.tsx`** (full page at `/dedicated-servers/:id/join`, replaced the old `JoinServerModal` in v2.2.x post-2.2.48) — game-style POD send screen: visual POD roster cards, per-pilot name plate, difficulty as three descriptive cards (copy grounded in the actual `assists.ini` values `acLauncher.ts` writes per preset), car grid with preview images (same picker style as `CreateDedicatedServer.tsx`). Defaults `durationMinutes` to `undefined` ("Illimité") — this is the common case operators pick, not an edge case. Any agent/backend logic around sessions must work correctly without a duration (see the agent gotcha about `acSharedMemoryReader` below).
-- **`Sessions.tsx`** (`/en-cours`) — session cards use a track-preview banner with the driver name as a nameplate, colored difficulty badges, and a top stat strip (PODs in session, live avg speed, sessions ending within a minute). Resolves car/track names+previews from the joined `stations` query's `content` field (same technique `DedicatedServers.tsx` uses), matched by `session.station.stationId`. `CircularGauge.tsx`'s colors must stay in the app's actual dark palette (`dark-950`/`dark-900` etc., not generic Tailwind grays) — this was a real bug found and fixed (clashing `#111827`/`#1f2937`).
-- **`SessionsKiosk.tsx`** (`/en-cours/kiosk`, v2.2.55) — read-only wall-display variant of `/en-cours`: 5x2 grid, capped at the 10 most-recently-started active sessions (`slice(0, 10)` after sorting by `startedAt` desc — no pagination/rotation), simplified per-POD card (pilot, car/circuit, live speed, remaining/elapsed time — no gauges, no extend/stop actions). Routed via a new `KioskRoute` wrapper in `App.tsx` (same auth check as `ProtectedRoute` but does **not** wrap in `Layout`/sidebar, to maximize grid space on an actual TV/monitor). Linked from `Sessions.tsx`'s header ("Mode kiosque" button, opens in a new tab).
-- **`JoinServer.tsx`**: after a successful "Envoyer", the mutation's `onSuccess` navigates straight to `/en-cours` (v2.2.55) — there is no more intermediate "En piste !" success screen with a manual "Retour aux serveurs" button (removed as dead code once the redirect became automatic).
+| Route                             | Composant               | Garde                         | Notes                                                             |
+| --------------------------------- | ----------------------- | ----------------------------- | ----------------------------------------------------------------- |
+| `/login`                          | `Login`                 | publique                      |                                                                   |
+| `/`                               | `Dashboard`             | `ProtectedRoute` (sidebar)    |                                                                   |
+| `/stations`                       | `Stations`              | `ProtectedRoute`              |                                                                   |
+| `/dedicated-servers`              | `DedicatedServers`      | `ProtectedRoute`              |                                                                   |
+| `/dedicated-servers/create`       | `CreateDedicatedServer` | `ProtectedRoute`              |                                                                   |
+| `/dedicated-servers/:id/join`     | `JoinServer`            | `ProtectedRoute`              |                                                                   |
+| `/leaderboard`                    | `Leaderboard`           | `ProtectedRoute`              | placeholder, jamais implémenté                                    |
+| `/en-cours`                       | `Sessions`              | `ProtectedRoute`              |                                                                   |
+| `/en-cours/kiosk`                 | `SessionsKiosk`         | `KioskRoute` (pas de sidebar) | mur d'affichage passif, TV/moniteur                               |
+| `/kiosk`                          | `Kiosk`                 | `KioskRoute`                  | opérateur tactile, voir 4.3                                       |
+| `/kiosk/dedicated-servers/create` | `CreateDedicatedServer` | `KioskRoute`                  | même composant que `/dedicated-servers/create`, `backPath` adapté |
+| `/users`                          | `Users`                 | `ProtectedRoute`, admin       |                                                                   |
+| `/content-previews`               | `ContentPreviews`       | `ProtectedRoute`, admin       |                                                                   |
+| `/blanking-media`                 | `BlankingMediaPage`     | `ProtectedRoute`, admin       |                                                                   |
+| `/settings`                       | `SettingsPage`          | `ProtectedRoute`, admin       |                                                                   |
 
-## 5. New Agent (`apps/agent`)
+`ProtectedRoute` = vérif auth + `Layout` (sidebar). `KioskRoute` = même vérif auth, **sans** `Layout` (plein écran).
 
-- **Entry**: `src/index.ts`. Packaged with `pkg` target `node18-win-x64`.
-- **Config**: `.env` next to the executable (`path.dirname(process.execPath)`). Auto-generated if missing.
-- **Auth**: auto-provisioning when `API_KEY` is empty; connects to `/agent` namespace.
-- **Key modules**:
-  - `config.ts` — Zod-validated `.env` loader.
-  - `agent.ts` — WebSocket lifecycle, heartbeat, command handlers.
-  - `network.ts` — local IP, MAC address, broadcast address detection.
-  - `wol.ts` — Wake-on-LAN magic packet sender (uses `wake_on_lan`, ports 9 + 7, unicast/broadcast).
-  - `wolDiagnostics.ts` — checks Windows WoL prerequisites at startup (Fast Startup, adapter settings).
-  - `contentScanner.ts` — scans `content/cars` and `content/tracks`.
-  - `serverLauncher.ts` — launches `acServer.exe`.
-  - `acLauncher.ts` — launches AC/CM sessions.
-  - `luaBridge.ts` — writes command files for the in-game Lua app.
-  - `acSharedMemoryReader.ts` — reads Assetto Corsa shared memory (`Local\acpmf_physics`, `Local\acpmf_graphics`, `Local\acpmf_static`) via koffi and emits live telemetry snapshots.
-  - `telemetryReceiver.ts` — legacy UDP/HTTP telemetry fallback from the CSP Lua app.
-  - `telemetryFileReader.ts` — legacy telemetry fallback from a JSON file written by the CSP Lua app.
-  - `raceResultReader.ts` — reads `Documents/Assetto Corsa/out/race_out.json` after a session ends and forwards it to the backend via `agent:results`.
-  - `blankingManager.ts` / `blankingMediaSync.ts` — blanking screen management.
-  - `kioskManager.ts` — kiosk mode during a session (hides taskbar, minimizes other windows); also owns `revealGame()`, called only via `BlankingManager`'s `onGameRevealed` callback (see kiosk/blanking gotcha below) — never call it directly at launch time.
-  - `processMonitor.ts` — verifies AC is genuinely running, not just present in `tasklist` (see "Process/shared-memory verification" below).
-  - `trayManager.ts` — tray icon + local console window lifecycle (flag-file command bridge, `updateStatus()` snapshot writer). See "Local console" below.
-  - `logRingBuffer.ts` / `logFileStream.ts` — in-memory ring buffer + persisted rotated log file (`%TEMP%\simracing-manager\logs\agent.log`) feeding the local console's log panel; the packaged agent normally runs with its console window hidden, so without this file logging, errors were previously discarded entirely.
+### 4.2 Composants/pages clés et leurs subtilités
 
-### Telemetry
+- **`Layout.tsx`**: rail de navigation icônes-seules révélées au survol ; header avec bouton **"Mode kiosque"** (`Link to="/kiosk"`, même onglet — ne **jamais** remettre `target="_blank"`), horloge, avatar/déconnexion.
+- **`Stations.tsx`**: écoute `socket.on('station:updated', ...)` directement dans le render (pas dans un `useEffect`) — provoque des listeners dupliqués ; envelopper dans `useEffect` avant toute modification. Filtre statut ET filtre rôle (Tous types/Simulateurs/Admin), tous deux appliqués ensemble (ET, pas OU). Panneau étendu par station : groupe "Maintenance" (MAJ agent, **Logs** — v2.2.63, Clé API, Supprimer), groupe "Type de poste" (bascule simulator/admin), groupe "Écran" (masquer/afficher blanking, écran d'attente), groupe VR/jeu (ligne idéale, boîte auto, teleport pits, recenter VR).
+- **`CreateDedicatedServer.tsx`** (wizard 3 étapes : Simulateur → Circuit → Configuration) :
+  - Étape 2 (Circuit) : vignette image par layout (pas juste du texte) — corrige un vrai bug de photos manquantes (v2.2.56).
+  - Étape 3 : `carCounts: Record<string, number>` — cliquer sur une voiture l'ajoute (jusqu'à `maxClients`) ; **le tout premier clic (aucune voiture encore sélectionnée) remplit directement tous les slots** (v2.2.66, plus besoin de cliquer sur le bouton "remplir" séparé pour le cas courant d'une seule voiture) ; bouton "remplir tous les slots" au survol pour re-remplir explicitement ; badge de quantité cliquable pour retirer un exemplaire. `flattenCarCounts()` transforme les comptes en tableau plat répété — `serverLauncher.ts` cycle ce tableau en round-robin sur `maxClients` slots, donc un tableau à un seul élément remplit déjà tous les slots naturellement côté agent. "Options avancées" (nom, slots, mot de passe, RCON) repliées par défaut, 11 slots par défaut.
+  - `backPath` = `/kiosk` si le chemin actuel commence par `/kiosk`, sinon `/dedicated-servers` — pour "Annuler" et après création réussie.
+- **`JoinServer.tsx`** (page complète `/dedicated-servers/:id/join`) : cartes PODs façon jeu, plaque nominative par pilote (`ClientNameInput.tsx`, autocomplete sur `Client`), difficulté en 3 cartes descriptives, grille de voitures avec images. `availableCars` **dédupliquée** (`Array.from(new Set(server.cars))`) — un serveur peut avoir des voitures répétées (quantité choisie à la création), mais pour le choix du pilote une seule carte par modèle suffit (corrige un vrai bug de clés React dupliquées → cartes qui se sélectionnaient toutes ensemble, v2.2.66-ish). `durationMinutes` par défaut `undefined` ("Illimité") — cas le plus courant, pas un cas limite. Après "Envoyer" réussi, redirige directement vers `/en-cours` (pas d'écran de succès intermédiaire).
+- **`Sessions.tsx`** (`/en-cours`) : `SessionCard` (exporté, réutilisé ailleurs) — bannière avec vignette circuit, nom du pilote en évidence, badges de difficulté colorés, jauges circulaires RPM/vitesse (couleurs de la palette sombre de l'app, pas des gris Tailwind génériques), barres accélérateur/frein, meilleur/dernier tour, temps restant avec barre de progression, boutons prolonger/arrêter, et (si `onCommand` fourni) ligne idéale/boîte auto/retour aux stands.
+- **`SessionsKiosk.tsx`** (`/en-cours/kiosk`) : mur passif, grille fixe 5×2 (10 slots max — plafonné aux 10 sessions les plus récemment démarrées, pas de pagination/rotation), cartes compactes cliquables ouvrant la `SessionCard` complète dans une `Modal`. Lien "Accueil" (`/`) et "Gérer les PODs" (`/kiosk`) dans le header, **même onglet**.
+- **`Kiosk.tsx`** (`/kiosk`, vue opérateur tactile, pas de sidebar) :
+  - Onglets Serveurs / **Postes** (Postes par défaut).
+  - **Onglet Postes**: grille fixe à **10 slots max** (`MAX_PODS`), stations `admin` **exclues** entièrement, slots vides en pointillés si moins de 10 PODs simulateurs. Chaque slot : `PodSessionCell` (compact, cliquable → modal détail complet via `SessionCard`) si en session, sinon `PodAvailableCell` (cliquable, bouton "Envoyer" ou "Créer un serveur" selon qu'un serveur tourne).
+  - Cliquer un POD disponible → si 0 serveur actif : navigue vers `/kiosk/dedicated-servers/create` ; si 1 : ouvre directement l'écran d'envoi ; si plusieurs : modal "Choisir un serveur" d'abord.
+  - **Écran d'envoi (`SendPodsModal`) en page entière** (pas une `Modal` centrée) — header avec flèche retour, contenu scrollable, footer fixe avec compteur de pilotes + bouton Envoyer.
+  - Header : liens "Accueil" (`/`) et "Voir les sessions" (`/en-cours/kiosk`), tous en même onglet.
+- **`ClientNameInput.tsx`** (composant partagé, `JoinServer.tsx` + `Kiosk.tsx`) : input pilote avec dropdown de suggestions débattu 250ms sur `GET /clients?search=`.
 
-The agent has three telemetry sources, all feeding the same `onTelemetrySnapshot()` handler:
+## 5. Agent (`apps/agent`)
 
-1. **Shared memory (primary, Windows-only)** — `AcSharedMemoryReader` polls AC at 10 Hz using koffi. It does not depend on CSP/Lua UDP.
-2. **UDP/HTTP receiver (fallback)** — `TelemetryReceiver` listens on `127.0.0.1:19900` (UDP) and `127.0.0.1:19901` (HTTP) for the CSP Lua app.
-3. **File reader (fallback)** — `TelemetryFileReader` reads `Documents/Assetto Corsa/cfg/SimCenterManager/telemetry.json`.
+- **Entrée**: `src/index.ts`. Packagé avec `pkg`, cible `node18-win-x64`.
+- **Config**: `.env` à côté de l'exécutable (`path.dirname(process.execPath)`, jamais `process.cwd()`). Auto-généré si absent.
+- **Auth**: auto-provisioning si `API_KEY` vide ; connexion au namespace `/agent`.
+- **Réseau**: `io(SERVER_URL + '/agent', { transports: ['websocket'], reconnection: false })` — la reconnexion est gérée **manuellement** dans le code de l'agent, pas par socket.io-client (voir gotcha 5.6).
 
-`onTelemetrySnapshot()` forwards to the backend via `agent:telemetry` and updates the blanking manager / best-lap tracking.
+### 5.1 Modules — liste exhaustive
 
-### Session results
+| Fichier                   | Rôle                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------ |
+| `index.ts`                | Point d'entrée, logger pino, gestion SIGINT/SIGTERM                                        |
+| `agent.ts`                | Cycle de vie WebSocket, heartbeat, tous les handlers de commandes                          |
+| `config.ts`               | Chargeur `.env` validé par Zod                                                             |
+| `network.ts`              | IP locale, adresse MAC, adresse de broadcast                                               |
+| `wol.ts`                  | Envoi de paquets magiques Wake-on-LAN (`wake_on_lan`, ports 9 + 7)                         |
+| `wolDiagnostics.ts`       | Vérifie les prérequis WoL Windows au démarrage (Fast Startup, réglages adaptateur)         |
+| `contentScanner.ts`       | Scanne `content/cars` et `content/tracks`                                                  |
+| `contentCache.ts`         | Cache de scan de contenu, `CACHE_VERSION` à bumper si le format change                     |
+| `contentSync.ts`          | Orchestration de la synchronisation de contenu vers le backend                             |
+| `serverLauncher.ts`       | Lance `acServer.exe` (serveur dédié)                                                       |
+| `acLauncher.ts`           | Lance AC/Content Manager (direct ou join)                                                  |
+| `acPathResolver.ts`       | Résout le chemin d'installation d'Assetto Corsa                                            |
+| `cmLocator.ts`            | Localise `Content Manager.exe`                                                             |
+| `dialogs.ts`              | Prompts natifs (ex: demander le chemin CM)                                                 |
+| `luaBridge.ts`            | Écrit les fichiers de commande pour l'app Lua embarquée                                    |
+| `acSharedMemoryReader.ts` | Lit la mémoire partagée AC (`acpmf_physics/graphics/static`) via koffi, télémétrie live    |
+| `acSharedMemory.ts`       | Vérification PowerShell de présence + fraîcheur de la mémoire partagée (signal `acLoaded`) |
+| `telemetryReceiver.ts`    | Fallback UDP/HTTP (127.0.0.1:19900/19901) depuis l'app Lua CSP                             |
+| `telemetryFileReader.ts`  | Fallback fichier JSON écrit par l'app Lua CSP                                              |
+| `raceResultReader.ts`     | Lit `Documents/Assetto Corsa/out/race_out.json` en fin de session                          |
+| `raceResultCleaner.ts`    | Nettoie le JSON de résultats brut                                                          |
+| `lapTelemetryRecorder.ts` | Enregistre `laps.csv` par session, upload en fin de session                                |
+| `blankingManager.ts`      | Gestion complète de l'écran de blanking/résultats/lancement                                |
+| `blankingMediaSync.ts`    | Synchronise les médias de blanking par station                                             |
+| `kioskManager.ts`         | Mode kiosque pendant une session (masque taskbar, minimise les autres fenêtres)            |
+| `processMonitor.ts`       | Vérifie qu'AC tourne réellement (pas juste présent dans `tasklist`)                        |
+| `trayManager.ts`          | Icône barre système + fenêtre console locale                                               |
+| `logRingBuffer.ts`        | Buffer en mémoire des ~100 dernières lignes de log                                         |
+| `logFileStream.ts`        | Flux pino persistant + alimente `logRingBuffer`                                            |
+| `updater.ts`              | Auto-mise à jour depuis la dernière release GitHub                                         |
+| `watchdogManager.ts`      | Démarre/arrête le processus watchdog indépendant (v2.2.67)                                 |
+| `singleInstance.ts`       | Verrou TCP port `33291`, empêche deux instances simultanées                                |
+| `autoStart.ts`            | Enregistrement `HKCU\...\Run` si `AUTO_START=1`                                            |
+| `envWriter.ts`            | Écrit/persiste des valeurs dans `.env`                                                     |
+| `serverReachability.ts`   | Vérifie que le backend est joignable avant d'ouvrir le WebSocket                           |
+| `version.ts`              | Généré au build depuis `package.json` (`scripts/write-version.js`)                         |
 
-All three ways a tracked session can end — duration expires naturally, is reduced to 0 via extend, or is stopped manually — go through the single `agent.ts#endSession()` method, so they behave identically. On end:
+### 5.2 Assets (scripts PowerShell/VBS embarqués, `apps/agent/assets/`)
 
-1. `blankingManager.showResults({ ...pending: true })` is called **immediately** (driver/car/track/best-lap already known from live telemetry), showing an F1-styled results screen with a loading spinner where the leaderboard will go — instead of leaving the plain waiting screen up.
-2. The agent then waits ~3s for AC to write `Documents/Assetto Corsa/out/race_out.json`, reads it via `raceResultReader.ts`, cleans it via `raceResultCleaner.ts`, and emits `agent:results` to the backend (`AgentGateway` → `sessionsService.finish()` stores the raw JSON in `Session.result`).
-3. `showResults()` is called again with the final leaderboard (or a "Classement indisponible" placeholder if `race_out.json` wasn't usable). Sections reveal with a staggered fade/slide-up animation (`generateResultsHtml()` in `blankingManager.ts`).
-4. After 60s, `setAuto()` returns to normal blanking.
+- `blanking.ps1` — fenêtre WPF plein écran de blanking/résultats/lancement, `FEATURE_BROWSER_EMULATION` pour rendu IE11.
+- `kiosk.ps1` — P/Invoke Win32 pour masquer la taskbar, minimiser les fenêtres, mettre le jeu au premier plan.
+- `check-ac-shared-memory.ps1` — vérifie présence + fraîcheur de la mémoire partagée AC.
+- `update-agent.ps1` — script de mise à jour (voir 5.7).
+- `watchdog.ps1` — processus de surveillance indépendant (voir 5.8).
+- `start-agent.vbs` — lanceur silencieux (évite le flash de fenêtre console d'un exécutable `pkg`, qui est une app console par défaut).
 
-The results HTML is rendered inside a WPF `WebBrowser` control (legacy IE engine) — `blanking.ps1` sets `FEATURE_BROWSER_EMULATION` for the host process so it renders in IE11 "edge" mode instead of IE7 quirks; CSS must stay IE11-safe (no `clamp()`/CSS Grid/conic-gradient — use flexbox + `vw` units instead).
+### 5.3 Télémétrie
 
-### Agent gotchas
+Trois sources, toutes alimentant `onTelemetrySnapshot()` :
 
-- `envWriter.ts` must use `path.dirname(process.execPath)` (not `process.cwd()`), otherwise packaged agent writes `.env` in the wrong place.
-- `serverLauncher.ts` uses dynamic ports `9600-9700` / `8081-8181`. Allocated ports are stored in `DedicatedServer.udpPort/tcpPort/httpPort`.
-- `server:join` payload sends `host`, `port`, `httpPort`, `password`, `carAcId`, `track`, `trackLayout`, `serverName`.
-- `acLauncher.ts` handles joining a server via Content Manager (`acmanager://race/online/join`) or direct `acs.exe`.
-- The agent does **not** scan running `acServer.exe` processes; server status relies on `server:started` / `server:stopped`.
-- `pkg` config bundles `lua_app/**/*`, `assets/**/*`, and `node_modules/koffi/**/*`. koffi native binaries (`.node`/`.lib`) are copied next to the executable by `postpackage:win` and loaded at runtime via a patched koffi loader.
-- koffi is **Windows-only**. On Linux/macOS the shared-memory reader no-ops gracefully; telemetry falls back to Lua UDP/HTTP or file.
-- Native helpers (`PressDriveKey.exe`, `ViGEmBus`) are not included in the new agent.
-- **Previews**: `contentScanner.ts` reads car/track preview images and sends them raw as base64 data URLs (up to 2 MB per image). Jimp compression was removed because it fails inside the packaged executable (`Invalid host defined options`). DDS previews are converted to PNG via ImageMagick (`magick convert`) when available.
-- **v2.2.56: per-layout track preview images, and a real bug behind missing circuit photos.** `Track.layouts` changed from `string[]` to `TrackLayout[]` (`{ name, preview? }`, `contentScanner.ts`/`contentCache.ts` — cache `CACHE_VERSION` bumped to 7 to force a fresh scan, since the old shape is structurally incompatible). Root cause of missing photos: a multi-layout AC track's per-layout `ui_track.json`/`preview.png` normally live under `<track>/ui/<layout>/` (the standard convention — that folder holds each layout's UI assets), **not** `<track>/<layout>/` (that sibling folder holds the layout's 3D geometry data, referenced by `models_<layout>.ini`). The old code only ever checked the latter (wrong, for this convention) path, so any circuit whose only preview lived under the standard `ui/<layout>/` location silently got no photo at all — logged only as a debug-level read failure, never surfaced anywhere. `discoverLayoutNames()`/`findLayoutPreview()` now check both conventions (`<track>/ui/<layout>/`, `<track>/<layout>/ui/`, `<track>/<layout>/`) since real-world content varies between official and community track packages. `CreateDedicatedServer.tsx`'s layout picker (Step 2, "Circuit") now renders an image thumbnail per layout (same card style as the track/car grids) instead of plain text buttons. **Requires a fresh content sync on each POD** (cache version bump forces this automatically on next scan, but a manual "Synchroniser le contenu" click makes it immediate) to actually pick up the newly-found layout photos. **Confirmed working in production**: queried a station's `stations.content` JSON directly from the DB post-upgrade — 21/21 tracks had a preview (0 missing) and every multi-layout track (`ks_barcelona`, `ks_nurburgring`, `ks_silverstone`, etc.) had a preview per layout. A station still reporting missing photos after this release is running an older agent version, not a regression — check `stations.version` in the DB (or the Stations page) before assuming the fix didn't work.
-- **v2.2.57: car names were broken for virtually the entire catalogue (same root-cause pattern as v2.2.56, but for cars' `ui_car.json`).** The car scanner only ever read `content/cars/<car>/ui_car.json` at the car root; the standard AC convention nests it under `content/cars/<car>/ui/ui_car.json` (mirroring how tracks nest theirs). This failed silently — a missing `name`/`brand`/`category` isn't treated as an error, so `name` fell back to the raw acId (e.g. `ks_ferrari_488_gt3_2020` instead of a real display name) for nearly every car, confirmed via the same production DB query (all 180 cars had `name === acId`, `brand`/`category` both `null`). Now checks `ui/ui_car.json` first, falling back to the root path. Also added `content/cars/<car>/ui/` as one more candidate location for the car's preview image (alongside the existing root/`skins/*` checks). `JoinServer.tsx`/`CreateDedicatedServer.tsx` also now run the displayed car name through `formatCarName()` (already used by `Sessions.tsx`/`DedicatedServers.tsx`) instead of showing the raw value, so a still-missing name degrades to a readable title-cased fallback instead of a raw snake_case id. `CACHE_VERSION` bumped again (8) — file mtimes on disk don't change just because the agent's parsing code did, so without the bump this fix would never actually run against already-cached (incorrectly-parsed) entries.
-- **Sessions**: the backend `Session` model tracks dedicated-server joins with `clientName`, `difficulty`, `carAcId`, `durationMinutes`, etc. The agent emits `agent:status` (`in_game`/`online`) immediately on join/stop and supports `session:extend` to adjust the remaining time. The backend now sends the absolute `newDurationMinutes` so the agent timer stays in sync.
-- **`currentSession.durationMinutes` can be `null`** (unlimited/"Illimité" join, the frontend's default). Session tracking (`agent.ts#currentSession`) and the results screen on stop both start regardless of whether a duration was set — **only** the auto-end timer (`scheduleSessionEnd()`) is conditional on having one. Extend can add a duration to a previously-unlimited session later.
-- **Known dead-code cleanup (v2.2.40/v2.2.41)**: `HeartbeatPayload.cmRunning`/`vrConnected` were always `false` and never consumed by backend or frontend — removed from the shared contract and the agent. `AcSharedMemoryChecker` (`acSharedMemory.ts`, PowerShell-based polling every 2s) looks redundant with `AcSharedMemoryReader` but isn't: it's the signal for `acLoaded` used by blanking's hide logic above, including **outside** an agent-managed session (e.g. someone launches AC manually without going through the dashboard) — don't remove it.
-- **Blanking hide logic is based on AC process presence, not telemetry** (rewritten v2.2.41, after v2.2.29-v2.2.40 all chased pieces of the same "blanking never clears" symptom via a telemetry/shared-memory approach that was never fully reliable — two independent telemetry sources could disagree on "car ready" and the confirmation would never land). `blankingManager.evaluate()`'s auto branch is `shouldHide = acRunning || acLoaded`: `acRunning` from `processMonitor.ts#isAcRunning()`, `acLoaded` from `acSharedMemory.ts` (both polled every 2s in the heartbeat loop). There is no more "car ready" confirmation delay, `onTelemetry()`/`isReady()`/`updateReadyState()`/`clearReady()` were removed from `BlankingManager` entirely, and `podInGame` no longer affects the hide decision (it only resets a stale manual override to `auto` at session start — see below). This matches the previous production launcher ("RS Launcher", closed-source Electron app, not `agent-legacy/`), reverse-engineered specifically to resolve this bug — it hides its idle screen purely on `acs.exe` presence too.
-- **Configurable hide delay (v2.2.42)**: `hideDelaySeconds` (default 10s, `BlankingManager.setHideDelaySeconds()`) is a plain timer applied uniformly once `shouldHide` becomes true — gives the game time to actually load before blanking disappears. Configurable from the dashboard (`AppSettings.blankingDelaySeconds`, `/api/settings`, pushed to all agents via `settings:updated`).
-- **Kiosk foreground timing must be tied to blanking, not to launch (v2.2.46)**: `kioskManager.enter()` (called at launch) only hides the taskbar and minimizes other windows — it must **never** call `revealGame()` itself. Early versions had `kiosk.ps1`'s `Enter` action bring the game window to the foreground immediately once it existed, racing ahead of the hide-delay timer above and visually covering blanking (topmost or not — a window becoming the OS foreground window always draws above non-foreground topmost windows) well before its grace period elapsed, making the configurable delay look broken. Fixed by giving `kiosk.ps1` a separate `Foreground` action, triggered only via `BlankingManager`'s `onGameRevealed` constructor callback — fired exactly when blanking actually hides (grace period elapsed, or a manual hide override), never earlier.
-- **A blanking-process crash must not be treated as a manual close (v2.2.48)**: the window has no title bar/close button (fullscreen kiosk overlay) — the only deliberate way to close it is Escape. The exit handler used to treat _any_ unexpected process exit as "user closed it manually" and switch to `hide` override, instantly revealing the game and completely bypassing `hideDelaySeconds`. Now an exit within `EARLY_EXIT_THRESHOLD_MS` (2s) of spawning is treated as a crash — blanking restarts instead (up to `MAX_EARLY_EXIT_RETRIES` = 3 consecutive attempts before falling back to the old hide-override behavior). The script's stdout/stderr are also piped to the logger so a real crash leaves a trace (see "Local console" below).
-- **Process/shared-memory verification, not just presence (v2.2.49)**: a process literally named `acs.exe` existing, or AC's shared-memory sections being mapped, isn't proof the game is actually running/usable — both can outlive the real session (a hung/crashed instance that a previous `taskkill`/`quit()` failed to fully reap, or a shared-memory mapping kept alive by a stale handle). Checked the latest decompiled RS Launcher (`isAssettoRunning()`) for a better technique first — it does the exact same plain `tasklist` check with no extra verification, so this isn't something to copy from there, it had to be built new:
-  - `processMonitor.ts#isAcRunning()` now calls `tasklist /V` (verbose) and reads the `Status` column: `acs.exe` present but flagged **"Not Responding"** by Windows no longer counts as running (so it can't fool blanking into hiding). If it stays unresponsive past `NOT_RESPONDING_KILL_THRESHOLD_MS` (5 minutes — deliberately long, since AC's own loading screens can legitimately make it "Not Responding" for a while and killing a game that's genuinely still loading would be worse than leaving a real zombie a bit longer), it's force-killed as cleanup.
-  - `check-ac-shared-memory.ps1` / `acSharedMemory.ts` now also check **freshness**: `acpmf_graphics`' `packetId` (first 4 bytes) is read twice, 200ms apart — if it hasn't moved, the mapping is stale (left over from a previous session) and ignored, even if all three sections technically exist.
-  - If blanking issues resurface, check both signals independently (heartbeat logs, or the local console's live status) before assuming it's the delay/timer logic — a stale process/mapping bypasses that logic entirely by making `shouldHide` true when it shouldn't be.
-- **v2.2.50: the v2.2.49 "Not Responding" check itself regressed normal launches.** Gating `isAcRunning()`'s return value on tasklist's `Status` column also excluded AC during completely ordinary loading screens (its physics thread keeps ticking — and shared memory stays fresh — even while its message pump legitimately stalls), delaying/blocking blanking's reveal well past the configured `hideDelaySeconds`. Fixed by decoupling: `isAcRunning()` is existence-based again (`state !== 'absent'`); responsiveness now only feeds a separate, non-gating background cleanup path (`trackForCleanup()`, still force-kills a **truly** stuck process after 5 minutes) that never affects the return value.
-- **v2.2.51: stale process-exit event could clobber a just-spawned replacement window.** `restartIfActive()` kills the current blanking window and `evaluate()`/`startBlanking()` spawns its replacement in the same synchronous pass, but Windows only delivers the _old_ process's `'exit'` event later, asynchronously — after `this.process` already points at the new, legitimately-running one. The exit handler used to null out `this.process` unconditionally, so a stale event from the old window clobbered the reference to the current one: `isBlankingActive()` started reporting `false` while blanking was actually still visible on screen, and `hide()`/the dashboard's "masquer" button silently no-op'd (nothing left to stop, in the code's view) — only Escape on the POD still worked. Fixed with a per-spawn identity guard: `startBlanking()` captures `const proc = spawn(...)` locally and every handler checks `if (this.process !== proc) return;` before touching shared state.
-- **v2.2.52: `setPodInGame(true)`/`setAuto()` were restarting the window even when nothing needed to change.** Both unconditionally called `restartIfActive()` on every call, even when blanking was already showing the plain waiting screen — killing and respawning the WPF window for no visual change, causing a brief flicker exactly at session launch. A restart is only actually needed to drop a _results_ (or, since v2.2.54, _launching_) screen whose content is fixed at spawn time; both callers now only restart when `resultsHtmlPath`/`launchingHtmlPath` was actually set beforehand.
-- **v2.2.53: the blanking window only asserted `Topmost` once, not continuously.** Even after the v2.2.52 fix, a residual flicker remained: Content Manager's own launcher window marks itself topmost too during its boot, and gets created (via `acLauncher.launch()`/`joinServer()`) _after_ blanking's `Topmost` was last asserted (at spawn / on `Loaded`) — inserting it above blanking in the topmost z-order band for a moment, before `kioskManager.enter()`'s fire-and-forget, still-booting PowerShell process ever gets a chance to minimize it. Fixed in `blanking.ps1` with a `DispatcherTimer` that toggles `Topmost` off/on every 200ms for the window's whole lifetime, forcing Windows to re-sort it back to the top of that band any time something else briefly gets inserted above it.
-- **v2.2.54: dedicated "session launching" screen (driver/car/circuit), shown before the game is even spawned.** `BlankingManager.showLaunching(info)` generates a themed screen (visually identical to the results screen — `generateResultsHtml()`/`generateLaunchingHtml()` now share CSS via `commonStyles()`) and is called by `agent.ts#handleLaunch()`/`handleJoinServer()` **before** `acLauncher.launch()`/`joinServer()` is awaited. Reuses the existing `-ResultsHtmlPath` PowerShell arg/poll-reload mechanism generically (`startBlanking()` passes whichever of `resultsHtmlPath`/`launchingHtmlPath` is set) rather than adding a second parallel arg — the two are mutually exclusive and `blanking.ps1` doesn't care what the HTML says. Showing it _before_ the launch call means the one restart it causes happens in isolation, before Content Manager's/AC's own window exists to race against. `setPodInGame(true)` deliberately does **not** clear `launchingHtmlPath` (only `resultsHtmlPath`) so the launching screen survives that transition untouched; it's cleared (with a restart back to plain blanking) via `setAuto()`/`hide()`, including in the launch/join failure `catch` blocks so a failed launch doesn't leave the POD stuck on "Lancement en cours" forever.
-- **v2.2.55: gearbox (manual/auto) decoupled from difficulty.** `configureAssistsIni()` (`acLauncher.ts`) used to hard-tie `AUTO_SHIFTER` to the difficulty preset (`1` only on `EASY`) — a pilot picking `PRO` for reduced other assists had no way to also get an auto gearbox, and vice versa. Now takes an independent optional `gearbox: 'MANUAL' | 'AUTO'` param (from `JoinServerConfig.gearbox`, threaded from `JoinServer.tsx`'s per-POD toggle → backend DTO → `Session.gearbox` → `server:join` payload) that overrides `AUTO_SHIFTER` regardless of preset; falls back to the old preset-based default when not provided. Only wired for the dedicated-server join flow (`handleJoinServer`) — the direct-launch `session:launch` flow has no per-pod config UI and was left untouched.
-- **Session end / results**: on session end the agent reads AC's `race_out.json`, cleans it via `raceResultCleaner.ts`, pushes it to the backend with `agent:results`, and renders a leaderboard on the blanking screen for 60 seconds. See "Session results" above for the instant-display flow.
-- **Blanking override reset on session start must be atomic.** `setPodInGame(true)` resets a stale manual override (`hide`/`show` left over from Escape/"Masquer écran") to `auto` **inside itself**, not via a separate `setAuto()` call beforehand — doing it as two steps left a window where `evaluate()` ran with `podInGame` still `false` and could use stale `acLoaded`/`acRunning` state to flicker blanking off for a moment right after launch (fixed v2.2.36). `podInGame` itself no longer feeds the hide decision (see above) but is kept for this reset and for gating kiosk mode/results-screen triggers in `agent.ts`.
-- **Blanking/results window orphaning across restarts.** The blanking screen is a child PowerShell/WPF process; on Windows it does **not** die automatically when the agent process exits. `Updater.update()` used to call `process.exit(0)` directly with zero cleanup, so every self-update (or crash) left the old window running while the new agent spawned its own on top — duplicates piling up across restarts (fixed v2.2.38). Now: `BlankingManager.shutdown()` force-kills the active window and is called from `agent.stop()` and from the updater (`onBeforeExit` callback) before exiting; a pid file (`<tmp>/simracing-manager/blanking.pid`) lets `init()` kill any window orphaned by a previous crash on the next startup. `index.ts` also handles `SIGINT`/`SIGTERM` for a graceful stop. If you ever see duplicated blanking/results windows on a POD, it's from _before_ this fix — close them manually (or reboot) once; new duplicates should never appear again.
-- **Blanking manual close**: the blanking window can be closed locally by pressing `Escape`; the agent detects this and switches to `hide` override so it does not restart automatically.
-- **Blanking video playback**: videos loop when alone, and playback failures skip to the next playlist item.
-- **Blanking display targeting**: the `BLANKING_MONITOR` env var selects which screen the blanking/results window appears on (`1` = primary, `2` = secondary, etc.).
-- **Kiosk mode** (`kioskManager.ts` + `assets/kiosk.ps1`, Win32 P/Invoke): on session launch (direct or join), hides the Windows taskbar, force-minimizes any other visible window (Explorer, etc. — explicitly **excluding** the blanking window by title and the game's own window by process id, to avoid disrupting a fullscreen game's rendering/telemetry state), and brings the game window to the foreground once it appears (polls up to 20s). Restored (taskbar shown again) on session end via `kioskManager.exit()`, called from the same `endSession()`/`handleStop()` paths as blanking cleanup.
-- **Windows auto-start**: setting `AUTO_START=1` in `.env` registers the agent in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` so it starts automatically on user login.
-- **Tray icon + local console (v2.2.47)**: `TRAY_ICON=1` (now the **default** in newly generated `.env` files — existing installs keep whatever they already had, edit `.env` manually to enable) shows a system-tray icon with a context menu: toggle blanking, quit, sync content, check for updates, restart the agent (new — reuses `Updater`'s wait-for-this-PID-then-relaunch technique, no download), and **"Ouvrir la console"** (also double-click the tray icon). The console is a normal (non-kiosk) WPF window — same `WebBrowser`-hosting pattern as `blanking.ps1`, styled with the dashboard's dark palette — showing live status (connected/AC running/blanking active), the last ~100 log lines, and those same actions as buttons. Communication reuses the existing flag-file mechanism (`TrayManager`'s 500ms poll) for clicks, and a `console-status.json` snapshot (written every heartbeat tick via `TrayManager.updateStatus()`) that the console polls and re-renders — no new IPC channel, no Electron (the agent stays a lightweight `pkg` executable).
-- **Best invalid (cut) lap on the results screen (v2.2.44)**: AC's own `bestLapMs` (`iBestTime`) already excludes invalid laps. `agent.ts#trackBestLap()` detects a "best invalid lap" by comparison alone — no `numberOfTyresOut` heuristic needed: if a just-completed lap (`lastLapMs`) is faster than the currently known valid best but didn't become the new official best, AC must have rejected it. Shown as a second, red tile on the results screen only when one was actually recorded.
-- **`endSession()` shows results before quitting AC, not after (v2.2.46)**: `acLauncher.quit()` can take up to 15s (polls for graceful exit before force-killing). Showing the results screen _first_ (topmost, covers the still-running game) then quitting in the background removes what used to be a dead gap between the session ending and the results appearing.
-- **Per-lap telemetry CSV**: during a session the agent records a `laps.csv` file with each completed lap (lap time, max speed/RPM, average throttle/brake, best lap). On session end it uploads the CSV to the backend over the `agent:telemetry:csv` WebSocket event; the backend stores it in `uploads/telemetry/<sessionId>.csv`.
-- **AC quit**: agent polls `tasklist` up to 15s after the Lua quit command, then force-kills the process tree if needed (RS Launcher style).
-- **Remote agent update**: technicians and admins can trigger an agent update from the Stations page. The agent downloads `sim-center-agent-win.zip` from the latest GitHub release and replaces itself (including koffi native binaries).
-- **Server reachability check**: the agent pings `SERVER_URL` before opening the WebSocket and logs a clear warning if the backend is unreachable (helps diagnose network/DNS issues).
-- **Single-instance enforcement**: the agent acquires a TCP lock on port `33291` at startup. If another agent instance is already running, the new process exits immediately.
-- **Self-healing status reconciliation (v2.2.43)**: `agent.ts#reconcileReportedStatus()` runs every heartbeat tick, comparing the actual `acRunning` state to the last status reported to the backend (`agent:status`) and correcting drift after 2 consecutive mismatched ticks (immediate on the very first observation post-connect). Mirrors RS Launcher's `syncAssettoState()`. Blanking's own state was already implicitly reconciled every tick via `setAcRunning()`'s unconditional `evaluate()` call (since v2.2.41) — no separate fix needed there.
-- **Live blanking-status LED (v2.2.45)**: `blankingActive` (from `BlankingManager.isBlankingActive()`) rides the existing heartbeat/`station:updated` channel — no new socket event. Shown as an amber (pulsing)/gray LED per station card on `/stations`. New `stations.blanking_active` DB column.
-- **Session stop**: technicians (not only admins) can stop/extend sessions from `/en-cours`.
-- **Session end flow**: when duration reaches zero the agent ends the session, pushes `race_out.json` results, shows the results overlay for 60 seconds, then returns to auto blanking.
-- **En cours page**: redesigned with circular RPM/speed gauges, throttle/brake bars, larger timer and cleaner info cards; lists active sessions with extend/stop controls.
-- **Per-POD join**: the join modal on `DedicatedServers.tsx` lets the operator set a client name, difficulty (EASY/PRO/CUSTOM), and car per POD. Difficulty writes `assists.ini`; client name is shown in-game by the Lua app overlay.
-- Heartbeat includes `macAddress` (v2.2.3+).
-- WoL packets are sent on ports 9 and 7, unicast to target IP when known, otherwise broadcast (v2.2.4+).
-- Startup diagnostics log warnings if Fast Startup is enabled or if no adapter supports Wake on Magic Packet (v2.2.4+).
-- Shutdown command (`system:shutdown`) runs `shutdown /s /t 0` on Windows; no-op on Linux/macOS.
+1. **Mémoire partagée (primaire, Windows uniquement)** — `AcSharedMemoryReader`, 10 Hz via koffi, ne dépend pas de CSP/Lua UDP.
+2. **UDP/HTTP (fallback)** — `TelemetryReceiver`, `127.0.0.1:19900` (UDP) / `19901` (HTTP), pour l'app Lua CSP.
+3. **Fichier (fallback)** — `TelemetryFileReader`, `Documents/Assetto Corsa/cfg/SimCenterManager/telemetry.json`.
 
-## 6. Shared Contracts (`packages/shared`)
+`onTelemetrySnapshot()` transmet au backend via `agent:telemetry`, met à jour le blanking manager et le suivi du meilleur tour.
 
-- Build this workspace **before** backend/agent/frontend if types/contracts changed.
-- Key files: `src/contracts/index.ts`, `src/enums/index.ts`, `src/types/index.ts`.
-- Recent additions (v2.2.3): `HeartbeatPayload.macAddress`, `ServerToAgentEvents['system:shutdown']`, `ServerToAgentEvents['wol:send']`.
-- `StationRole` enum (`SIMULATOR = 'simulator'`, `ADMIN = 'admin'`) added for the station role feature — see "Station roles" under Backend.
-- Changing contracts requires rebuilding dependent workspaces.
+### 5.4 Fin de session / résultats
 
-## 7. Build & Deploy
+Les trois façons pour une session suivie de se terminer (durée expirée, réduite à 0 via extend, arrêt manuel) passent toutes par `agent.ts#endSession()` :
 
-### Development build order
+1. `blankingManager.showResults({ pending: true })` **immédiat** (pilote/voiture/circuit/meilleur tour déjà connus par télémétrie live), écran F1 avec spinner de chargement à la place du classement.
+2. Attente ~3s pour `race_out.json`, lecture via `raceResultReader.ts`, nettoyage via `raceResultCleaner.ts`, envoi `agent:results` au backend (stocké dans `Session.result`).
+3. `showResults()` rappelé avec le classement final (ou "Classement indisponible"). Sections révélées avec animation échelonnée.
+4. Après 60s, retour au blanking automatique.
+
+### 5.5 Blanking — logique de masquage
+
+- **Basée sur la présence du processus AC, pas la télémétrie** (réécrit v2.2.41, après v2.2.29-40 qui chassaient tous le même symptôme via une approche télémétrie jamais totalement fiable). `blankingManager.evaluate()` : `shouldHide = acRunning || acLoaded`. Pas de délai de confirmation "voiture prête".
+- **Délai de masquage configurable** (v2.2.42) : `hideDelaySeconds` (défaut 10s), poussé via `settings:updated`.
+- **Timing du premier plan kiosque lié au blanking, pas au lancement** (v2.2.46) : `kioskManager.enter()` ne doit **jamais** appeler `revealGame()` directement — seulement via le callback `onGameRevealed` du `BlankingManager`.
+- **Crash du processus de blanking ≠ fermeture manuelle** (v2.2.48) : sortie dans les 2s du spawn = traité comme un crash (redémarre, jusqu'à 3 tentatives), pas comme "l'utilisateur a fermé avec Échap".
+- **Vérification processus/mémoire partagée, pas juste présence** (v2.2.49-50) : `tasklist /V`, colonne `Status` — "Not Responding" prolongé (5 min) force-tue le zombie mais ne bloque **pas** le statut "en cours" retourné (sinon régression des lancements normaux, v2.2.50). `packetId` de `acpmf_graphics` lu deux fois à 200ms d'écart — s'il n'a pas bougé, la mappe est considérée périmée (session précédente) et ignorée.
+- **Garde d'identité par spawn** (v2.2.51) : `startBlanking()` capture `const proc = spawn(...)` localement, chaque handler vérifie `if (this.process !== proc) return` pour éviter qu'un événement `exit` tardif d'une ancienne fenêtre n'écrase la référence vers la nouvelle.
+- **Pas de redémarrage inutile** (v2.2.52) : `setPodInGame(true)`/`setAuto()` ne redémarrent la fenêtre que si `resultsHtmlPath`/`launchingHtmlPath` était réellement défini avant.
+- **`Topmost` réaffirmé en continu** (v2.2.53) : `DispatcherTimer` toggle `Topmost` toutes les 200ms pour re-trier la fenêtre au-dessus de la bande topmost à chaque insertion concurrente (ex: fenêtre de Content Manager).
+- **Écran "Lancement en cours"** (v2.2.54) : `showLaunching(info)`, affiché **avant** `acLauncher.launch()`/`joinServer()`, même mécanisme de rechargement que l'écran de résultats.
+- **Réinitialisation atomique du override manuel** (v2.2.36) : `setPodInGame(true)` réinitialise un override périmé (`hide`/`show`) en **une seule étape interne**, pas via un `setAuto()` séparé avant.
+- **Fenêtres orphelines après redémarrage** (v2.2.38) : `BlankingManager.shutdown()` force-tue la fenêtre active, appelé depuis `agent.stop()` et depuis l'updater (`onBeforeExit`) avant de sortir ; fichier pid (`<tmp>/simracing-manager/blanking.pid`) permet à `init()` de tuer une fenêtre orpheline d'un crash précédent.
+- **Fermeture manuelle** : `Échap` sur la fenêtre de blanking → passe en override `hide`, plus de redémarrage automatique.
+- **Ciblage d'écran** : variable d'env `BLANKING_MONITOR` (`1` = principal, `2` = secondaire...).
+- **Le rôle station (admin/simulateur) doit atteindre l'agent pour désactiver le blanking sur un poste admin** — `station:role` (et `settings:updated`) est émis au **premier heartbeat** (`isFirstHeartbeat` flag dédié dans `AgentGateway`, pas `handleConnection` — `client.stationId` n'y est jamais renseigné en pratique, et la room-membership seule ne peut pas servir de détecteur de "premier heartbeat" puisque `AgentAuthGuard` a déjà rejoint la room avant que le handler ne s'exécute). `agent.ts#handleStationRole()` appelle `blankingManager.setEnabled(role !== ADMIN)` et persiste `STATION_ROLE` dans `.env`.
+- **Blanking doit être affiché AVANT de fermer le jeu, pas après** (v2.2.60) : `blanking.ps1` signale `BLANKING_WINDOW_READY` sur stdout une fois chargé ; l'agent attend ce signal (`waitUntilShown()`, filet de sécurité 4s) avant `quit()`/`stop()`, aussi bien pour un arrêt de session suivie que pour un arrêt direct.
+
+### 5.6 Réseau / reconnexion
+
+- **`reconnection: false` sur le client socket.io** — la reconnexion est gérée manuellement. Deux points de déclenchement : sur `'disconnect'` (déjà connecté puis coupé) ET sur `'connect_error'` (jamais réussi à se connecter — corrigé en **v2.2.62**, avant ça un `connect_error` isolé pendant un redémarrage backend laissait l'agent bloqué déconnecté indéfiniment). `scheduleReconnect()` coalesce les tentatives multiples dans un seul timer (5s), annulé sur connexion réussie ou re-provisioning.
+- **`waitForServerReachable()`** ping `SERVER_URL` (jusqu'à 10s) avant d'ouvrir le WebSocket, log un warning clair si injoignable — aide au diagnostic réseau/DNS.
+- **Statut station auto-réparé** (v2.2.43) : `reconcileReportedStatus()` à chaque heartbeat compare l'état réel `acRunning` au dernier statut envoyé, corrige après 2 ticks discordants consécutifs (immédiat à la première observation post-connexion).
+
+### 5.7 Mise à jour à distance (`updater.ts` + `assets/update-agent.ps1`)
+
+- Techniciens/admins déclenchent une mise à jour depuis la page Postes (`POST /stations/:id/update-agent` → `system:update` → `handleUpdate()`).
+- `Updater.update()` : vérifie la dernière release GitHub, télécharge `sim-center-agent-win.zip`, écrit `update-agent.ps1` (extrait de `assets/`) sur disque, le spawn en détaché, puis `process.exit(0)`.
+- **`update-agent.ps1` (durci en v2.2.65 après un échec réel constaté en production)** :
+  1. `Wait-Process -Timeout 30` sur le PID de l'ancien agent (PowerShell, pas de boucle cmd.exe — voir bug ci-dessous).
+  2. **Sauvegarde** l'exe + `build/` actuels dans `update-backup/` avant d'extraire.
+  3. `Expand-Archive -Force` — si ça échoue, **restaure** la sauvegarde plutôt que de laisser un état incohérent.
+  4. **Relance toujours** en fin de script (nouvelle version si l'extraction a réussi, ancienne restaurée sinon) — avant ce fix, un échec d'extraction laissait le script s'arrêter net sans jamais relancer, l'agent restant complètement mort jusqu'à une intervention physique.
+  5. Toutes les étapes journalisées dans `update-agent.log` à côté de l'exécutable.
+- **La mise à jour ne se déclenche jamais automatiquement** — chaque agent doit être mis à jour via le bouton "MAJ agent" du dashboard, ou manuellement (téléchargement + exécution de `sim-center-agent-win-setup.exe`).
+- **Un agent qui tourne déjà utilise SON PROPRE `update-agent.ps1` embarqué (l'ancienne version), pas celui de la nouvelle release téléchargée** — si le script de la version installée a un bug non corrigé dans cette version-là, "MAJ agent" échouera de la même façon qu'avant tant que l'agent n'a pas été mis à jour manuellement (setup.exe) au moins une fois pour obtenir le script corrigé.
+
+### 5.8 Watchdog (`watchdogManager.ts` + `assets/watchdog.ps1`, v2.2.67)
+
+- Processus PowerShell détaché et **indépendant** de l'agent — nécessaire car si l'agent lui-même est mort, il ne peut pas s'en apercevoir.
+- Démarré par `agent.ts#start()` → `watchdogManager.ensureRunning()`, qui **ne démarre pas de doublon** si un watchdog est déjà vivant (PID tracké dans `<tmp>/simracing-manager/watchdog.pid`, confirmé vivant via `tasklist` en vérifiant que le nom du process est bien `powershell.exe`).
+- Boucle : toutes les 20s, vérifie si le process de l'agent tourne (`Get-Process -Name <nom sans extension>`) ; si absent, attend 15s de grâce (tolère une mise à jour/redémarrage légitime en cours), revérifie, puis relance via `start-agent.vbs` si toujours absent.
+- **Arrêté explicitement (par PID, `taskkill`) avant tout arrêt volontaire** (`agent.stop()`, `handleUpdate()`, `handleLocalRestart()`) — pour ne jamais entrer en course avec un arrêt/une mise à jour légitime. Le prochain `start()` le réétablit une fois le nouveau processus démarré.
+- Journalise dans `watchdog.log` à côté de l'exécutable.
+- **Contexte** : ajouté après avoir constaté en conditions réelles qu'une mise à jour ratée laissait les deux stations hors ligne ~90-100s avant de se rétablir seules (grâce au fix 5.7, mais sans garantie pour un futur mode d'échec différent).
+
+### 5.9 Redémarrage local (console de la tray, `handleLocalRestart()`)
+
+- **Avait le même bug cmd.exe que l'updater avant sa correction** — `set /a waitTime+=1` dans un bloc `if (...)` entre parenthèses ne s'incrémentait jamais dans la même itération (les blocs `cmd.exe` évaluent les `%var%` une seule fois, au moment où le bloc est lu). Corrigé (même passe que le watchdog, v2.2.67) avec la même approche PowerShell `Wait-Process`, relance via `start-agent.vbs` (avant : `start "" exe` direct, flash de fenêtre console).
+
+### 5.10 Autres gotchas agent
+
+- `envWriter.ts` doit utiliser `path.dirname(process.execPath)` (jamais `process.cwd()`), sinon l'agent packagé écrit `.env` au mauvais endroit.
+- `serverLauncher.ts` utilise des ports dynamiques `9600-9700`/`8081-8181`. Vérifie la disponibilité TCP+UDP avant d'assigner. Ports alloués stockés dans `DedicatedServer.udpPort/tcpPort/httpPort`.
+- **Firewall + vérification de port réellement lié (v2.2.58, fix du "Failed to handshake" #1)** : `ensureFirewallRule()` ajoute une règle Windows Firewall unique, programme-wide, pour `acServer.exe` (best-effort, ne bloque jamais le lancement). `waitForPortBound()` vérifie via `netstat -ano -p UDP` que le PID du process possède bien le port avant de considérer le lancement réussi — un process vivant n'est pas la preuve que le port UDP est réellement ouvert (pare-feu, port déjà pris au niveau OS malgré la vérif préalable).
+- **`race.ini` du join direct incomplet (v2.2.64, fix du "Failed to handshake" #2, le vrai fix pour le join)** : `writeJoinRaceIni()` n'écrivait que `[RACE]`/`[CAR_0]`/`[REMOTE]`, contrairement à `agent-legacy` (référence connue pour fonctionner) et à `writeRaceIni()` (lancement direct/solo, juste à côté dans le même fichier, qui fonctionne bien) qui écrivent en plus `[AUTOSPAWN]`, `[SESSION_0]`, `[TEMPERATURE]`, `[WEATHER]`, `[WIND]`, `[LIGHTING]` (v2.2.66) et plusieurs champs `[CAR_0]`/`[REMOTE]` (`DRIVERNAME`, `TEAM`, `GUID`, `RESTRICTOR`, `SPECTATOR_MODE`, `SPAWN_POINT`, `NAME`, `__CM_EXTENDED`). Symptôme diagnostiqué via les logs distants (5.11) : `acs.exe` se lance, la mémoire partagée se mappe, mais reste "gelée" en boucle (`packetId` n'avance jamais) — le client n'entre jamais réellement en course. **Confirmé réparé en conditions réelles** (créé un serveur + envoyé un POD réel) : la mémoire partagée passe de "gelée" à "state changed" en ~15s, centaines de paquets de télémétrie reçus en quelques minutes.
+- `server:join` envoie `host`, `port`, `httpPort`, `password`, `carAcId`, `track`, `trackLayout`, `serverName`, `durationMinutes?`, `clientName?`, `difficulty?`, `gearbox?`, `sessionId?`.
+- `acLauncher.ts` gère le join soit via Content Manager (`acmanager://race/online/join`), soit en direct (`acs.exe` + `race.ini`).
+- L'agent ne scanne **pas** les process `acServer.exe` en cours — le statut du serveur dédié dépend uniquement de `server:started`/`server:stopped`.
+- `pkg` embarque `lua_app/**/*`, `assets/**/*`, `node_modules/koffi/**/*`. Binaires natifs koffi copiés à côté de l'exécutable par `postpackage:win`.
+- koffi est **Windows uniquement**. Sur Linux/macOS le lecteur mémoire partagée ne fait rien, la télémétrie retombe sur UDP/HTTP/fichier Lua.
+- **Aperçus (previews)**: `contentScanner.ts` envoie les images en base64 brut (jusqu'à 2 Mo/image). DDS converties en PNG via ImageMagick si disponible.
+- **Photos de circuits manquantes (v2.2.56)** : un circuit multi-layout a son `ui_track.json`/`preview.png` par layout sous `<track>/ui/<layout>/` (convention standard), pas `<track>/<layout>/` (données 3D, référencées par `models_<layout>.ini`). L'ancien code ne vérifiait que ce dernier chemin. `discoverLayoutNames()`/`findLayoutPreview()` vérifient maintenant les trois conventions. Nécessite une resynchronisation de contenu par POD (bump de `CACHE_VERSION` la force automatiquement).
+- **Noms de voitures cassés (v2.2.57)** : même schéma que ci-dessus pour `ui_car.json` (`content/cars/<car>/ui/ui_car.json`, pas `content/cars/<car>/ui_car.json` à la racine). `formatCarName()` en dernier recours si toujours manquant.
+- **Gearbox découplé de la difficulté (v2.2.55)** : `configureAssistsIni()` prend un `gearbox: 'MANUAL'|'AUTO'` indépendant, pas juste lié au preset de difficulté. Seulement câblé pour le flow de join serveur dédié, pas le lancement direct.
+- **`currentSession.durationMinutes` peut être `null`** (join "Illimité", cas par défaut du frontend) — le suivi de session et l'écran de résultats démarrent quand même ; seul le timer de fin auto est conditionnel à une durée définie.
+- **Vérification unique enforcement** : verrou TCP port `33291` au démarrage — une deuxième instance sort immédiatement.
+- **Icône barre système + console locale (v2.2.47)** : `TRAY_ICON=1` (défaut pour les nouveaux `.env`) — menu contextuel (basculer blanking, quitter, sync contenu, vérifier MAJ, redémarrer l'agent, ouvrir la console). Console = fenêtre WPF normale (pas kiosque), même pattern `WebBrowser` que `blanking.ps1`, affiche statut live + ~100 dernières lignes de log + les mêmes actions en boutons. Communication via le même mécanisme de fichiers-drapeaux (poll 500ms) + snapshot `console-status.json` écrit à chaque tick de heartbeat.
+- **Meilleur tour invalide (cut)** (v2.2.44) : détecté par comparaison seule — si un tour vient d'être complété plus vite que le meilleur valide connu mais n'est pas devenu le nouveau `bestLapMs` officiel, AC l'a rejeté.
+- **Auto-start Windows** : `AUTO_START=1` dans `.env` enregistre l'agent dans `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+- Heartbeat inclut `macAddress`. WoL envoyé sur les ports 9 et 7, unicast si IP cible connue sinon broadcast.
+- `system:shutdown` lance `shutdown /s /t 0` sur Windows, no-op ailleurs.
+
+### 5.11 Logs distants (v2.2.63)
+
+- Nouveau socket event `logs:request` (serveur→agent) / `agent:logs` (agent→serveur, `{ stationId, lines }`).
+- `agent.ts#handleLogsRequest()` renvoie `agentLogRingBuffer.getLines()` (les mêmes ~100 lignes que la console locale).
+- Backend : `AgentGateway.requestLogs(stationId, timeoutMs=4000)` — aller-retour promesse/timeout, coalesce les requêtes concurrentes par station, retourne `[]` (jamais de rejet) si la station n'est pas connectée ou ne répond pas dans le délai.
+- Endpoint : `GET /api/stations/:id/logs` (voir 3.1).
+- Frontend : bouton "Logs" sur `Stations.tsx` (groupe Maintenance) → `LogsModal` (fetch + bouton Actualiser, affichage monospace scrollable).
+- **A servi à diagnostiquer en conditions réelles** le bug de `race.ini` de join (5.10) sans accès physique aux PC.
+
+## 6. Contrats partagés (`packages/shared`)
+
+Toujours builder ce workspace **avant** backend/agent/frontend si les types/contrats changent.
+
+### 6.1 `AgentToServerEvents` (agent → backend)
+
+`agent:register`, `agent:heartbeat` (`HeartbeatPayload`), `agent:log` (`LogPayload`), `agent:results` (`ResultsPayload`), `agent:status` (`StatusPayload`), `agent:session:ended`, `agent:content`, `agent:telemetry` (`TelemetrySnapshot`), `agent:telemetry:csv` (`TelemetryCsvPayload`), `server:started`, `server:stopped`, `agent:logs` (v2.2.63).
+
+### 6.2 `ServerToAgentEvents` (backend → agent)
+
+`agent:provisioned`, `agent:unauthorized`, `session:launch` (`LaunchSessionPayload`), `session:stop`, `session:extend`, `ac:idealLine`, `ac:autoShifter`, `ac:teleportToPits`, `vr:recenter`, `system:restart`, `system:update`, `system:shutdown`, `wol:send`, `content:sync`, `server:join`, `server:launch` (`LaunchDedicatedServerPayload`), `server:stop`, `blanking:hide`, `blanking:show`, `blanking:mediaUpdated`, `settings:updated`, `station:role`, `logs:request` (v2.2.63).
+
+### 6.3 `ServerToClientEvents` (backend → dashboard/frontend)
+
+`station:updated`, `station:telemetry`, `session:updated`.
+
+### 6.4 Types partagés clés
+
+`HeartbeatPayload`, `LogPayload`, `ResultsPayload`, `TelemetryCsvPayload`, `StatusPayload`, `TelemetrySnapshot`, `LaunchSessionPayload`, `LaunchDedicatedServerPayload`. Enums : `StationRole` (`SIMULATOR`, `ADMIN`), `StationStatus`, `LaunchMode`, `SessionStatus`, `GearboxMode`.
+
+- Historique dead-code cleanup (v2.2.40/41) : `HeartbeatPayload.cmRunning`/`vrConnected` étaient toujours `false`, jamais consommés — supprimés du contrat et de l'agent.
+- Changer un contrat oblige à rebuilder tous les workspaces qui en dépendent.
+
+## 7. Build & déploiement
+
+### 7.1 Ordre de build en dev
 
 ```bash
 cd /root/sim-center-manager
@@ -221,166 +401,187 @@ npm run build --workspace=@simracing/frontend
 npm run build --workspace=@simracing/agent
 ```
 
-### Production deploy
+### 7.2 Déploiement production
 
 ```bash
 npx prisma migrate deploy --schema=apps/backend/prisma/schema.prisma
 docker compose up -d --build backend
 ```
 
-The backend image copies pre-built `dist/` and `node_modules` from the host. Do **not** build Docker from a clean checkout without building workspaces first.
+L'image backend copie le `dist/` et `node_modules` pré-buildés depuis l'hôte. **Ne jamais** builder Docker depuis un checkout propre sans avoir buildé les workspaces avant.
 
-### Agent packaging
+**Chaque redémarrage du conteneur backend déconnecte tous les agents** — avec le fix v2.2.62, ils se reconnectent automatiquement (retry sur `connect_error` en plus de `disconnect`). Les agents antérieurs à v2.2.62 peuvent rester bloqués déconnectés et nécessiter un redémarrage manuel.
+
+### 7.3 Packaging de l'agent
 
 ```bash
 cd apps/agent
-npm run package:win      # outputs exe/agent.exe + exe/build/koffi/win32_x64/*.node
+npm run package:win      # → exe/agent.exe + exe/build/koffi/win32_x64/*.node
 ```
 
-`package:win` runs:
+`package:win` = `prepackage:win` (build + patch koffi) → `pkg . --targets node18-win-x64 --out-path exe` → `postpackage:win` (copie `koffi.node`/`.lib`/`.exp`).
 
-- `prepackage:win` → build + patch koffi for `pkg`.
-- `package:win` → `pkg . --targets node18-win-x64 --out-path exe`.
-- `postpackage:win` → copy `koffi.node` / `koffi.lib` / `koffi.exp` to `exe/build/koffi/win32_x64/`.
+Distribution : `sim-center-agent-win-setup.exe` (SFX 7-Zip, installation manuelle) et `sim-center-agent-win.zip` (utilisé par l'auto-updater, remplace exe + `build/koffi/win32_x64/`).
 
-For distribution, the CI builds a self-extracting Windows installer. Locally you can create a zip of the executable together with the `build/` folder so the native module is found at runtime:
+### 7.4 Processus de release
+
+1. Bump la version dans `apps/agent/package.json` (source de vérité).
+2. Mettre à jour `CHANGELOG.md` (et ce skill si architecture/build/déploiement a changé).
+3. Builder shared → backend → frontend → agent.
+4. Commit, tag `vX.Y.Z`, push : `git push origin main --tags`.
+5. Le workflow GitHub Actions `Release SimCenter Agent` build Windows + Linux et publie sur la release automatiquement.
+6. Redéployer l'image Docker backend + appliquer les migrations si le backend a changé.
+
+### 7.5 Déploiement post-release
+
+**Backend/frontend** (côté serveur) :
 
 ```bash
-cd apps/agent/exe
-7z a -tzip sim-center-agent-win-vX.Y.Z.zip sim-center-agent-win-vX.Y.Z.exe build
+cd /root/sim-center-manager
+git pull && npm ci
+npm run build --workspace=@simracing/shared
+npm run build --workspace=@simracing/backend
+npm run build --workspace=@simracing/frontend
+docker compose up -d --build backend
 ```
 
-The release workflow produces:
+**Agent** (côté PC Windows) : télécharger `sim-center-agent-win-setup.exe` depuis la release GitHub, l'installer sur chaque POD (écrase l'agent précédent + binaires natifs), redémarrer, vérifier la version dans les logs/heartbeat.
 
-- `sim-center-agent-win-setup.exe` — 7-Zip SFX for manual installation.
-- `sim-center-agent-win.zip` — used by the agent’s built-in auto-updater (replaces the executable + `build/koffi/win32_x64/` native binaries).
+### 7.6 Pièges du processus de release
 
-## 8. Release Process
+- **L'asset Windows arrive après le Linux** — jobs parallèles, le job Windows (choco 7zip, pkg, packaging SFX) prend plus longtemps. Si seul le `.tar.gz` apparaît juste après le push du tag, attendre quelques minutes.
+- **Toujours tester l'exe packagé sur Windows avant de publier** — `pkg` peut réussir à builder mais échouer à l'exécution avec `MODULE_NOT_FOUND` pour des fichiers requis dynamiquement.
+- L'asset Windows est un **installeur auto-extractible** — ne jamais distribuer le `.exe` nu seul (le module natif koffi doit être extrait avec).
+- Vérifier le hash/la taille de l'asset uploadé — le CDN peut servir un ancien asset en cache (`?nocache=<ts>`).
+- Ne **jamais** release le build `agent-legacy/`.
+- Si frontend/backend a changé, l'image Docker doit être rebuildée et le conteneur redémarré — releaser seulement l'agent `.exe` ne suffit pas.
+- **La mise à jour de l'agent ne se déclenche jamais automatiquement** — chaque POD doit être mis à jour via "MAJ agent" ou manuellement.
+- **Un agent qui échoue sa mise à jour utilise son propre script embarqué** (voir 5.7) — retenter "MAJ agent" avec la même version installée répétera le même échec ; installer manuellement le nouveau setup.exe contourne le problème.
 
-1. Bump version in `apps/agent/package.json` (agent is the source of truth).
-2. Update `CHANGELOG.md` if the repo has one.
-3. Build shared → backend → frontend → agent.
-4. Package agent: `cd apps/agent && npm run package:win`.
-5. Commit, tag `vX.Y.Z`, push: `git push origin main --tags`.
-6. The `Release SimCenter Agent` workflow builds Windows + Linux assets and publishes them to the GitHub release automatically.
-7. Redeploy backend Docker image and apply migrations if backend changes were made.
+## 8. Dépannage
 
-### Post-release deployment
+### "Stop" ou "0 seconde" ne fait rien
 
-After a release is published you **must** deploy both sides for the changes to take effect:
+1. Vérifier que le backend est déployé (boutons frontend appellent `POST /sessions/:id/stop`/`extend`).
+2. Vérifier la version de l'agent sur le POD.
+3. Logs : `docker compose logs -f backend` (backend), fichier log local ou console tray (agent).
+4. Causes fréquentes : `dist/` frontend pas rebuildé avant l'image Docker ; `.exe` agent pas remplacé ; asset CDN en cache.
 
-1. **Backend / frontend** (server side):
+### L'écran de blanking ne se retire pas / reste bloqué
 
-   ```bash
-   cd /root/sim-center-manager
-   git pull
-   npm ci
-   npm run build --workspace=@simracing/shared
-   npm run build --workspace=@simracing/backend
-   npm run build --workspace=@simracing/frontend
-   docker compose up -d --build backend
-   ```
+- Vérifier `stations.blanking_active` et les logs de heartbeat.
+- Un process/mapping périmé peut faire `shouldHide = true` à tort (voir 5.5) — indépendant du délai/timer.
+- Un poste `admin` ne doit **jamais** afficher de blanking — vérifier que `station:role` a bien atteint l'agent (log `"Sent settings:updated + station:role"` côté backend).
 
-   The backend image copies the pre-built `apps/frontend/dist`. If backend code changed (routes, roles, gateways, Prisma schema), rebuild and restart the container.
+### Écran de blanking impossible à fermer
 
-2. **Agent** (Windows POD side):
-   - Download `sim-center-agent-win-setup.exe` from the GitHub release.
-   - Install it on each POD (it overwrites the previous agent and native binaries).
-   - Restart the agent service / process.
-   - Verify the version in the agent logs or heartbeat.
+- `Échap` en focus sur la fenêtre pour fermer localement.
+- Bouton "Masquer écran" dans Stations.
+- Vidéos qui ne jouent pas : convertir en H.264 MP4 (codecs limités du `MediaElement` WPF).
 
-### Release gotchas
+### "Failed to handshake" en rejoignant un serveur dédié
 
-- **The Windows release asset lags behind the Linux one.** `Release SimCenter Agent` runs `build-windows` and `build-linux` as separate parallel jobs. The Linux job (ubuntu-latest, no extra tooling) finishes fast and uploads `sim-center-agent-linux-x64.tar.gz` first. The Windows job (windows-latest runner, `choco install 7zip`, `pkg`, SFX packaging) takes a few minutes longer. If you check the GitHub release page right after pushing the tag and only see the `.tar.gz`, this is expected — wait a couple of minutes and refresh, or check the workflow run status, before assuming the Windows build failed.
-- **Always test the packaged `.exe` on Windows before publishing a release.** `pkg` can build successfully but fail at runtime with `MODULE_NOT_FOUND` for dynamically required files.
-- The Windows release asset is a **self-extracting installer** (`sim-center-agent-win-setup.exe`) built with 7-Zip SFX; it extracts the executable **and** `build/koffi/win32_x64/` native binaries. Do not distribute the bare `.exe` alone.
-- Verify the uploaded asset hash/size against the local file. CDN caching can serve an old asset; use `?nocache=<ts>` to test.
-- Do **not** release the legacy `agent-legacy/` build.
-- If the frontend or backend changed, the Docker image must be rebuilt and the container restarted. Releasing only the agent `.exe` is not enough.
-- **Agent update does not happen automatically.** Each POD must install the new release or be updated via the dashboard button **MAJ agent** (requires backend/agent v2.2.26+).
+1. Vérifier que le serveur dédié est bien `running` (pas coincé en `starting` — voir gotcha `emitLaunchDedicatedServer` en 3.3, et vérifier que l'agent hôte est bien connecté).
+2. Vérifier les ports réellement liés côté hôte (fix v2.2.58 — pare-feu + `waitForPortBound`).
+3. Récupérer les logs de l'agent joueur à distance (`GET /stations/:id/logs`, ou bouton "Logs") juste après la tentative — chercher "AC shared memory is mapped but frozen" en boucle (signe que le `race.ini` de join est incomplet, voir fix v2.2.64/5.10) versus "state changed" (succès).
+4. Vérifier qu'aucune télémétrie n'arrive côté backend (`docker compose logs backend | grep "Telemetry snapshot received"`) — zéro = le client n'est jamais réellement entré en course.
 
-## 9. Troubleshooting
+### Un agent reste hors ligne après un redéploiement backend ou une "MAJ agent"
 
-### "Stop" or "0 seconds" does nothing
+1. Vérifier la version de l'agent dans `stations.version` — s'il est antérieur à v2.2.62, il peut rester bloqué déconnecté après un simple redémarrage backend (bug de reconnexion corrigé en v2.2.62) et nécessiter un redémarrage manuel.
+2. Si c'est après "MAJ agent" et que l'agent reste bloqué plus d'une minute ou deux : voir 5.7 (script de mise à jour, fix v2.2.65) et 5.8 (watchdog, v2.2.67, censé relancer automatiquement après ~35s si tout le reste échoue).
+3. Un agent qui échoue sa mise à jour retentera le même échec avec "MAJ agent" tant qu'il n'a pas été mis à jour manuellement une fois (voir 5.7, dernier point).
 
-1. **Check the backend is deployed.** Frontend buttons call `POST /sessions/:id/stop` and `POST /sessions/:id/extend`. If backend code changed (roles, gateways), the Docker container must be rebuilt/restarted.
-2. **Check the agent version on the POD.** Open the agent log or heartbeat and verify it reports `v2.2.24` (or the target version). If not, install the latest release asset and restart the agent.
-3. **Check logs:**
-   - Backend: `docker compose logs -f backend`
-   - Agent: local log file next to the executable (usually `sim-center-agent-win.log` or console output).
-4. **Common causes:**
-   - Frontend `dist/` was not rebuilt before Docker image build.
-   - Agent `.exe` was not replaced on the POD.
-   - CDN served an old release asset (append `?nocache=<timestamp>` to the download URL).
+## 9. Checklist de test
 
-### Blanking screen cannot be closed
+Après un changement agent/backend, vérifier :
 
-- Press `Escape` while the blanking window is focused to close it locally.
-- Use the **Masquer écran** button in Stations (requires backend/agent up to date).
-- If videos fail to play, convert them to H.264 MP4; WPF `MediaElement` has limited codec support.
+- [ ] `sim-center-agent-win.exe` packagé démarre sans `MODULE_NOT_FOUND` sur Windows.
+- [ ] L'agent se provisionne et apparaît `online` sur la page Postes.
+- [ ] Le heartbeat maintient la station en ligne, l'adresse MAC apparaît dans Paramètres.
+- [ ] Le scan de contenu montre les voitures/circuits pour la station, `content_previews` peuplé.
+- [ ] Créer un serveur dédié lance réellement `acServer.exe` sur l'agent (statut passe à `running`).
+- [ ] Les ports de serveurs dédiés sont uniques par hôte, et se libèrent quand le serveur est arrêté (pas d'incrémentation infinie).
+- [ ] La commande de join atteint l'agent et lance CM/AC avec la bonne voiture/circuit — la télémétrie arrive réellement côté backend (pas juste le process qui se lance).
+- [ ] Télémétrie mémoire partagée live sur `/en-cours` quand AC tourne (Windows).
+- [ ] Fin de session pousse `race_out.json` au backend, stocké dans `Session.result`.
+- [ ] Classement affiché sur l'écran de blanking (position, pilote, voiture, tours, meilleur tour).
+- [ ] Démarrer une deuxième instance de l'agent sur le même POD se termine au lieu de créer une connexion dupliquée.
+- [ ] `AUTO_START=1` enregistre l'agent au démarrage Windows et il se lance à la prochaine connexion.
+- [ ] `TRAY_ICON=1` affiche l'icône barre système, menu fonctionnel (basculer blanking/quitter).
+- [ ] Après une session, `laps.csv` existe et est uploadé sur `uploads/telemetry/<sessionId>.csv`.
+- [ ] Arrêter un serveur ne termine que le bon process.
+- [ ] "MAJ agent" (`system:update`) télécharge et redémarre depuis la dernière release ; en cas d'échec d'extraction, l'agent relance quand même (ancienne version) au lieu de rester mort.
+- [ ] Le watchdog relance l'agent s'il est tué manuellement (attendre ~35-40s) — et **ne** le relance **pas** après un arrêt volontaire (quitter depuis la tray, ou "MAJ agent"/redémarrage local en cours).
+- [ ] Wake-on-LAN fonctionne via un POD relais en ligne sur le même sous-réseau.
+- [ ] Arrêt distant éteint bien le POD Windows cible.
+- [ ] Rejoindre un POD **sans** durée ("Illimité") : masque le blanking une fois la voiture prête, affiche le classement à l'arrêt, peut recevoir une durée après coup via extend.
+- [ ] Lancer une session (direct ou join) affiche l'écran "Lancement en cours" (pilote/voiture/circuit) avant la fenêtre du jeu, sans flicker.
+- [ ] Un lancement/join raté retombe sur l'écran d'attente classique plutôt que de rester bloqué sur "Lancement en cours".
+- [ ] "Automatique" sur l'écran de join force `AUTO_SHIFTER=1` même en Pro/Custom ; "Manuelle" force `AUTO_SHIFTER=0` même en Easy.
+- [ ] Envoyer des PODs depuis `JoinServer.tsx`/`Kiosk.tsx` redirige vers `/en-cours` (ou reste dans le mode kiosque) et les sessions apparaissent immédiatement.
+- [ ] `/en-cours/kiosk` montre jusqu'à 10 PODs en grille 5×2 sans sidebar ; au-delà, seuls les 10 plus récents.
+- [ ] `/kiosk` (Postes) montre une grille fixe de 10 slots, stations admin exclues, slots vides en pointillés.
+- [ ] Sélectionner une seule voiture à la création d'un serveur remplit tous les slots directement.
+- [ ] Le sélecteur de voiture à l'envoi d'un POD ne montre chaque modèle qu'une fois, même si le serveur a des doublons.
+- [ ] Le champ pilote propose l'autocomplete sur les clients existants et relie la session au bon `Client` (créé si nouveau).
+- [ ] Le bouton "Logs" (page Postes) récupère bien les logs d'un agent connecté, revient vide proprement si déconnecté.
+- [ ] Une seule fenêtre de blanking/résultats visible à la fois — redémarrer l'agent (ou "MAJ agent") deux fois de suite ne duplique rien.
+- [ ] Pendant une session, la taskbar est masquée, le jeu au premier plan, les autres fenêtres pré-lancement minimisées. Se termine avec la session.
+- [ ] Créer un serveur dédié rejette une station `simulator` comme hôte ; rejoindre rejette une station `admin` comme POD.
+- [ ] Les liens "Mode kiosque"/"Accueil" naviguent dans le même onglet, jamais un nouveau.
 
-## 10. Testing Checklist
-
-After agent/backend changes, verify:
-
-- [ ] Packaged `sim-center-agent-win.exe` starts without `MODULE_NOT_FOUND` on Windows.
-- [ ] Agent provisions and appears `online` on the Stations page.
-- [ ] Heartbeat keeps station online and MAC address appears in Settings.
-- [ ] Content scan shows cars/tracks for the station.
-- [ ] `content_previews` table is populated after the content scan.
-- [ ] Creating a dedicated server launches `acServer.exe` on the agent.
-- [ ] Server ports are unique per server on the same host.
-- [ ] Join/POD command reaches the agent and launches CM/AC with the right car/track.
-- [ ] Shared-memory telemetry appears live on the `/en-cours` page when AC is running (Windows).
-- [ ] Session end pushes `race_out.json` results to the backend and stores them in `Session.result`.
-- [ ] Results overlay shows a leaderboard (position, driver, car, laps, best lap) on the blanking screen.
-- [ ] Starting a second agent instance on the same POD exits instead of creating duplicate connections.
-- [ ] Blanking/results overlay appears on the monitor configured by `BLANKING_MONITOR`.
-- [ ] Setting `AUTO_START=1` adds the agent to the Windows startup registry and it launches on next login.
-- [ ] With `TRAY_ICON=1`, a Windows tray icon appears and its menu can toggle blanking / quit the agent.
-- [ ] After a session, a `laps.csv` file exists with one row per completed lap and is uploaded to `uploads/telemetry/<sessionId>.csv` on the backend.
-- [ ] Stop server terminates only the correct process.
-- [ ] Agent update (`system:update`) downloads and restarts from latest release.
-- [ ] Wake-on-LAN works when a relay POD is online on the same subnet.
-- [ ] Remote shutdown powers off the target Windows POD.
-- [ ] Joining a POD **without** picking a duration ("Illimité") still: dismisses blanking once the car is ready, shows the results screen on stop, and can receive a duration afterward via extend.
-- [ ] Blanking clears when the car is confirmed ready, with no flicker in the first few seconds after launch.
-- [ ] Launching a session (direct or joining a dedicated server) shows the themed "Lancement en cours" screen with driver/car/circuit before the game window ever appears, with no visible flicker as Content Manager/AC's own window comes up.
-- [ ] A failed launch/join (e.g. unreachable server) falls back to the plain waiting screen instead of getting stuck on "Lancement en cours".
-- [ ] Choosing "Automatique" for a POD on the join screen forces `AUTO_SHIFTER=1` in `assists.ini` even with `Pro`/`Custom` difficulty selected, and "Manuelle" forces `AUTO_SHIFTER=0` even with `Easy`.
-- [ ] Sending PODs from `JoinServer.tsx` redirects straight to `/en-cours` and the sessions appear immediately (no manual navigation needed).
-- [ ] `/en-cours/kiosk` shows up to 10 PODs in a 5x2 grid with no sidebar; with 11+ active sessions, only the 10 most recently started are shown.
-- [ ] Results screen appears immediately on session end (driver/car/track/best lap), with the leaderboard filling in a few seconds later — no plain blanking gap in between.
-- [ ] Only one blanking/results window is ever visible at a time — restart the agent (or trigger "MAJ agent") twice in a row and confirm no duplicate window appears.
-- [ ] During a session, the taskbar is hidden and the game is in the foreground; other windows open before launch are minimized. Ends when the session ends.
-- [ ] Creating a dedicated server rejects a `simulator`-role station as host; joining rejects an `admin`-role station as a POD.
-
-## 10. Common Commands
+## 10. Commandes courantes
 
 ```bash
-# Logs
+# Logs backend
 docker compose logs -f backend
 
-# Database shell
+# Shell base de données
 docker exec -it simracing-postgres psql -U simracing -d simracing
 
-# Prisma migrate dev
+# Migration Prisma (dev)
 npx prisma migrate dev --schema=apps/backend/prisma/schema.prisma
 
-# Prisma migrate deploy
+# Migration Prisma (deploy)
 npx prisma migrate deploy --schema=apps/backend/prisma/schema.prisma
 
-# Agent dev (Linux)
+# Agent en dev (Linux, sans koffi)
 npm run dev --workspace=@simracing/agent
 
-# Frontend dev
+# Frontend en dev
 npm run dev --workspace=@simracing/frontend
+
+# Statut des stations (accès direct DB)
+docker exec -i simracing-postgres psql -U simracing -d simracing -c "select name, version, status, last_seen_at from stations;"
+
+# Statut du dernier build de release agent
+gh run list --workflow="Release SimCenter Agent" --limit 1
+
+# Assets d'une release
+gh release view vX.Y.Z --json assets -q '.assets[].name'
 ```
 
-## 11. When Modifying This Project
+## 11. Méthodologie de test en conditions réelles (établie pendant cette session)
 
-- Keep changes minimal and aligned with existing NestJS/React patterns.
-- Update `@simracing/shared` contracts before backend/agent when adding WebSocket events.
-- Always run `npm run build --workspace=@simracing/shared` after changing shared code.
-- After Prisma schema changes, generate a migration and apply it.
-- Update this skill file if you change architecture, build steps, or deployment.
+- **Compte de test jetable** : jamais forger un JWT pour se connecter en tant qu'utilisateur réel existant (bloqué explicitement, ne pas contourner). À la place : créer un compte admin jetable via insertion SQL directe + hash bcrypt, l'utiliser pour les appels API de test, **toujours le supprimer après** (`DELETE FROM users WHERE email = 'claude-test@simracing.local'`).
+  ```bash
+  node -e "const bcrypt=require('bcryptjs'); bcrypt.hash('MotDePasseAléatoire!',10).then(h=>console.log(h))"
+  docker exec -i simracing-postgres psql -U simracing -d simracing -c "INSERT INTO users (id, email, password, role, created_at, updated_at) VALUES (gen_random_uuid(), 'claude-test@simracing.local', '<hash>', 'admin', now(), now());"
+  TOKEN=$(curl -s -X POST http://127.0.0.1:3002/api/auth/login -H 'Content-Type: application/json' -d '{"email":"claude-test@simracing.local","password":"<motdepasse>"}' | node -e "process.stdin.on('data',d=>console.log(JSON.parse(d).accessToken))")
+  ```
+- **Créer/rejoindre un vrai serveur dédié n'est pas anodin** — ça déclenche des actions physiques réelles sur les PC de production (lance `acServer.exe`, ouvre Content Manager/AC sur le POD, bascule le blanking/kiosque). Ne le faire qu'avec une autorisation explicite de l'utilisateur, et **toujours nettoyer après** (arrêter la session puis le serveur, supprimer les `Client`/comptes de test créés).
+- **Vérifier un join réussi** : `GET /stations/:id/logs` sur le POD joueur — chercher la transition "AC shared memory is mapped but frozen" (répété) → "AC shared memory state changed" (succès), et confirmer côté backend avec `docker compose logs backend | grep -c "Telemetry snapshot received"` (des centaines en quelques minutes = succès réel, zéro = handshake raté).
+- **Frontend** : test Playwright via `/root/jobsync/node_modules/playwright`, `executablePath: '/root/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome'`, `args: ['--no-sandbox']`. Éditer temporairement `apps/frontend/vite.config.ts` (proxy `3000`→`3002` pour pointer vers le backend Docker réel), `npm run dev --workspace=@simracing/frontend` en arrière-plan, puis **toujours** `git checkout -- apps/frontend/vite.config.ts` après.
+- **Attendre un build GitHub Actions** : `gh run list --workflow="Release SimCenter Agent" --limit 1`, en tâche de fond avec un polling de quelques secondes, jamais de `sleep` long en avant-plan.
+- **Toujours vérifier le déploiement réel**, pas juste "ça marche en local" : comparer le hash du bundle JS servi (`curl http://127.0.0.1:3002/ | grep -o 'index-[a-zA-Z0-9]*\.js'`) avec celui du build local, et `curl` le contenu du bundle pour confirmer qu'une chaîne de caractères du nouveau code y est bien présente.
+
+## 12. En modifiant ce projet
+
+- Garder les changements minimaux et alignés avec les patterns NestJS/React existants.
+- Mettre à jour les contrats `@simracing/shared` **avant** backend/agent lors de l'ajout d'un événement WebSocket.
+- Toujours `npm run build --workspace=@simracing/shared` après un changement de code partagé.
+- Après un changement de schéma Prisma, générer une migration et l'appliquer (`prisma migrate dev` en local, `deploy` en prod).
+- Mettre à jour ce fichier (et `CLAUDE.md`, sa copie miroir, et `CHANGELOG.md`) à chaque changement d'architecture, d'étape de build ou de déploiement.
+- Ne jamais forger de JWT pour usurper un compte utilisateur réel existant — créer un compte de test jetable à la place.
+- Toute action ayant un effet physique réel sur le matériel de production (lancer un serveur, rejoindre un POD, déclencher une mise à jour/redémarrage d'agent) nécessite une autorisation explicite de l'utilisateur, et doit être nettoyée après usage.
