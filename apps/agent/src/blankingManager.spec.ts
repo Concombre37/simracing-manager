@@ -489,7 +489,23 @@ describe('BlankingManager', () => {
     vi.useRealTimers();
   });
 
-  it('reveals the game immediately on a manual hide override', () => {
+  it('reveals the game immediately on a manual hide override during a session', () => {
+    const onGameRevealed = vi.fn();
+    const m = new BlankingManager(mockLogger, onGameRevealed);
+    (m as unknown as { scriptPath: string }).scriptPath = path.join(os.tmpdir(), 'blanking.ps1');
+    (m as unknown as { playlistPath: string }).playlistPath = path.join(
+      os.tmpdir(),
+      'blanking-playlist.json',
+    );
+    m.setAcRunning(true);
+    m.hide();
+    expect(onGameRevealed).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reveal/sweep on a manual hide override while idle (no session running or loading)', () => {
+    // A manual "hide" override is also used for maintenance when nothing is
+    // running at all — minimizing whatever the operator has open in that
+    // case would be pure disruption with no game to actually reveal.
     const onGameRevealed = vi.fn();
     const m = new BlankingManager(mockLogger, onGameRevealed);
     (m as unknown as { scriptPath: string }).scriptPath = path.join(os.tmpdir(), 'blanking.ps1');
@@ -498,7 +514,24 @@ describe('BlankingManager', () => {
       'blanking-playlist.json',
     );
     m.hide();
-    expect(onGameRevealed).toHaveBeenCalledTimes(1);
+    expect(onGameRevealed).not.toHaveBeenCalled();
+    expect(m.isBlankingActive()).toBe(false);
+  });
+
+  it('never reveals/sweeps on an admin (hosting-only) station', () => {
+    // Admin stations never run the AC client themselves (acRunning/acLoaded
+    // should never go true there), but this is enforced explicitly rather
+    // than relying on that indirectly.
+    const onGameRevealed = vi.fn();
+    const m = new BlankingManager(mockLogger, onGameRevealed);
+    (m as unknown as { scriptPath: string }).scriptPath = path.join(os.tmpdir(), 'blanking.ps1');
+    (m as unknown as { playlistPath: string }).playlistPath = path.join(
+      os.tmpdir(),
+      'blanking-playlist.json',
+    );
+    m.setEnabled(false);
+    m.hide();
+    expect(onGameRevealed).not.toHaveBeenCalled();
   });
 
   it('shutdown() force-kills an active blanking process', () => {

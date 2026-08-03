@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.71 — Le balayage des fenêtres ne doit jamais tourner sans session, ni sur un poste admin
+
+### Corrigé
+
+- **`revealThenStop()` (v2.2.70) déclenchait le balayage "minimiser les autres fenêtres" + mise au premier plan à chaque fois qu'un `hide()` manuel était reçu, même hors session.** Un "Masquer écran" déclenché pendant une maintenance (aucune session en cours) minimisait donc les fenêtres de l'opérateur pour rien — il n'y a aucun jeu à révéler dans ce cas. Ajout d'une garde : le balayage ne se déclenche que si `acRunning`/`acLoaded` indique qu'une session tourne ou charge réellement ; sinon l'écran d'attente se retire simplement, sans toucher à quoi que ce soit d'autre.
+- **Idem, explicitement, sur les postes admin (hébergement uniquement)** — ils ne lancent jamais le client AC eux-mêmes donc `acRunning`/`acLoaded` ne devraient déjà jamais y être vrais, mais l'exclusion est maintenant explicite (`!this.enabled`, déjà utilisé pour désactiver l'écran d'attente sur ces postes) plutôt que de reposer sur ça indirectement.
+
 ## v2.2.70 — Le jeu doit être confirmé au premier plan avant que l'écran d'attente ne se retire
 
 ### Corrigé

@@ -963,6 +963,20 @@ export class BlankingManager {
    * hides blanking (late beats stuck-forever). */
   private revealThenStop(attempt = 1): void {
     if (this.revealing) return;
+    // Bringing the game forward — and sweeping whatever else is open out of
+    // its way — only makes sense while a session is actually running or
+    // loading, and only ever on a simulator station. A manual "hide"
+    // override while idle (maintenance, no session) must leave whatever the
+    // operator has open alone: there is no game to reveal in the first
+    // place, so minimizing their windows would be pure disruption for no
+    // benefit. And `!this.enabled` means an admin (hosting-only) station —
+    // it never runs the AC client itself, so acRunning/acLoaded should
+    // already never be true there, but this makes the exclusion explicit
+    // rather than relying on that indirectly.
+    if (!this.enabled || (!this.acRunning && !this.acLoaded)) {
+      this.stopBlanking();
+      return;
+    }
     const result = this.onGameRevealed?.();
     if (!result || typeof (result as Promise<boolean>).then !== 'function') {
       this.stopBlanking();
