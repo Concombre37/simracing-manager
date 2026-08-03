@@ -34,6 +34,7 @@ import { AcSharedMemoryReader } from './acSharedMemoryReader';
 import { RaceResultReader } from './raceResultReader';
 import { cleanupRaceResult, RaceResultData } from './raceResultCleaner';
 import { waitForServerReachable } from './serverReachability';
+import { agentLogRingBuffer } from './logRingBuffer';
 import { LapTelemetryRecorder } from './lapTelemetryRecorder';
 import { TrayManager } from './trayManager';
 import { ProcessMonitor } from './processMonitor';
@@ -460,6 +461,14 @@ export class SimRacingAgent {
     this.socket.on('station:role', (payload) => this.handleStationRole(payload));
     this.socket.on('system:shutdown', () => this.handleShutdown());
     this.socket.on('wol:send', (payload) => this.handleWakeOnLan(payload));
+    this.socket.on('logs:request', () => this.handleLogsRequest());
+  }
+
+  private handleLogsRequest(): void {
+    this.socket?.emit('agent:logs', {
+      stationId: config.STATION_ID,
+      lines: agentLogRingBuffer.getLines(),
+    });
   }
 
   private isApiKeyError(message: string): boolean {

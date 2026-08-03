@@ -19,6 +19,10 @@ export interface AgentToServerEvents {
     httpPort: number;
   }) => void;
   'server:stopped': (payload: { serverId: string; error?: string }) => void;
+  /** Response to 'logs:request' — the agent's in-memory ring buffer of its
+   * last ~100 log lines (same content shown in its local tray console),
+   * so an admin can check what happened on a POD without walking up to it. */
+  'agent:logs': (payload: { stationId: string; lines: string[] }) => void;
 }
 
 export interface ServerToAgentEvents {
@@ -65,6 +69,8 @@ export interface ServerToAgentEvents {
    * from the dashboard, so the agent can gate the blanking screen off
    * entirely for hosting-only (admin) stations. */
   'station:role': (payload: { role: StationRole }) => void;
+  /** Asks the agent to send back its current log ring buffer via 'agent:logs'. */
+  'logs:request': () => void;
 }
 
 export interface ServerToClientEvents {

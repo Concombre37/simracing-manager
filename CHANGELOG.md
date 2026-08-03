@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.63 — Logs de l'agent consultables à distance depuis le dashboard
+
+### Ajouté
+
+- **Un bouton "Logs" sur la page Postes** (groupe "Maintenance") ouvre les ~100 dernières lignes du journal de l'agent (le même contenu déjà affiché dans sa console locale via l'icône de la barre système) directement dans le dashboard — plus besoin d'aller physiquement ouvrir la console sur le PC pour diagnostiquer un problème (ex: un "Failed to handshake" côté client). Le backend demande les logs à l'agent via un aller-retour WebSocket (`logs:request` / `agent:logs`, timeout 4s) et les expose via `GET /api/stations/:id/logs` ; si l'agent n'est pas connecté ou ne répond pas, la liste revient vide plutôt que de bloquer la requête.
+
 ## v2.2.62 — Un agent pouvait rester déconnecté indéfiniment après un redéploiement du backend
 
 ### Corrigé

@@ -63,6 +63,8 @@ export const stationsApi = {
   stop: (id: string) => api.post(`/stations/${id}/stop`).then((res) => res.data),
   updateAgent: (id: string) => api.post(`/stations/${id}/update-agent`).then((res) => res.data),
   syncContent: (id: string) => api.post(`/stations/${id}/sync-content`).then((res) => res.data),
+  getLogs: (id: string) =>
+    api.get<{ lines: string[] }>(`/stations/${id}/logs`).then((res) => res.data),
   getBlankingMedia: (id: string) =>
     api.get<BlankingMediaFile[]>(`/stations/${id}/blanking-media`).then((res) => res.data),
   uploadBlankingMedia: (id: string, file: File) => {

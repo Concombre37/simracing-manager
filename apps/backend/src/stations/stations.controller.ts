@@ -138,4 +138,12 @@ export class StationsController {
     await this.agentGateway.emitContentSync(station.stationId);
     return { success: true };
   }
+
+  @Get(':id/logs')
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
+  async getLogs(@Param('id') id: string) {
+    const station = await this.stationsService.findOne(id);
+    const lines = await this.agentGateway.requestLogs(station.stationId);
+    return { lines };
+  }
 }

@@ -58,6 +58,10 @@ export class AgentGateway
 {
   private readonly logger = new Logger(AgentGateway.name);
   private readonly connectedStationIds = new Set<string>();
+  private readonly pendingLogRequests = new Map<
+    string,
+    { resolve: (lines: string[]) => void; timeout: NodeJS.Timeout }
+  >();
 
   @WebSocketServer()
   server!: Server<AgentToServerEvents, ServerToAgentEvents>;
@@ -390,6 +394,47 @@ export class AgentGateway
         httpPort: payload.httpPort,
       },
     );
+  }
+
+  @SubscribeMessage('agent:logs')
+  handleAgentLogs(
+    _client: AuthenticatedSocket,
+    payload: { stationId: string; lines: string[] },
+  ): void {
+    const pending = this.pendingLogRequests.get(payload.stationId);
+    if (!pending) return;
+    clearTimeout(pending.timeout);
+    this.pendingLogRequests.delete(payload.stationId);
+    pending.resolve(payload.lines);
+  }
+
+  /**
+   * Asks the agent for its in-memory log ring buffer and waits for the
+   * 'agent:logs' reply — lets an admin check what happened on a POD
+   * remotely instead of walking up to it and opening the local console.
+   * Resolves with an empty array (never rejects) if the station isn't
+   * connected or doesn't answer in time.
+   */
+  async requestLogs(stationId: string, timeoutMs = 4000): Promise<string[]> {
+    const room = `station:${stationId}`;
+    const sockets = await this.server.in(room).fetchSockets();
+    if (sockets.length === 0) return [];
+
+    const existing = this.pendingLogRequests.get(stationId);
+    if (existing) {
+      clearTimeout(existing.timeout);
+      this.pendingLogRequests.delete(stationId);
+      existing.resolve([]);
+    }
+
+    return new Promise<string[]>((resolve) => {
+      const timeout = setTimeout(() => {
+        this.pendingLogRequests.delete(stationId);
+        resolve([]);
+      }, timeoutMs);
+      this.pendingLogRequests.set(stationId, { resolve, timeout });
+      this.server.to(room).emit('logs:request');
+    });
   }
 
   @SubscribeMessage('server:stopped')

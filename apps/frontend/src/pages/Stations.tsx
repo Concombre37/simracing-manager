@@ -29,6 +29,7 @@ import {
   ImageIcon,
   Gamepad2,
   Server,
+  Terminal,
 } from 'lucide-react';
 
 type StatusFilter = 'all' | Station['status'];
@@ -61,6 +62,7 @@ export function Stations() {
     apiKey: string;
   } | null>(null);
   const [blankingStation, setBlankingStation] = useState<Station | null>(null);
+  const [logsStation, setLogsStation] = useState<Station | null>(null);
   const socket = useSocket('/');
 
   const { data, isLoading, error } = useQuery({
@@ -368,6 +370,9 @@ export function Stations() {
                               >
                                 MAJ agent
                               </Chip>
+                              <Chip icon={Terminal} onClick={() => setLogsStation(station)}>
+                                Logs
+                              </Chip>
                               {isAdmin && (
                                 <>
                                   <Chip
@@ -473,6 +478,8 @@ export function Stations() {
         <BlankingMediaModal station={blankingStation} onClose={() => setBlankingStation(null)} />
       )}
 
+      {logsStation && <LogsModal station={logsStation} onClose={() => setLogsStation(null)} />}
+
       {apiKeyStation && (
         <Modal title="Nouvelle clé API" onClose={() => setApiKeyStation(null)}>
           <div className="space-y-4">
@@ -556,6 +563,50 @@ function Chip({
       )}
       {children}
     </button>
+  );
+}
+
+function LogsModal({ station, onClose }: { station: Station; onClose: () => void }) {
+  const { data, isFetching, refetch, dataUpdatedAt } = useQuery({
+    queryKey: ['station-logs', station.id],
+    queryFn: () => stationsApi.getLogs(station.id),
+  });
+
+  const lines = data?.lines ?? [];
+
+  return (
+    <Modal title={`Logs — ${station.name}`} onClose={onClose} size="lg">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            {isFetching
+              ? 'Récupération en cours...'
+              : dataUpdatedAt
+                ? `Mis à jour à ${new Date(dataUpdatedAt).toLocaleTimeString('fr-FR')}`
+                : ''}
+          </p>
+          <Button variant="secondary" size="sm" onClick={() => refetch()} isLoading={isFetching}>
+            <RefreshCw className="h-3.5 w-3.5" />
+            Actualiser
+          </Button>
+        </div>
+        <div className="max-h-[28rem] overflow-y-auto rounded-lg border border-dark-600 bg-dark-950 p-3 font-mono text-xs text-gray-300">
+          {lines.length === 0 ? (
+            <p className="py-6 text-center text-gray-500">
+              {isFetching
+                ? 'Chargement...'
+                : "Aucun log reçu — l'agent n'est peut-être pas connecté."}
+            </p>
+          ) : (
+            lines.map((line, i) => (
+              <p key={i} className="whitespace-pre-wrap break-all">
+                {line}
+              </p>
+            ))
+          )}
+        </div>
+      </div>
+    </Modal>
   );
 }
 
