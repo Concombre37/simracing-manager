@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { dedicatedServersApi, type Car as AcCar, type Track } from '../services/dedicatedServers';
 import { stationsApi, type Station } from '../services/stations';
 import { formatTrackName, formatCarName } from '../utils/track';
-import { useContentLabelMap } from '../services/contentLabels';
+import { useContentLabelMap, type ContentLabelMap } from '../services/contentLabels';
 import { setWizardBackgroundStep } from '../components/PageBackground';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
@@ -190,11 +190,23 @@ export function CreateDedicatedServer() {
       // Picking a first car is the common case ("un seul type de voiture") —
       // fill every slot with it right away instead of leaving it at a count
       // of 1 and requiring a separate "remplir tous les slots" click.
-      // Mixing multiple cars still works: once something is already
-      // selected, further clicks just add one more of that car.
       if (total === 0) return { [carAcId]: maxClients };
-      if (total >= maxClients) return prev;
-      return { ...prev, [carAcId]: (prev[carAcId] ?? 0) + 1 };
+      if (total < maxClients) {
+        return { ...prev, [carAcId]: (prev[carAcId] ?? 0) + 1 };
+      }
+      // Already at capacity (the common single-car case fills it in one
+      // click) — picking a *different* car here must never be a dead end,
+      // or mixing several cars would be impossible without first manually
+      // removing slots one by one. Take a slot from whichever car currently
+      // has the most, rather than blocking the click.
+      const [donorId, donorCount] =
+        Object.entries(prev)
+          .filter(([id]) => id !== carAcId)
+          .sort((a, b) => b[1] - a[1])[0] ?? [];
+      if (!donorId || !donorCount) return prev;
+      const next = { ...prev, [donorId]: donorCount - 1, [carAcId]: (prev[carAcId] ?? 0) + 1 };
+      if (next[donorId] <= 0) delete next[donorId];
+      return next;
     });
   }
 
@@ -856,7 +868,6 @@ function StepConfig({
             <div className="grid max-h-[65vh] grid-cols-2 gap-3 overflow-y-auto p-1 sm:grid-cols-3 lg:grid-cols-4">
               {cars.map((car) => {
                 const count = carCounts[car.acId] ?? 0;
-                const canAddMore = !atCapacity;
                 return (
                   <div
                     key={car.acId}
@@ -869,9 +880,12 @@ function StepConfig({
                     <button
                       type="button"
                       onClick={() => onAddCar(car.acId)}
-                      disabled={!canAddMore}
-                      title="Ajouter une voiture"
-                      className={`block w-full text-left ${!canAddMore && count === 0 ? 'cursor-not-allowed opacity-40' : ''}`}
+                      title={
+                        atCapacity && count === 0
+                          ? 'Prendre un emplacement à une autre voiture'
+                          : 'Ajouter une voiture'
+                      }
+                      className="block w-full text-left"
                     >
                       <div className="flex aspect-video items-center justify-center bg-dark-900">
                         {car.preview ? (
@@ -949,19 +963,103 @@ function StepConfig({
                 : '—'
             }
           />
-          <RecapItem
-            icon={Car}
-            label="Voitures"
-            value={`${totalSelectedCars} / ${maxClients} slots`}
-          />
           <RecapItem icon={Users} label="Slots" value={String(maxClients)} />
           <RecapItem icon={Lock} label="Accès" value={password ? 'Protégé' : 'Public'} />
+        </div>
+        <div className="border-t border-dark-700 p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              <Car className="h-3.5 w-3.5" />
+              Grille de voitures
+            </p>
+            <p className="text-[10px] font-semibold text-gray-400">
+              {totalSelectedCars}/{maxClients}
+            </p>
+          </div>
+          <CarSlotsGrid
+            carCounts={carCounts}
+            cars={cars}
+            maxClients={maxClients}
+            labelMap={labelMap}
+            onRemoveCar={onRemoveCar}
+          />
         </div>
         <div className="space-y-1.5 border-t border-dark-700 px-4 py-3">
           <CheckRow ok={!!name.trim()}>Nom défini</CheckRow>
           <CheckRow ok={totalSelectedCars > 0}>Au moins une voiture</CheckRow>
         </div>
       </aside>
+    </div>
+  );
+}
+
+/** "Team select" style roster: one tile per occupied slot (a car picked 3
+ * times shows up as 3 separate tiles, not a badge with "×3") plus dashed
+ * placeholders for the remaining empty slots — makes the actual 11-slot
+ * distribution visible at a glance instead of just a text counter. Clicking
+ * a filled tile removes that one instance (mirrors the "−" badge in the
+ * grid above). */
+function CarSlotsGrid({
+  carCounts,
+  cars,
+  maxClients,
+  labelMap,
+  onRemoveCar,
+}: {
+  carCounts: Record<string, number>;
+  cars: AcCar[];
+  maxClients: number;
+  labelMap: ContentLabelMap;
+  onRemoveCar: (id: string) => void;
+}) {
+  const carByAcId = useMemo(() => new Map(cars.map((c) => [c.acId, c])), [cars]);
+  const slots = useMemo(() => {
+    const flat: string[] = [];
+    for (const [acId, count] of Object.entries(carCounts)) {
+      for (let i = 0; i < count; i++) flat.push(acId);
+    }
+    return flat;
+  }, [carCounts]);
+
+  return (
+    <div className="grid grid-cols-4 gap-1.5">
+      {Array.from({ length: maxClients }, (_, i) => {
+        const acId = slots[i];
+        if (!acId) {
+          return (
+            <div
+              key={`empty-${i}`}
+              className="aspect-square rounded-md border border-dashed border-dark-600 bg-dark-900/40"
+            />
+          );
+        }
+        const car = carByAcId.get(acId);
+        const displayName = formatCarName(car?.name, acId, labelMap);
+        return (
+          <button
+            key={`slot-${i}`}
+            type="button"
+            onClick={() => onRemoveCar(acId)}
+            title={`${displayName} — cliquer pour retirer`}
+            className="group relative aspect-square overflow-hidden rounded-md border border-dark-600 bg-dark-900 transition-colors hover:border-accent-red/60"
+          >
+            {car?.preview ? (
+              <img
+                src={car.preview}
+                alt={displayName}
+                className="h-full w-full object-cover transition-opacity group-hover:opacity-30"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center">
+                <Car className="h-4 w-4 text-gray-600" />
+              </div>
+            )}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100">
+              <X className="h-4 w-4 text-white drop-shadow" />
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 }
