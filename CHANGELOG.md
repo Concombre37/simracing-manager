@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.64 — Corrige les "Failed to handshake" intermittents en rejoignant un serveur dédié
+
+### Corrigé
+
+- **`race.ini` écrit pour un join direct (`acs.exe`) était incomplet, causant des échecs intermittents à rejoindre un serveur dédié.** Reproduit et diagnostiqué grâce au nouveau bouton "Logs" (v2.2.63) : `acs.exe` se lance bien, la mémoire partagée se mappe, mais reste "gelée" en continu (le `packetId` n'avance jamais) — signe que le client ne rentre jamais réellement en course, cohérent avec un handshake qui échoue silencieusement. En comparant avec `agent-legacy` (l'implémentation précédente, en production pendant longtemps) et avec `writeRaceIni()` (utilisée pour le lancement direct/solo, juste à côté dans le même fichier et qui fonctionne bien), `writeJoinRaceIni()` s'est révélée avoir perdu plusieurs sections lors d'une réécriture précédente : `[AUTOSPAWN]`, `[SESSION_0]`, `[TEMPERATURE]`, `[WEATHER]`, `[WIND]`, ainsi que plusieurs champs de `[CAR_0]`/`[REMOTE]` (`DRIVERNAME`, `TEAM`, `GUID`, `RESTRICTOR`, `SPECTATOR_MODE`, `SPAWN_POINT`, `NAME`, `__CM_EXTENDED`). Le `race.ini` du join direct correspond maintenant exactement à celui du lancement direct/legacy.
+
 ## v2.2.63 — Logs de l'agent consultables à distance depuis le dashboard
 
 ### Ajouté

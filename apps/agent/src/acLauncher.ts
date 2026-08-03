@@ -385,20 +385,46 @@ export class AcLauncher {
     },
   ): Promise<void> {
     const raceIniPath = path.join(cfgDir, 'race.ini');
+    // Mirrors the previous (agent-legacy) implementation's race.ini exactly —
+    // a prior version of this file trimmed it down to [RACE]/[CAR_0]/[REMOTE]
+    // only, which is missing [AUTOSPAWN]/[SESSION_0]/[TEMPERATURE]/[WEATHER]/
+    // [WIND] and several [CAR_0]/[REMOTE] fields legacy always wrote. AC's own
+    // parser may not treat an online join as well-formed without them, which
+    // is consistent with the intermittent "acs.exe launches but never
+    // actually enters the race" (shared memory stays frozen) symptom this
+    // was rewritten to fix — this restores full parity with the known-good
+    // format rather than the trimmed one.
     const lines = [
       '[HEADER]',
       'VERSION=2',
       'TYPE=RACE',
       '',
       '[RACE]',
+      'CARS=1',
+      'AI_LEVEL=100',
+      `MODEL=${cfg.car}`,
+      'MODEL_CONFIG=',
+      'SKIN=',
       `TRACK=${cfg.track}`,
       `CONFIG_TRACK=${cfg.trackLayout ?? ''}`,
-      `MODEL=${cfg.car}`,
+      'PENALTIES=0',
+      'RACE_LAPS=0',
+      'DRIFT_MODE=0',
+      'FIXED_SETUP=0',
+      'JUMP_START_PENALTY=0',
       '',
       '[CAR_0]',
       `MODEL=${cfg.car}`,
+      'MODEL_CONFIG=',
       'SKIN=',
+      'DRIVERNAME=',
+      'TEAM=',
+      'GUID=',
       'SETUP=',
+      'BALLAST=0',
+      'RESTRICTOR=0',
+      'SPECTATOR_MODE=0',
+      'SPAWN_POINT=1',
       '',
       '[REMOTE]',
       'ACTIVE=1',
@@ -408,6 +434,31 @@ export class AcLauncher {
       `SERVER_NAME=${cfg.serverName ?? 'Serveur SimCenter'}`,
       `PASSWORD=${cfg.password ?? ''}`,
       `REQUESTED_CAR=${cfg.car}`,
+      'NAME=',
+      'TEAM=',
+      'GUID=',
+      '__CM_EXTENDED=0',
+      '',
+      '[AUTOSPAWN]',
+      'ACTIVE=1',
+      '',
+      '[SESSION_0]',
+      'NAME=Practice',
+      'TYPE=1',
+      'DURATION_MINUTES=0',
+      'SPAWN_SET=PIT',
+      '',
+      '[TEMPERATURE]',
+      'AMBIENT=20',
+      'ROAD=20',
+      '',
+      '[WEATHER]',
+      'NAME=3_clear',
+      '',
+      '[WIND]',
+      'DIRECTION_DEG=0',
+      'SPEED_KMH_MIN=0',
+      'SPEED_KMH_MAX=0',
       '',
     ];
     await fs.writeFile(raceIniPath, lines.join('\n'), 'utf-8');
