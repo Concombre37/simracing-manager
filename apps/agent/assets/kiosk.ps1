@@ -37,6 +37,9 @@ public class SimRacingKiosk {
 
   [DllImport("user32.dll")]
   public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+  [DllImport("user32.dll")]
+  public static extern IntPtr GetForegroundWindow();
 }
 '@
 
@@ -115,8 +118,14 @@ function Minimize-OtherWindows {
 function Set-GameForeground {
   param([string]$ProcessName, [int]$TimeoutMs)
 
+  # Returns $true only once the game window is actually confirmed as the
+  # foreground window (GetForegroundWindow), not just once SetForegroundWindow
+  # was called — that call can silently fail (Windows' foreground-lock
+  # heuristics) even when the window handle is valid, so the caller must not
+  # take "we asked" as proof it worked. Keeps retrying both finding the
+  # window and re-asserting foreground within the same timeout budget.
   $elapsed = 0
-  $intervalMs = 500
+  $intervalMs = 300
   while ($elapsed -lt $TimeoutMs) {
     $proc = Get-Process -Name $ProcessName -ErrorAction SilentlyContinue |
       Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
@@ -124,12 +133,15 @@ function Set-GameForeground {
     if ($proc) {
       [SimRacingKiosk]::ShowWindow($proc.MainWindowHandle, $SW_RESTORE) | Out-Null
       [SimRacingKiosk]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
-      return
+      if ([SimRacingKiosk]::GetForegroundWindow() -eq $proc.MainWindowHandle) {
+        return $true
+      }
     }
     Start-Sleep -Milliseconds $intervalMs
     $elapsed += $intervalMs
   }
-  Write-Warning "Game process '$ProcessName' window not found within timeout, giving up"
+  Write-Warning "Game process '$ProcessName' window not confirmed in foreground within timeout, giving up"
+  return $false
 }
 
 switch ($Action) {
@@ -142,7 +154,14 @@ switch ($Action) {
     Minimize-OtherWindows -SkipTitle $SkipTitle -GameProcessName $GameProcessName
   }
   'Foreground' {
-    Set-GameForeground -ProcessName $GameProcessName -TimeoutMs $ForegroundTimeoutMs
+    # Re-sweep right before revealing, not just once at session start: a
+    # crash dialog, an updater popup, Content Manager reappearing, etc. can
+    # all show up after 'Enter' ran and would otherwise flash on screen the
+    # instant blanking drops, since the caller only removes blanking once
+    # this whole action reports success (see BlankingManager.revealThenStop).
+    Minimize-OtherWindows -SkipTitle $SkipTitle -GameProcessName $GameProcessName
+    $ok = Set-GameForeground -ProcessName $GameProcessName -TimeoutMs $ForegroundTimeoutMs
+    if (-not $ok) { exit 1 }
   }
   'Exit' {
     Show-Taskbar

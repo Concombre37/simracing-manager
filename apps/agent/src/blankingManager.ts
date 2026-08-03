@@ -85,14 +85,22 @@ export class BlankingManager {
   private readyPromise: Promise<void> | null = null;
   private resolveReady: (() => void) | null = null;
 
+  /** Guards revealThenStop() against overlapping attempts while a reveal
+   * is in flight (production only — the async path, see revealThenStop). */
+  private revealing = false;
+
   constructor(
     private readonly logger: Logger,
-    /** Called right when blanking actually hides (grace period elapsed, or
-     * a manual "hide" override) — not on internal restarts. The game window
-     * must stay hidden behind blanking until this fires, otherwise it would
-     * grab the foreground and visually cover blanking well before its own
-     * grace period elapses. */
-    private readonly onGameRevealed?: () => void,
+    /** Called right when blanking is *about* to hide (grace period elapsed,
+     * or a manual "hide" override) — not on internal restarts. Blanking is
+     * only actually torn down once this reports success (revealThenStop()),
+     * i.e. the game must be confirmed in the foreground *before* blanking
+     * disappears, not after — otherwise whatever was behind it (desktop, a
+     * stray dialog, Content Manager...) can flash on screen first. In
+     * production this returns a real Promise<boolean> (see
+     * KioskManager.revealGame); the test suite's synchronous mocks (or no
+     * callback at all) resolve inline with no behavior change. */
+    private readonly onGameRevealed?: () => Promise<boolean> | void,
   ) {}
 
   /** Configurable from the dashboard (Paramètres), pushed over the socket. */
@@ -754,8 +762,7 @@ export class BlankingManager {
   private evaluate(): void {
     if (this.override === 'hide') {
       this.clearPendingHide();
-      this.stopBlanking();
-      this.onGameRevealed?.();
+      this.revealThenStop();
       return;
     }
     if (this.override === 'show') {
@@ -782,8 +789,7 @@ export class BlankingManager {
       if (this.isBlankingActive() && !this.pendingHideTimeout) {
         this.pendingHideTimeout = setTimeout(() => {
           this.pendingHideTimeout = null;
-          this.stopBlanking();
-          this.onGameRevealed?.();
+          this.revealThenStop();
         }, this.hideDelaySeconds * 1000);
       }
     } else {
@@ -943,6 +949,41 @@ export class BlankingManager {
       if (this.process === proc) {
         this.process = null;
       }
+    });
+  }
+
+  /** Reverses the old "hide first, reveal after" order: brings the game
+   * forward (re-sweeping any window that might have appeared on top since
+   * kiosk mode was entered) and only tears down blanking once that's
+   * actually confirmed, retrying a few times first. Synchronous callbacks
+   * (the test suite's mocks, or no callback at all) are treated as
+   * confirmed immediately — identical to the pre-fix behavior — since only
+   * the real, Promise-returning implementation needs the async retry path.
+   * Never blocks forever: after `maxAttempts` a failed confirmation still
+   * hides blanking (late beats stuck-forever). */
+  private revealThenStop(attempt = 1): void {
+    if (this.revealing) return;
+    const result = this.onGameRevealed?.();
+    if (!result || typeof (result as Promise<boolean>).then !== 'function') {
+      this.stopBlanking();
+      return;
+    }
+    this.revealing = true;
+    const maxAttempts = 3;
+    void (result as Promise<boolean>).then((confirmed) => {
+      this.revealing = false;
+      if (confirmed || attempt >= maxAttempts) {
+        if (!confirmed) {
+          this.logger.error(
+            { attempt },
+            'Giving up trying to confirm the game is in the foreground; hiding blanking anyway',
+          );
+        }
+        this.stopBlanking();
+        return;
+      }
+      this.logger.warn({ attempt }, 'Game window not confirmed in foreground yet, retrying');
+      this.revealThenStop(attempt + 1);
     });
   }
 

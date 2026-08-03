@@ -39,12 +39,15 @@ export class KioskManager {
     this.run(['-Action', 'Enter', '-GameProcessName', gameProcessName]);
   }
 
-  /** Brings the game window to the foreground once its window appears.
-   * Fire-and-forget: the script polls for the game window itself with its
-   * own timeout. Call this when blanking is about to hide, not at launch. */
-  revealGame(gameProcessName = 'acs'): void {
+  /** Re-sweeps stray windows and brings the game window to the foreground,
+   * resolving only once that's actually confirmed (not just "asked for") —
+   * see BlankingManager.revealThenStop(), which must not remove blanking
+   * until this resolves true. Awaited, unlike enter()/exit(): the caller
+   * needs to know whether it actually worked before treating the game as
+   * genuinely on top. */
+  revealGame(gameProcessName = 'acs'): Promise<boolean> {
     this.logger.info({ gameProcessName }, 'Bringing game window to foreground');
-    this.run(['-Action', 'Foreground', '-GameProcessName', gameProcessName]);
+    return this.runAwaited(['-Action', 'Foreground', '-GameProcessName', gameProcessName]);
   }
 
   /** Restores the taskbar when a session ends. */
@@ -53,24 +56,28 @@ export class KioskManager {
     this.run(['-Action', 'Exit']);
   }
 
-  private run(extraArgs: string[]): void {
-    if (process.platform !== 'win32') return;
-    if (!this.scriptPath) {
-      this.logger.warn('Kiosk script not extracted, skipping');
-      return;
-    }
-    const args = [
+  private buildArgs(extraArgs: string[]): string[] {
+    return [
       '-NoProfile',
       '-WindowStyle',
       'Hidden',
       '-ExecutionPolicy',
       'Bypass',
       '-File',
-      this.scriptPath,
+      this.scriptPath as string,
       ...extraArgs,
     ];
+  }
+
+  /** Fire-and-forget spawn, for actions nothing downstream needs to block on. */
+  private run(extraArgs: string[]): void {
+    if (process.platform !== 'win32') return;
+    if (!this.scriptPath) {
+      this.logger.warn('Kiosk script not extracted, skipping');
+      return;
+    }
     try {
-      const proc = spawn('powershell.exe', args, {
+      const proc = spawn('powershell.exe', this.buildArgs(extraArgs), {
         detached: true,
         windowsHide: true,
         stdio: 'ignore',
@@ -80,5 +87,32 @@ export class KioskManager {
     } catch (err) {
       this.logger.error({ err }, 'Failed to spawn kiosk script');
     }
+  }
+
+  /** Same spawn, but the caller waits for the exit code (0 = success) instead
+   * of firing and forgetting — used where the result decides whether it's
+   * actually safe to do something irreversible (removing blanking). */
+  private runAwaited(extraArgs: string[]): Promise<boolean> {
+    if (process.platform !== 'win32') return Promise.resolve(true);
+    if (!this.scriptPath) {
+      this.logger.warn('Kiosk script not extracted, skipping');
+      return Promise.resolve(false);
+    }
+    return new Promise((resolve) => {
+      try {
+        const proc = spawn('powershell.exe', this.buildArgs(extraArgs), {
+          windowsHide: true,
+          stdio: 'ignore',
+        });
+        proc.on('error', (err) => {
+          this.logger.error({ err }, 'Kiosk script failed to start');
+          resolve(false);
+        });
+        proc.on('exit', (code) => resolve(code === 0));
+      } catch (err) {
+        this.logger.error({ err }, 'Failed to spawn kiosk script');
+        resolve(false);
+      }
+    });
   }
 }

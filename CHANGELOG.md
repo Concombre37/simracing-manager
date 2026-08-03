@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.70 — Le jeu doit être confirmé au premier plan avant que l'écran d'attente ne se retire
+
+### Corrigé
+
+- **L'écran d'attente (blanking) se retirait _avant_ que la remise au premier plan du jeu soit tentée, et sans jamais vérifier qu'elle avait réussi.** `BlankingManager` appelait `stopBlanking()` puis lançait `onGameRevealed()` en fire-and-forget juste après — tout ce qui traînait derrière (bureau, une boîte de dialogue, Content Manager encore ouvert...) pouvait donc apparaître brièvement avant que le jeu ne reprenne le focus. `revealThenStop()` inverse l'ordre : le jeu est ramené au premier plan (avec un nouveau balayage des fenêtres parasites, pas juste celui fait une fois à l'entrée en mode kiosque) et **confirmé** avant que l'écran d'attente ne disparaisse réellement, avec jusqu'à 3 tentatives avant d'abandonner (l'écran ne reste jamais bloqué indéfiniment si la fenêtre du jeu n'est jamais trouvée).
+- `kiosk.ps1` : `Set-GameForeground` vérifie maintenant via `GetForegroundWindow()` que le jeu est _réellement_ devenu la fenêtre active (`SetForegroundWindow` peut échouer silencieusement à cause des restrictions Windows) avant de rapporter un succès, et re-balaie les fenêtres parasites (`Minimize-OtherWindows`) à chaque appel plutôt qu'une seule fois à l'entrée en mode kiosque.
+- `KioskManager.revealGame()` retourne maintenant `Promise<boolean>` (au lieu d'un spawn fire-and-forget) pour que l'appelant puisse effectivement attendre et vérifier le résultat.
+
 ## v2.2.69 — Désactive l'enregistrement au lobby public Kunos (cause probable des crashs ~29-30s)
 
 ### Corrigé
