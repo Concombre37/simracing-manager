@@ -142,7 +142,7 @@ export function Sessions() {
             </span>
             {count} POD{count > 1 ? 's' : ''} en session
           </div>
-          <Link to="/en-cours/kiosk" target="_blank" rel="noopener noreferrer">
+          <Link to="/en-cours/kiosk">
             <Button variant="secondary">
               <Tv className="h-4 w-4" />
               Mode kiosque

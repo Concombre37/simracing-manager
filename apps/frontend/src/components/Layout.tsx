@@ -138,8 +138,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-4">
             <Link
               to="/kiosk"
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex items-center gap-2 rounded-lg border border-accent-orange/40 bg-accent-orange/10 px-3 py-1.5 text-xs font-bold text-accent-orange transition-colors hover:bg-accent-orange/20"
             >
               <Tv className="h-3.5 w-3.5" />
