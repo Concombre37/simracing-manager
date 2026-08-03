@@ -38,6 +38,32 @@ export class ServerLauncher {
     private readonly onUnexpectedExit?: (serverId: string, code: number | null) => void,
   ) {}
 
+  /**
+   * `servers` is purely in-memory — any dedicated server started by a
+   * *previous* agent process (before an update, a crash, or a manual
+   * restart) has no entry here anymore, so stop() can never find it again
+   * ("No matching server process to stop"). The real acServer.exe keeps
+   * running regardless, permanently squatting its port — every later launch
+   * that happens to land on that same port (9600 first, always, since
+   * nothing marks it used anymore) then fails: acServer.exe doesn't exit
+   * cleanly on a bind failure, it limps on with a null UDP socket and
+   * panics (nil pointer dereference) the moment it tries to use it, which
+   * is what actually produces the instant "exited with code 2" symptom.
+   * Mirrors the exact same orphan-cleanup already done for the blanking
+   * window (BlankingManager.killOrphanedProcess) and for the AC client
+   * itself (AcLauncher.launchAcs() taskkill's acs.exe before every launch)
+   * — called once at agent startup, best-effort.
+   */
+  async killOrphanedProcesses(): Promise<void> {
+    if (process.platform !== 'win32') return;
+    try {
+      await execFileAsync('taskkill', ['/F', '/IM', 'acServer.exe']);
+      this.logger.info('Killed orphaned acServer.exe process(es) from a previous agent run');
+    } catch {
+      // Nothing was running — the common case, not an error.
+    }
+  }
+
   async launch(payload: LaunchDedicatedServerPayload): Promise<LaunchedServerInfo> {
     this.logger.info({ serverId: payload.serverId }, 'Launching dedicated server');
 

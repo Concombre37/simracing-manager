@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.75 — Un redémarrage de l'agent laissait `acServer.exe` orphelin, squattant son port pour toujours
+
+### Corrigé
+
+- **Cause racine réelle de l'échec instantané (code 2) de tout lancement de serveur dédié — le fix v2.2.74 (dédup de `CARS=`) était une fausse piste.** Confirmé via le `server.log` d'`acServer.exe` lui-même (fourni par l'utilisateur) : `CreateServer(): ERROR OPENING UDP CONNECTION ... bind 10048` puis `listen tcp :9600: bind: Only one usage of each socket address...` — le port 9600 était déjà occupé par un **autre process**. `acServer.exe` ne quitte pas proprement dans ce cas : il continue avec un socket UDP nul puis **panique** (nil pointer dereference) dès qu'il essaie de l'utiliser, quelques centaines de ms plus tard — d'où le "code 2" quasi instantané, peu importe la config (voitures, circuit...) testée.
+- **`ServerLauncher.servers` (la table des serveurs en cours) est purement en mémoire.** Tout serveur dédié lancé par une **précédente** instance de l'agent (avant une mise à jour, un crash, ou un redémarrage manuel) n'y a plus d'entrée — `stop()` ne le retrouve donc jamais ("No matching server process to stop"), mais le vrai `acServer.exe` continue de tourner indéfiniment, squattant son port. Comme chaque nouveau lancement retente systématiquement le port 9600 en premier, **tout redémarrage de l'agent pendant qu'un serveur dédié tourne casse silencieusement toute création future de serveur** jusqu'à un redémarrage complet de la machine ou un `taskkill` manuel. C'est exactement ce qui s'est produit ce soir : le premier serveur de test (port 9600, lancé avec succès) a survécu à plusieurs mises à jour d'agent (v2.2.70 → v2.2.74) sans jamais être arrêté proprement.
+- **Fix** : `ServerLauncher.killOrphanedProcesses()` (nouveau), appelé une fois au démarrage de l'agent — `taskkill /F /IM acServer.exe`, best-effort. Même principe déjà utilisé pour la fenêtre de blanking (`BlankingManager.killOrphanedProcess()`, via pidfile) et pour le client AC (`AcLauncher.launchAcs()` fait déjà un `taskkill /F /IM acs.exe` avant chaque lancement).
+
 ## v2.2.74 — `CARS=` avec des doublons faisait crasher acServer.exe instantanément sur un mix de voitures
 
 ### Corrigé

@@ -255,6 +255,7 @@ export class SimRacingAgent {
     await this.acSharedMemory.init();
     await this.trayManager.init();
     void this.watchdogManager.ensureRunning();
+    void this.serverLauncher.killOrphanedProcesses();
 
     if (!this.apiKey) {
       await this.provision();
