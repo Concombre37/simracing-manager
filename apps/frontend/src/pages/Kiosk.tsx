@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { TelemetrySnapshot } from '@simracing/shared';
@@ -85,8 +85,9 @@ const DURATION_OPTIONS: { value: number | undefined; label: string }[] = [
  */
 export function Kiosk() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const socket = useSocket('/');
-  const [tab, setTab] = useState<Tab>('servers');
+  const [tab, setTab] = useState<Tab>('stations');
   const [sendTarget, setSendTarget] = useState<{
     server: DedicatedServer;
     preselect?: string;
@@ -159,7 +160,10 @@ export function Kiosk() {
   );
 
   function handleSendFromStation(stationId: string) {
-    if (runningServers.length === 0) return;
+    if (runningServers.length === 0) {
+      navigate('/kiosk/dedicated-servers/create');
+      return;
+    }
     if (runningServers.length === 1) {
       setSendTarget({ server: runningServers[0], preselect: stationId });
     } else {
@@ -519,14 +523,18 @@ function StationsTab({
         ) : (
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
             {others.map((station) => {
-              const sendable =
-                canSend &&
+              const validPod =
                 station.role === 'simulator' &&
                 (station.status === 'online' || station.status === 'in_game');
               return (
                 <div
                   key={station.id}
-                  className="flex flex-col justify-between rounded-xl border border-dark-600 bg-dark-800/70 p-4"
+                  onClick={() => validPod && onSend(station.stationId)}
+                  className={`flex flex-col justify-between rounded-xl border border-dark-600 bg-dark-800/70 p-4 transition-colors ${
+                    validPod
+                      ? 'cursor-pointer hover:border-accent-orange/50'
+                      : 'cursor-not-allowed opacity-60'
+                  }`}
                 >
                   <div className="mb-3 min-w-0">
                     <div className="mb-2 flex items-center justify-between gap-2">
@@ -546,12 +554,23 @@ function StationsTab({
                   <Button
                     variant="success"
                     size="sm"
-                    disabled={!sendable}
-                    onClick={() => onSend(station.stationId)}
-                    title={!canSend ? 'Aucun serveur actif' : undefined}
+                    disabled={!validPod}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSend(station.stationId);
+                    }}
                   >
-                    <Send className="h-4 w-4" />
-                    Envoyer
+                    {canSend ? (
+                      <>
+                        <Send className="h-4 w-4" />
+                        Envoyer
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" />
+                        Créer un serveur
+                      </>
+                    )}
                   </Button>
                 </div>
               );
