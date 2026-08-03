@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.67 — Ajoute un watchdog indépendant qui relance l'agent s'il disparaît
+
+### Ajouté
+
+- **Un processus "watchdog" séparé** (`watchdogManager.ts` + `assets/watchdog.ps1`) surveille toutes les 20s si l'agent tourne encore et le relance après 15s de grâce sinon — utile constaté en conditions réelles cette session : la MAJ vers v2.2.66 a laissé les deux postes hors ligne près de 90-100s avant de revenir (heureusement grâce au filet de sécurité de v2.2.65, mais rien ne garantit qu'un futur échec de relance se rattrape tout seul). Le watchdog est arrêté explicitement avant tout arrêt volontaire (quit, MAJ, redémarrage local) pour ne jamais interférer avec un arrêt légitime.
+
+### Corrigé
+
+- **`handleLocalRestart()` (redémarrage depuis la console locale) avait le même bug cmd.exe déjà corrigé une fois dans le updater (v2.2.61)** — `set /a waitTime+=1` dans un bloc `if (...)` entre parenthèses ne s'incrémentait jamais dans la même itération. Corrigé avec la même approche PowerShell (`Wait-Process`), et relance maintenant via `start-agent.vbs` (plus de fenêtre console qui flashe).
+
 ## v2.2.66 — Vérifié en conditions réelles : handshake corrigé, ports libérés, MAJ agent testée
 
 ### Corrigé

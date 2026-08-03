@@ -44,6 +44,7 @@ import { AcSharedMemoryChecker } from './acSharedMemory';
 import { BlankingMediaSync } from './blankingMediaSync';
 import { sendWakeOnLan } from './wol';
 import { runWolDiagnostics } from './wolDiagnostics';
+import { WatchdogManager } from './watchdogManager';
 
 export class SimRacingAgent {
   private socket: Socket<ServerToAgentEvents, AgentToServerEvents> | null = null;
@@ -91,6 +92,7 @@ export class SimRacingAgent {
   private lapTelemetryRecorder: LapTelemetryRecorder;
   private trayManager: TrayManager;
   private blankingMediaSync: BlankingMediaSync;
+  private watchdogManager: WatchdogManager;
 
   constructor(private readonly logger: Logger) {
     this.acLauncher = new AcLauncher(logger);
@@ -99,6 +101,7 @@ export class SimRacingAgent {
     this.contentScanner = new ContentScanner(logger);
     this.serverLauncher = new ServerLauncher(logger);
     this.updater = new Updater(logger);
+    this.watchdogManager = new WatchdogManager(logger);
     this.processMonitor = new ProcessMonitor(logger);
     this.raceResultReader = new RaceResultReader(logger);
     this.kioskManager = new KioskManager(logger);
@@ -237,6 +240,7 @@ export class SimRacingAgent {
     await this.kioskManager.init();
     await this.acSharedMemory.init();
     await this.trayManager.init();
+    void this.watchdogManager.ensureRunning();
 
     if (!this.apiKey) {
       await this.provision();
@@ -528,6 +532,10 @@ export class SimRacingAgent {
     // without this, every agent restart (update, crash recovery) piles up
     // another blanking/results window on top of an orphaned one.
     this.blankingManager.shutdown();
+    // Stopped explicitly (not left to notice on its own) so a deliberate
+    // quit is never "fixed" by the watchdog relaunching the agent right
+    // back — the next start() call re-establishes it once running again.
+    await this.watchdogManager.stop();
     await this.acLauncher.stop();
     this.socket?.disconnect();
   }
@@ -876,7 +884,13 @@ export class SimRacingAgent {
   private async handleUpdate(): Promise<void> {
     this.logger.info('Received update command');
     try {
-      await this.updater.update(() => this.blankingManager.shutdown());
+      await this.updater.update(() => {
+        this.blankingManager.shutdown();
+        // Stopped explicitly so it can't race the update's own relaunch
+        // step; start() re-establishes it once the new/restored process
+        // is up.
+        void this.watchdogManager.stop();
+      });
     } catch (err) {
       this.logger.error({ err }, 'Agent update failed');
     }
@@ -885,8 +899,10 @@ export class SimRacingAgent {
   /**
    * Plain restart requested from the local console (no download/update
    * involved) — same wait-for-this-PID-then-relaunch technique as
-   * Updater.update(), minus the download/extract steps since it's the same
-   * executable.
+   * Updater.update() (PowerShell's Wait-Process, not a hand-rolled cmd.exe
+   * loop — cmd's `if (...)` blocks parse %var% once up front, so a `set`
+   * inside the same block doesn't reflect until the next iteration, the
+   * same footgun already found and fixed in the updater in v2.2.61).
    */
   private async handleLocalRestart(): Promise<void> {
     if (process.platform !== 'win32') {
@@ -896,34 +912,42 @@ export class SimRacingAgent {
     try {
       const currentExe = process.execPath;
       const baseDir = path.dirname(currentExe);
-      const batPath = path.join(baseDir, 'restart-agent.bat');
-      const batContent = [
-        '@echo off',
-        'set /a waitTime=0',
-        ':wait',
-        `tasklist /FI "PID eq ${process.pid}" /FO CSV | find "${process.pid}" >nul`,
-        'if %errorlevel% == 0 (',
-        '  timeout /t 1 /nobreak >nul',
-        '  set /a waitTime+=1',
-        '  if %waitTime% GTR 30 goto force',
-        '  goto wait',
-        ')',
-        ':force',
-        `if exist "${batPath}" del /f "${batPath}"`,
-        `start "" "${currentExe}"`,
-        'exit',
+      const launcherPath = path.join(baseDir, 'start-agent.vbs');
+      const scriptPath = path.join(baseDir, 'restart-agent.ps1');
+      const scriptContent = [
+        'param([int]$AgentPid, [string]$ExePath, [string]$LauncherPath)',
+        'try { Wait-Process -Id $AgentPid -Timeout 30 -ErrorAction SilentlyContinue } catch {}',
+        'if (Test-Path $LauncherPath) {',
+        '  Start-Process -FilePath \'wscript.exe\' -ArgumentList "`"$LauncherPath`""',
+        '} else {',
+        '  Start-Process -FilePath $ExePath',
+        '}',
+        'Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue',
       ].join('\r\n');
-      await fs.writeFile(batPath, batContent, 'utf-8');
+      await fs.writeFile(scriptPath, scriptContent, 'utf-8');
 
-      spawn('cmd.exe', ['/c', batPath], {
-        cwd: baseDir,
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-      });
+      spawn(
+        'powershell.exe',
+        [
+          '-WindowStyle',
+          'Hidden',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          scriptPath,
+          '-AgentPid',
+          String(process.pid),
+          '-ExePath',
+          currentExe,
+          '-LauncherPath',
+          launcherPath,
+        ],
+        { cwd: baseDir, detached: true, stdio: 'ignore', windowsHide: true },
+      );
 
       this.logger.info('Agent restart scheduled, exiting current process');
       this.blankingManager.shutdown();
+      await this.watchdogManager.stop();
       process.exit(0);
     } catch (err) {
       this.logger.error({ err }, 'Failed to schedule agent restart');
