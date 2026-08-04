@@ -79,6 +79,12 @@ if ($extracted) {
 # succeeded, so a failed update still comes back online (previous version)
 # instead of staying down until someone walks up to the PC.
 try {
+  # Give a freshly-extracted exe a moment to settle before relaunching it —
+  # confirmed live that shell.Run inside start-agent.vbs can otherwise hit a
+  # transient sharing violation (0x80070020) right after Expand-Archive.
+  # start-agent.vbs itself now also retries this, but avoiding the race here
+  # too means the common case doesn't need to hit that retry loop at all.
+  Start-Sleep -Milliseconds 1500
   if (Test-Path $LauncherPath) {
     Start-Process -FilePath 'wscript.exe' -ArgumentList "`"$LauncherPath`""
     Write-Log "Relaunched via $LauncherPath"

@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.84 — Relance bloquée par un verrou transitoire sur l'exe fraîchement extrait
+
+### Corrigé
+
+- **Signalé par l'utilisateur juste après le fix v2.2.83 (tâche interactive) : `desktop-gl3t50t` est resté bloqué en 2.2.82 après une MAJ à distance, avec une boîte de dialogue Windows Script Host affichant l'erreur `0x80070020` ("Le processus ne peut pas accéder au fichier car ce fichier est utilisé par un autre processus") sur `start-agent.vbs`, ligne 13 (`shell.Run` sur l'exe fraîchement extrait).** `concombre` avait basculé en 2.2.83 sans problème au même moment — confirmant qu'il s'agit d'un verrou transitoire (le suspect principal reste l'analyse temps réel de Windows Defender juste après l'écriture du nouvel exe par `Expand-Archive`), pas d'un bug systématique.
+- **Fix** : `start-agent.vbs` retente maintenant jusqu'à 10 fois (1s d'intervalle) avant d'abandonner et d'afficher l'erreur — ce script étant réextrait à chaque MAJ, le correctif s'applique dès la toute prochaine tentative de MAJ, sans avoir besoin d'un aller-retour de version supplémentaire. `update-agent.ps1` ajoute en plus un court délai (1.5s) avant la relance pour éviter la course dans le cas courant.
+
 ## v2.2.83 — La tâche planifiée relançait l'agent en session non-interactive, invisible sur le bureau
 
 ### Corrigé
