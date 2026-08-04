@@ -75,6 +75,15 @@ export class SimRacingAgent {
     lastSeenLapCount?: number;
   } | null = null;
   private resultsTimeout: NodeJS.Timeout | null = null;
+  /** Bumped by every new session start (handleLaunch/handleJoinServer).
+   * endSession()'s teardown spans several long awaits (acLauncher.quit() —
+   * up to 15s — then a 3s wait for race_out.json) during which a quickly
+   * relaunched session can already be up and showing. endSession() captures
+   * the value at its own start and checks it after those awaits so a stale
+   * continuation from the *previous* session recognizes it's been
+   * superseded and skips touching blanking/status state that now belongs
+   * to the new one, instead of clobbering it mid-race. */
+  private sessionGeneration = 0;
   private acLauncher: AcLauncher;
   private luaBridge: LuaBridge;
   private contentSync: ContentSync;
@@ -725,6 +734,7 @@ export class SimRacingAgent {
 
   private async handleLaunch(payload: LaunchSessionPayload): Promise<void> {
     this.logger.info({ sessionId: payload.sessionId }, 'Received launch command');
+    this.sessionGeneration += 1;
     this.clearResultsTimeout();
     // Shown immediately, before AC/Content Manager is even spawned below: any
     // restart this causes (dropping the plain waiting screen for this one)
@@ -777,11 +787,18 @@ export class SimRacingAgent {
     // first — a process merely existing isn't enough, cold PowerShell/WPF
     // startup can take a moment, and closing the game before that moment
     // passes just moves the exposure window instead of removing it.
+    const myGeneration = this.sessionGeneration;
     this.blankingManager.show();
     await this.blankingManager.waitUntilShown();
     this.acSharedMemoryReader?.stop();
     await this.luaBridge.quit();
     await this.acLauncher.stop();
+    if (this.sessionGeneration !== myGeneration) {
+      this.logger.warn(
+        'A new session started while this stop command was still processing — skipping stale teardown',
+      );
+      return;
+    }
     this.acRunning = false;
     this.clearResultsTimeout();
     const csvPath = await this.lapTelemetryRecorder.finish();
@@ -1083,6 +1100,8 @@ export class SimRacingAgent {
     sessionId?: string;
   }): Promise<void> {
     this.logger.info(payload, 'Received join server command');
+    this.sessionGeneration += 1;
+    this.clearResultsTimeout();
     this.clearCurrentSession();
     // Shown immediately, before AC/Content Manager is even spawned below: any
     // restart this causes (dropping the plain waiting screen for this one)
@@ -1155,6 +1174,7 @@ export class SimRacingAgent {
    */
   private async endSession(): Promise<void> {
     this.logger.info('Ending session, returning POD to paddock');
+    const myGeneration = this.sessionGeneration;
     const session = this.currentSession;
     this.clearCurrentSession();
     const csvPath = await this.lapTelemetryRecorder.finish();
@@ -1190,6 +1210,20 @@ export class SimRacingAgent {
 
     try {
       await this.acLauncher.quit();
+      // quit() can take up to 15s — a session started right after this one
+      // ended can already be up and showing by the time it resolves. Acting
+      // on this session's teardown now would clobber blanking/status state
+      // that the new session already owns (podInGame(false) would wrongly
+      // mark a live session as not running, a fresh showResults() would
+      // rip the game off screen mid-race). Bail out entirely rather than
+      // risk any of that — the new session's own flow already reported its
+      // own status correctly.
+      if (this.sessionGeneration !== myGeneration) {
+        this.logger.warn(
+          'A new session started while this one was still ending — skipping stale teardown',
+        );
+        return;
+      }
       this.acRunning = false;
       this.setReportedStatus(StationStatus.ONLINE);
       this.blankingManager.setPodInGame(false);
@@ -1197,6 +1231,12 @@ export class SimRacingAgent {
       if (session) {
         // Wait for Assetto Corsa to write race_out.json, then read and push results.
         await new Promise((resolve) => setTimeout(resolve, 3000));
+        if (this.sessionGeneration !== myGeneration) {
+          this.logger.warn(
+            'A new session started while this one was still ending — skipping stale results screen',
+          );
+          return;
+        }
         const rawResult = await this.raceResultReader.readLatest(session.startedAt);
         let raceResult: RaceResultData | undefined;
         if (rawResult) {

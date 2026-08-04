@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.77 — Relancer une session très vite après la précédente pouvait perturber son blanking
+
+### Corrigé
+
+- **Signalé par l'utilisateur : relancer rapidement une session juste après avoir terminé la précédente faisait apparaître le blanking de fin (résultats) pendant la nouvelle partie**, avant que l'ancien écran n'ait eu le temps de repasser en mode normal. Deux causes :
+  - `handleJoinServer()` (rejoindre un serveur dédié) n'annulait pas le minuteur de 60s qui ramène blanking en mode auto après l'affichage des résultats (`resultsTimeout`) — contrairement à `handleLaunch()`, qui le fait déjà. Une nouvelle session démarrée dans cette fenêtre de 60s laissait donc ce minuteur périmé actif, capable de perturber blanking en pleine nouvelle partie.
+  - `endSession()` (fin de session, affichage des résultats) enchaîne plusieurs attentes longues (`acLauncher.quit()` jusqu'à 15s, puis 3s pour la lecture de `race_out.json`) avant de toucher à nouveau blanking/statut/kiosque. Relancer une session pendant cette fenêtre laissait l'ancien `endSession()` continuer en arrière-plan et écraser l'état (statut, `podInGame`, écran de résultats) de la session **déjà en cours**.
+- **Fix** : `sessionGeneration`, un compteur incrémenté à chaque nouveau démarrage de session (`handleLaunch`, `handleJoinServer`). `endSession()`/`handleStop()` capturent sa valeur au début et la revérifient après chaque attente longue — si elle a changé (une nouvelle session a démarré entre-temps), le reste du traitement est abandonné (log warning) plutôt que d'écraser l'état de la session déjà en cours. `handleJoinServer()` annule aussi désormais `resultsTimeout` au démarrage, comme `handleLaunch()`.
+
 ## v2.2.76 — Blanking pouvait réapparaître en pleine session sur un simple faux-positif
 
 ### Corrigé
