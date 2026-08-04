@@ -17,6 +17,11 @@ const EARLY_EXIT_THRESHOLD_MS = 2000;
  * forever — after this many consecutive early exits, fall back to the
  * previous behavior (switch to hide override) so the POD is at least usable. */
 const MAX_EARLY_EXIT_RETRIES = 3;
+/** Consecutive ~2s heartbeat polls in a row reporting "AC not detected"
+ * required before blanking is allowed to reappear mid-session — protects
+ * against a single transient tasklist.exe/shared-memory glitch yanking
+ * blanking back over a live race. See evaluate(). */
+const MISSING_STREAK_THRESHOLD_DURING_SESSION = 3;
 
 interface SessionResultsSummary {
   clientName?: string;
@@ -60,6 +65,14 @@ export class BlankingManager {
   private acRunning = false;
   private acLoaded = false;
   private podInGame = false;
+  private missingDuringSessionStreak = 0;
+  /** True once the game has actually been confirmed on screen during the
+   * *current* session (revealThenStop() succeeded) — distinguishes "the
+   * game was showing and a poll suddenly says it's gone" (debounce this,
+   * likely a transient glitch) from "the session just started and blanking
+   * legitimately hasn't been dropped yet" (no debounce needed or wanted —
+   * there's nothing to protect there). Reset on every new session. */
+  private gameRevealedThisSession = false;
   private stoppingIntentionally = false;
   private consecutiveEarlyExits = 0;
   private scriptPath: string | null = null;
@@ -228,6 +241,8 @@ export class BlankingManager {
         this.crossfadeRestart();
       }
       this.clearPendingHide();
+      this.missingDuringSessionStreak = 0;
+      this.gameRevealedThisSession = false;
     }
     this.logger.info({ podInGame: inGame }, 'POD in-game status changed');
     this.evaluate();
@@ -774,6 +789,7 @@ export class BlankingManager {
     const shouldHide = this.acRunning || this.acLoaded;
 
     if (shouldHide) {
+      this.missingDuringSessionStreak = 0;
       // Give the game a configurable grace period (default 10s, set from
       // the dashboard) before actually removing blanking, so it doesn't
       // vanish the instant acs.exe appears while AC is still loading.
@@ -783,10 +799,42 @@ export class BlankingManager {
           this.revealThenStop();
         }, this.hideDelaySeconds * 1000);
       }
-    } else {
-      this.clearPendingHide();
-      this.startBlanking();
+      return;
     }
+
+    this.clearPendingHide();
+
+    // acRunning/acLoaded are each re-polled from scratch every ~2s
+    // (tasklist.exe / AC's shared memory) and can transiently glitch false
+    // for a single tick with no real change in the game — a false reading
+    // here must never be allowed to slam blanking back up over an actual
+    // live race. Once the game has been confirmed up during this session
+    // (blanking is currently down), require several consecutive misses in
+    // a row before treating it as real; a genuinely closed/crashed game
+    // still gets blanking back, just a few seconds later rather than on
+    // the very first noisy poll. No debounce needed outside a session
+    // (idle attract-mode blanking reacting instantly is exactly its job),
+    // or while blanking is already up (nothing to protect there either).
+    if (this.podInGame && this.gameRevealedThisSession && !this.isBlankingActive()) {
+      this.missingDuringSessionStreak += 1;
+      if (this.missingDuringSessionStreak < MISSING_STREAK_THRESHOLD_DURING_SESSION) {
+        this.logger.warn(
+          {
+            streak: this.missingDuringSessionStreak,
+            acRunning: this.acRunning,
+            acLoaded: this.acLoaded,
+          },
+          'AC not detected during an active session — waiting for confirmation before re-showing blanking',
+        );
+        return;
+      }
+      this.logger.error(
+        { streak: this.missingDuringSessionStreak },
+        'AC still not detected after repeated checks during an active session — re-showing blanking',
+      );
+    }
+
+    this.startBlanking();
   }
 
   private clearPendingHide(): void {
@@ -1009,6 +1057,7 @@ export class BlankingManager {
     }
     const result = this.onGameRevealed?.();
     if (!result || typeof (result as Promise<boolean>).then !== 'function') {
+      this.gameRevealedThisSession = true;
       this.stopBlanking();
       return;
     }
@@ -1017,7 +1066,9 @@ export class BlankingManager {
     void (result as Promise<boolean>).then((confirmed) => {
       this.revealing = false;
       if (confirmed || attempt >= maxAttempts) {
-        if (!confirmed) {
+        if (confirmed) {
+          this.gameRevealedThisSession = true;
+        } else {
           this.logger.error(
             { attempt },
             'Giving up trying to confirm the game is in the foreground; hiding blanking anyway',

@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.76 — Blanking pouvait réapparaître en pleine session sur un simple faux-positif
+
+### Corrigé
+
+- **Signalé en conditions réelles : l'écran d'attente est réapparu alors que le pilote était bien en course.** `acRunning`/`acLoaded` sont re-vérifiés à zéro toutes les ~2s (`tasklist.exe` / mémoire partagée AC) et peuvent ponctuellement se tromper sur un seul tick sans qu'il y ait de changement réel côté jeu — `evaluate()` réagissait immédiatement au premier faux-positif et rappelait `startBlanking()`, recouvrant le jeu en pleine partie.
+- **Fix** : une fois le jeu réellement confirmé à l'écran pendant la session en cours (`gameRevealedThisSession`), il faut désormais **3 vérifications consécutives** disant "AC absent" avant que blanking ne soit autorisé à réapparaître — un seul accroc est ignoré (juste loggé en warning), un vrai crash/fermeture du jeu reste couvert quelques secondes plus tard. Aucun changement en dehors d'une session active (l'écran d'attente en mode "accueil" doit toujours réagir immédiatement, rien à protéger là) ni avant la première révélation du jeu (l'écran de lancement doit toujours s'afficher normalement).
+
 ## v2.2.75 — Un redémarrage de l'agent laissait `acServer.exe` orphelin, squattant son port pour toujours
 
 ### Corrigé

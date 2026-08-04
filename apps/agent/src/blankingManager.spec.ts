@@ -534,6 +534,77 @@ describe('BlankingManager', () => {
     expect(onGameRevealed).not.toHaveBeenCalled();
   });
 
+  it('does not re-show blanking over a live session on a single transient acRunning/acLoaded glitch', () => {
+    // Reported live: blanking popped back up mid-race even though the game
+    // was genuinely still running — acRunning/acLoaded are re-polled from
+    // scratch every ~2s (tasklist.exe / shared memory) and can misreport a
+    // single tick with no real change in the game. Once the game has
+    // actually been confirmed on screen this session, a lone "not
+    // detected" poll must not slam blanking back up over the live race.
+    vi.useFakeTimers();
+    const onGameRevealed = vi.fn();
+    const m = new BlankingManager(mockLogger, onGameRevealed);
+    (m as unknown as { scriptPath: string }).scriptPath = path.join(os.tmpdir(), 'blanking.ps1');
+    (m as unknown as { playlistPath: string }).playlistPath = path.join(
+      os.tmpdir(),
+      'blanking-playlist.json',
+    );
+    m.setAuto();
+    m.setPodInGame(true);
+    m.setAcRunning(true);
+    vi.advanceTimersByTime(10000);
+    expect(m.isBlankingActive()).toBe(false);
+    expect(onGameRevealed).toHaveBeenCalledTimes(1);
+
+    // A single glitchy poll (both sources say "not there" for one tick).
+    m.setAcLoaded(false);
+    m.setAcRunning(false);
+    expect(m.isBlankingActive()).toBe(false);
+
+    // The game is detected again on the very next poll — never actually gone.
+    m.setAcRunning(true);
+    expect(m.isBlankingActive()).toBe(false);
+    expect(onGameRevealed).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it('does re-show blanking mid-session once AC is missing for several consecutive polls in a row', () => {
+    // The debounce above must not turn into "blanking can never come back
+    // during a session" — a genuine crash/close still needs to be covered,
+    // just not on the very first noisy reading.
+    vi.useFakeTimers();
+    const onGameRevealed = vi.fn();
+    const m = new BlankingManager(mockLogger, onGameRevealed);
+    (m as unknown as { scriptPath: string }).scriptPath = path.join(os.tmpdir(), 'blanking.ps1');
+    (m as unknown as { playlistPath: string }).playlistPath = path.join(
+      os.tmpdir(),
+      'blanking-playlist.json',
+    );
+    m.setAuto();
+    m.setPodInGame(true);
+    m.setAcRunning(true);
+    vi.advanceTimersByTime(10000);
+    expect(m.isBlankingActive()).toBe(false);
+
+    m.setAcLoaded(false);
+    m.setAcRunning(false);
+    expect(m.isBlankingActive()).toBe(false);
+    m.setAcRunning(false);
+    expect(m.isBlankingActive()).toBe(false);
+    m.setAcRunning(false);
+    expect(m.isBlankingActive()).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('shows blanking on the very first poll at session start, before the game has ever been revealed', () => {
+    // The debounce must only kick in once the game has actually been shown
+    // this session — nothing to protect before that, and blanking is
+    // exactly what's supposed to cover the "still loading" gap.
+    manager.setAuto();
+    manager.setPodInGame(true);
+    expect(manager.isBlankingActive()).toBe(true);
+  });
+
   it('shutdown() force-kills an active blanking process', () => {
     // Guards against orphaned windows piling up across agent restarts
     // (self-update, crash): shutdown() must actually tear the process down
