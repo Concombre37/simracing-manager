@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.79 — La MAJ à distance échouait silencieusement (EPERM au téléchargement)
+
+### Corrigé
+
+- **Signalé par l'utilisateur : "ça télécharge la MAJ mais ne fait rien de plus".** Confirmé via les logs distants : `Agent update failed (err=EPERM: operation not permitted, open 'C:\...\exe\update.zip')` — l'échec survenait dès le téléchargement, avant même d'atteindre le script de relance, et n'était visible que dans le log local de l'agent (rien ne remonte au dashboard). `updater.ts` écrivait `update.zip` sous un nom fixe **juste à côté de l'exécutable en cours d'exécution** — exactement le genre d'emplacement où Windows Defender pose un verrou transitoire pendant son scan temps réel ; un verrou (ou un fichier résiduel d'une tentative précédente jamais nettoyé) bloque alors **toutes les tentatives suivantes**, silencieusement, pour toujours.
+- **Fix** : le zip et le script de mise à jour sont désormais écrits dans le dossier temporaire (même convention que `blanking.ps1`/`kiosk.ps1`), avec un nom **unique par tentative** (`update-<timestamp>.zip`) — plus aucune collision possible avec un fichier verrouillé ou résiduel. Un nettoyage best-effort des anciens fichiers `update-*.zip/.ps1` tourne au début de chaque nouvelle tentative. Un échec de mise à jour est aussi désormais poussé via `sendLog()` vers les logs du backend (visible immédiatement, sans avoir besoin de tirer les logs distants de l'agent manuellement).
+
 ## v2.2.78 — Le nettoyage des acServer.exe orphelins (v2.2.75) ne suffisait pas, il ne tournait qu'au démarrage
 
 ### Corrigé

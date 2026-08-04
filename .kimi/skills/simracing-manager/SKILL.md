@@ -1,6 +1,6 @@
 # SimRacing Manager — Skill
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.78`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.79`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -333,6 +333,7 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
   3. `Expand-Archive -Force` — si ça échoue, **restaure** la sauvegarde plutôt que de laisser un état incohérent.
   4. **Relance toujours** en fin de script (nouvelle version si l'extraction a réussi, ancienne restaurée sinon) — avant ce fix, un échec d'extraction laissait le script s'arrêter net sans jamais relancer, l'agent restant complètement mort jusqu'à une intervention physique.
   5. Toutes les étapes journalisées dans `update-agent.log` à côté de l'exécutable.
+- **La MAJ à distance échouait silencieusement dès le téléchargement (v2.2.79)** — signalé par l'utilisateur ("télécharge mais ne fait rien de plus"), confirmé via les logs distants : `EPERM: operation not permitted, open '...\exe\update.zip'`. `update.zip` était écrit sous un nom **fixe**, **à côté de l'exécutable en cours d'exécution** — verrou transitoire Windows Defender (scan temps réel) ou fichier résiduel d'une tentative précédente, dans les deux cas ça bloque **toutes les tentatives suivantes** indéfiniment, sans jamais rien remonter au-delà du log local de l'agent. Fix : `zipPath`/`scriptPath` déplacés dans le dossier temp (même convention que `blanking.ps1`/`kiosk.ps1`), noms **uniques par tentative** (`update-<Date.now()>.zip`), nettoyage best-effort des fichiers résiduels au début de chaque tentative (`cleanupStaleUpdateFiles()`). `finalExePath`/`launcherPath` (les cibles réelles de la mise à jour) restent dans `baseDir`, inchangé. Un échec pousse aussi désormais un `sendLog()` vers les logs backend, pas seulement le log local de l'agent.
 - **La mise à jour ne se déclenche jamais automatiquement** — chaque agent doit être mis à jour via le bouton "MAJ agent" du dashboard, ou manuellement (téléchargement + exécution de `sim-center-agent-win-setup.exe`).
 - **Un agent qui tourne déjà utilise SON PROPRE `update-agent.ps1` embarqué (l'ancienne version), pas celui de la nouvelle release téléchargée** — si le script de la version installée a un bug non corrigé dans cette version-là, "MAJ agent" échouera de la même façon qu'avant tant que l'agent n'a pas été mis à jour manuellement (setup.exe) au moins une fois pour obtenir le script corrigé.
 

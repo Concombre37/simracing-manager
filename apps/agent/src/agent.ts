@@ -925,6 +925,13 @@ export class SimRacingAgent {
       });
     } catch (err) {
       this.logger.error({ err }, 'Agent update failed');
+      // A failed update previously only ever showed up in this agent's own
+      // local/ring-buffer log — invisible unless someone specifically
+      // thought to pull it remotely. sendLog() at least lands it in the
+      // backend's own logs immediately, without needing that extra step.
+      this.sendLog('error', 'Agent update failed', {
+        err: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 

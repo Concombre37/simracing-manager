@@ -42,10 +42,24 @@ export class Updater {
 
     const currentExe = process.execPath;
     const baseDir = path.dirname(currentExe);
-    const zipPath = path.join(baseDir, 'update.zip');
-    const scriptPath = path.join(baseDir, 'update-agent.ps1');
     const finalExePath = path.join(baseDir, 'sim-center-agent-win.exe');
     const launcherPath = path.join(baseDir, 'start-agent.vbs');
+
+    // Staged in TEMP, not next to the live .exe: writing update.zip into
+    // baseDir hit a recurring EPERM on a real machine — a fixed filename
+    // right beside the currently-running executable is exactly the kind of
+    // path Windows Defender's real-time scanner holds a transient lock on,
+    // and any such lock (or a leftover handle from a prior failed attempt)
+    // then permanently blocks every future update, silently, since nothing
+    // ever surfaced past the local log. A fresh, uniquely-named file in the
+    // OS temp dir (same staging convention already used for blanking/kiosk
+    // scripts) sidesteps both: nothing to collide with, ever.
+    const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
+    await fs.mkdir(tmpDir, { recursive: true });
+    await this.cleanupStaleUpdateFiles(tmpDir);
+    const attemptId = Date.now();
+    const zipPath = path.join(tmpDir, `update-${attemptId}.zip`);
+    const scriptPath = path.join(tmpDir, `update-agent-${attemptId}.ps1`);
 
     await this.downloadFile(asset.browser_download_url, zipPath);
     this.logger.info({ path: zipPath }, 'New agent archive downloaded');
@@ -96,6 +110,29 @@ export class Updater {
     // blanking window on top of the orphaned one from this process.
     onBeforeExit?.();
     process.exit(0);
+  }
+
+  /** Best-effort cleanup of leftover update-*.zip/.ps1 files from earlier
+   * attempts before starting a new one — a per-attempt unique filename
+   * already guarantees the new download never collides with an old one,
+   * this just keeps the staging directory from accumulating stale files
+   * across every retry indefinitely. Failures here (e.g. one of them still
+   * genuinely locked) are not fatal — they simply won't be removed yet. */
+  private async cleanupStaleUpdateFiles(tmpDir: string): Promise<void> {
+    try {
+      const entries = await fs.readdir(tmpDir);
+      await Promise.all(
+        entries
+          .filter((name) => /^update-(agent-)?\d+\.(zip|ps1)$/.test(name))
+          .map((name) =>
+            fs.unlink(path.join(tmpDir, name)).catch((err) => {
+              this.logger.debug({ file: name, err }, 'Could not remove stale update file');
+            }),
+          ),
+      );
+    } catch (err) {
+      this.logger.debug({ err }, 'Failed to list temp dir for stale update file cleanup');
+    }
   }
 
   private async fetchLatestRelease(): Promise<GitHubRelease> {
