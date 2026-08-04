@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.83 — La tâche planifiée relançait l'agent en session non-interactive, invisible sur le bureau
+
+### Corrigé
+
+- **Signalé par l'utilisateur juste après le fix v2.2.82 (structure du zip) : "j'ai dû faire un double clic sur l'exe car il ne l'avait pas fait".** L'extraction fonctionnait désormais correctement, mais la relance finale du script (`wscript.exe` → `start-agent.vbs` → nouvel agent avec son icône de tray) ne se produisait pas visiblement sur le bureau. Cause : `schtasks /create` sans `/RU`/`/IT` explicites crée par défaut une tâche en session **non-interactive** (logon batch/S4U) — le script s'exécute bien (l'extraction avait réussi), mais tout ce qu'il lance ensuite tourne isolé du bureau réel de l'utilisateur, invisible, comme s'il ne s'était rien passé.
+- **Fix** : `schtasks /create` inclut maintenant `/RU <utilisateur courant>` (`os.userInfo().username`) et `/IT` (jeton interactif) — la tâche s'exécute alors dans la session déjà déverrouillée de l'utilisateur, indiscernable d'un double-clic manuel. Appliqué aux deux usages de tâche planifiée (mise à jour et redémarrage local, `updater.ts` et `handleLocalRestart()`).
+
 ## v2.2.82 — Le zip de mise à jour créait un dossier `exe\exe\` imbriqué au lieu d'écraser sur place
 
 ### Corrigé

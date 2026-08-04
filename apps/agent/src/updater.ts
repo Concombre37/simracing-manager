@@ -1,6 +1,7 @@
 import { promises as fs, createWriteStream } from 'fs';
 import path from 'path';
 import https from 'https';
+import os from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { Logger } from 'pino';
@@ -102,6 +103,17 @@ export class Updater {
     // to). A one-shot Scheduled Task sidesteps that entirely: the Task
     // Scheduler *service* launches the process, completely outside this
     // process's tree/job, so it survives no matter what happens here.
+    //
+    // /RU + /IT (run as the current user, with an interactive token)
+    // confirmed necessary live too: without them, schtasks defaults to a
+    // non-interactive (batch/S4U) logon — the script itself still runs
+    // (extraction succeeded), but the relaunch it triggers at the end
+    // (wscript.exe -> start-agent.vbs -> the new agent, with its tray
+    // icon) never actually came up on the real desktop; the station only
+    // came back after manually double-clicking the exe. /IT runs the task
+    // in the caller's own already-unlocked interactive session instead,
+    // indistinguishable from a manual double-click.
+    const currentUser = os.userInfo().username;
     const command = `powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "${scriptPath}" -ParamsPath "${paramsPath}"`;
     await execFileAsync('schtasks', [
       '/create',
@@ -113,6 +125,9 @@ export class Updater {
       'once',
       '/st',
       '00:00',
+      '/ru',
+      currentUser,
+      '/it',
       '/f',
     ]);
     await execFileAsync('schtasks', ['/run', '/tn', taskName]);

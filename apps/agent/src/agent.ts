@@ -3,6 +3,7 @@ import { Logger } from 'pino';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
+import os from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import {
@@ -988,6 +989,13 @@ export class SimRacingAgent {
       ].join('\r\n');
       await fs.writeFile(scriptPath, scriptContent, 'utf-8');
 
+      // /RU + /IT: without an explicit interactive-token logon, schtasks
+      // defaults to a non-interactive (batch/S4U) session — confirmed live
+      // on the updater's identical scheduled-task launch: the script itself
+      // ran fine, but the GUI-facing relaunch it triggers (wscript.exe's
+      // tray icon) never actually showed up on the real desktop until
+      // manually double-clicking the exe. /IT runs it in the current
+      // already-unlocked session instead, same as a manual double-click.
       const command = `powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "${scriptPath}"`;
       await execFileAsync('schtasks', [
         '/create',
@@ -999,6 +1007,9 @@ export class SimRacingAgent {
         'once',
         '/st',
         '00:00',
+        '/ru',
+        os.userInfo().username,
+        '/it',
         '/f',
       ]);
       await execFileAsync('schtasks', ['/run', '/tn', taskName]);
