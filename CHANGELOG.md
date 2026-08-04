@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.82 — Le zip de mise à jour créait un dossier `exe\exe\` imbriqué au lieu d'écraser sur place
+
+### Corrigé
+
+- **Signalé par l'utilisateur juste après le fix v2.2.80 (tâche planifiée) : "ça a mis le unzip de l'exe dans le dossier exe déjà".** Le zip de release (`sim-center-agent-win.zip`) contenait tous ses fichiers préfixés par `exe/` (`exe/sim-center-agent-win.exe`, `exe/build/...`) — confirmé en téléchargeant et inspectant l'archive réelle. `update-agent.ps1` extrait pourtant directement dans le dossier `exe` déjà existant (`Expand-Archive -DestinationPath $BaseDir`), donc ce préfixe créait un `exe\exe\...` imbriqué au lieu d'écraser les fichiers en place — le nouvel exe n'était donc jamais réellement utilisé. Même mismatch pour l'installeur SFX manuel : son `RunProgram="%%T\sim-center-agent-win.exe"` supposait déjà un placement à la racine, sans le préfixe `exe\`.
+- **Fix** : l'étape de packaging (`.github/workflows/release-agent.yml`) archive maintenant depuis **l'intérieur** du dossier `exe/` avec des noms de fichiers nus (`Push-Location exe` puis `7z a ... sim-center-agent-win.exe start-agent.vbs build`, sans préfixe) — la racine de l'archive correspond désormais exactement au contenu attendu du dossier `exe`, pour la mise à jour automatique comme pour l'installation manuelle via le SFX.
+- **Note pour une installation manuelle avec ce fix** : le SFX (`sim-center-agent-win-setup.exe`) doit maintenant être extrait avec le dossier `exe` existant lui-même comme destination (plus le dossier parent comme avant ce fix).
+
 ## v2.2.81 — Les écrans de lancement/résultats affichent maintenant le nom personnalisé des voitures/circuits
 
 ### Ajouté

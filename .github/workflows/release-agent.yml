@@ -52,9 +52,25 @@ jobs:
           $sfx = "C:\Program Files\7-Zip\7zCon.sfx"
           if (-not (Test-Path $7z)) { $7z = "7z.exe"; $sfx = "7zCon.sfx" }
           if (-not (Test-Path $sfx)) { throw "SFX module not found at $sfx" }
-          & $7z a -sfx"$sfx" -r -y exe\sim-center-agent-win-setup.exe exe\config.txt exe\sim-center-agent-win.exe exe\start-agent.vbs exe\build
+          # Archive from *inside* exe/ with bare filenames (no leading "exe\")
+          # so the archive's own root is what should become the exe/ folder's
+          # contents, not an "exe/" subfolder nested one level down —
+          # confirmed live: update-agent.ps1's Expand-Archive extracts
+          # straight into the already-existing exe/ folder, so an "exe/"
+          # prefix inside the archive created exe\exe\... instead of
+          # overwriting the running install in place. RunProgram above
+          # (%%T\sim-center-agent-win.exe, no exe\ prefix either) already
+          # assumed root-level placement, so this also fixes the SFX's
+          # self-launch after a manual extract.
+          Push-Location exe
+          & $7z a -sfx"$sfx" -r -y ..\sim-center-agent-win-setup.exe config.txt sim-center-agent-win.exe start-agent.vbs build
+          Pop-Location
+          Move-Item -Path sim-center-agent-win-setup.exe -Destination exe\sim-center-agent-win-setup.exe -Force
           if (-not (Test-Path exe\sim-center-agent-win-setup.exe)) { throw "SFX not created" }
-          & $7z a -tzip -r -y exe\sim-center-agent-win.zip exe\sim-center-agent-win.exe exe\start-agent.vbs exe\build
+          Push-Location exe
+          & $7z a -tzip -r -y ..\sim-center-agent-win.zip sim-center-agent-win.exe start-agent.vbs build
+          Pop-Location
+          Move-Item -Path sim-center-agent-win.zip -Destination exe\sim-center-agent-win.zip -Force
           if (-not (Test-Path exe\sim-center-agent-win.zip)) { throw "ZIP not created" }
 
       - name: Extract changelog section for this release
