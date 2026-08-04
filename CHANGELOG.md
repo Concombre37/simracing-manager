@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.85 — La détection auto d'Assetto Corsa ratait les installs sur une bibliothèque Steam secondaire
+
+### Corrigé
+
+- **Signalé par l'utilisateur : deux nouveaux postes (`pod04`, `pcelsassvap`) remontaient 0 voiture / 0 circuit alors qu'Assetto Corsa était bien installé "au bon endroit".** Confirmé via les logs distants (`GET /stations/:id/logs`) : `WARN Assetto Corsa directory not found` en boucle sur les deux. La détection auto ne cherchait que dans `<dossier d'install Steam>\steamapps\common\assettocorsa` — un jeu installé via Steam sur une **bibliothèque secondaire** (un autre disque, ce qui est très courant pour économiser l'espace du disque système) vit ailleurs et était donc invisible, même si l'installation Steam elle-même était parfaitement standard.
+- **Fix** : le scan lit maintenant `steamapps/libraryfolders.vdf` à côté de chaque install Steam détectée pour découvrir toutes ses bibliothèques (y compris sur d'autres disques), et sonde `steamapps\common\assettocorsa` dans chacune d'elles en plus de l'emplacement principal.
+
 ## v2.2.84 — Relance bloquée par un verrou transitoire sur l'exe fraîchement extrait
 
 ### Corrigé

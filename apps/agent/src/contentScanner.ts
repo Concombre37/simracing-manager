@@ -292,7 +292,7 @@ export class ContentScanner {
     const acPath = await this.resolveAcPath();
     if (!acPath) {
       this.logger.warn(
-        { tried: this.getCandidatePaths() },
+        { tried: await this.getCandidatePaths() },
         'Assetto Corsa directory not found. Set AC_PATH in .env if the game is installed elsewhere.',
       );
       return content;
@@ -452,31 +452,75 @@ export class ContentScanner {
     return paths;
   }
 
-  private getCandidatePaths(): string[] {
+  private async getCandidatePaths(): Promise<string[]> {
     const candidates: string[] = [];
     if (config.AC_PATH) {
       candidates.push(config.AC_PATH);
     }
-    if (process.platform === 'win32') {
-      const programFiles = process.env.ProgramFiles;
-      const programFilesX86 = process.env['ProgramFiles(x86)'];
-      const prefixes = [
-        programFiles,
-        programFilesX86,
-        'C:\\Program Files',
-        'C:\\Program Files (x86)',
-        'C:\\Steam',
-      ].filter((p): p is string => !!p);
-      const seen = new Set<string>();
-      for (const prefix of prefixes) {
-        const candidate = path.join(prefix, 'Steam', 'steamapps', 'common', 'assettocorsa');
-        if (!seen.has(candidate)) {
-          seen.add(candidate);
-          candidates.push(candidate);
-        }
+    if (process.platform !== 'win32') {
+      return candidates;
+    }
+
+    const programFiles = process.env.ProgramFiles;
+    const programFilesX86 = process.env['ProgramFiles(x86)'];
+    const steamPrefixes = [
+      programFiles,
+      programFilesX86,
+      'C:\\Program Files',
+      'C:\\Program Files (x86)',
+      'C:\\Steam',
+    ].filter((p): p is string => !!p);
+
+    const steamDirs = new Set<string>();
+    for (const prefix of steamPrefixes) {
+      steamDirs.add(path.join(prefix, 'Steam'));
+    }
+
+    const seen = new Set<string>();
+    const addCandidate = (base: string) => {
+      const candidate = path.join(base, 'steamapps', 'common', 'assettocorsa');
+      if (!seen.has(candidate)) {
+        seen.add(candidate);
+        candidates.push(candidate);
+      }
+    };
+
+    for (const steamDir of steamDirs) {
+      addCandidate(steamDir);
+      // A Steam install only covers the *primary* library — a game
+      // installed to a secondary library on another drive (extremely
+      // common: users move large game libraries off the OS drive) lives
+      // outside `<Steam>\steamapps\common`, so a perfectly valid,
+      // correctly-installed-via-Steam copy of AC was silently invisible
+      // to this scan. Every additional library Steam knows about is
+      // declared in steamapps/libraryfolders.vdf next to the Steam
+      // install itself — read it and probe each one too.
+      for (const library of await this.readSteamLibraryFolders(steamDir)) {
+        addCandidate(library);
       }
     }
+
     return candidates;
+  }
+
+  /** Parses the `"path"  "..."` entries out of Steam's libraryfolders.vdf.
+   * This is a minimal regex extraction rather than a full VDF parser —
+   * the file's only content we need is these path values, and a full
+   * parser would be a lot of code for a format we don't otherwise touch. */
+  private async readSteamLibraryFolders(steamDir: string): Promise<string[]> {
+    const vdfPath = path.join(steamDir, 'steamapps', 'libraryfolders.vdf');
+    try {
+      const raw = await fs.readFile(vdfPath, 'utf-8');
+      const paths: string[] = [];
+      const regex = /"path"\s*"((?:[^"\\]|\\.)*)"/g;
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(raw))) {
+        paths.push(match[1].replace(/\\\\/g, '\\'));
+      }
+      return paths;
+    } catch {
+      return [];
+    }
   }
 
   private async resolveAcPath(): Promise<string | undefined> {
@@ -490,7 +534,7 @@ export class ContentScanner {
       );
     }
 
-    for (const candidate of this.getCandidatePaths()) {
+    for (const candidate of await this.getCandidatePaths()) {
       if (await this.pathExists(path.join(candidate, 'content', 'cars'))) {
         return candidate;
       }
