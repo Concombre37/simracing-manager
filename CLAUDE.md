@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.79`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.80`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -326,7 +326,7 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 ### 5.7 Mise à jour à distance (`updater.ts` + `assets/update-agent.ps1`)
 
 - Techniciens/admins déclenchent une mise à jour depuis la page Postes (`POST /stations/:id/update-agent` → `system:update` → `handleUpdate()`).
-- `Updater.update()` : vérifie la dernière release GitHub, télécharge `sim-center-agent-win.zip`, écrit `update-agent.ps1` (extrait de `assets/`) sur disque, le spawn en détaché, puis `process.exit(0)`.
+- `Updater.update()` : vérifie la dernière release GitHub, télécharge `sim-center-agent-win.zip`, écrit `update-agent.ps1` (extrait de `assets/`) sur disque, le lance via une **tâche planifiée Windows ponctuelle** (v2.2.80, voir plus bas), puis `process.exit(0)`.
 - **`update-agent.ps1` (durci en v2.2.65 après un échec réel constaté en production)** :
   1. `Wait-Process -Timeout 30` sur le PID de l'ancien agent (PowerShell, pas de boucle cmd.exe — voir bug ci-dessous).
   2. **Sauvegarde** l'exe + `build/` actuels dans `update-backup/` avant d'extraire.
@@ -336,6 +336,7 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 - **La MAJ à distance échouait silencieusement dès le téléchargement (v2.2.79)** — signalé par l'utilisateur ("télécharge mais ne fait rien de plus"), confirmé via les logs distants : `EPERM: operation not permitted, open '...\exe\update.zip'`. `update.zip` était écrit sous un nom **fixe**, **à côté de l'exécutable en cours d'exécution** — verrou transitoire Windows Defender (scan temps réel) ou fichier résiduel d'une tentative précédente, dans les deux cas ça bloque **toutes les tentatives suivantes** indéfiniment, sans jamais rien remonter au-delà du log local de l'agent. Fix : `zipPath`/`scriptPath` déplacés dans le dossier temp (même convention que `blanking.ps1`/`kiosk.ps1`), noms **uniques par tentative** (`update-<Date.now()>.zip`), nettoyage best-effort des fichiers résiduels au début de chaque tentative (`cleanupStaleUpdateFiles()`). `finalExePath`/`launcherPath` (les cibles réelles de la mise à jour) restent dans `baseDir`, inchangé. Un échec pousse aussi désormais un `sendLog()` vers les logs backend, pas seulement le log local de l'agent.
 - **La mise à jour ne se déclenche jamais automatiquement** — chaque agent doit être mis à jour via le bouton "MAJ agent" du dashboard, ou manuellement (téléchargement + exécution de `sim-center-agent-win-setup.exe`).
 - **Un agent qui tourne déjà utilise SON PROPRE `update-agent.ps1` embarqué (l'ancienne version), pas celui de la nouvelle release téléchargée** — si le script de la version installée a un bug non corrigé dans cette version-là, "MAJ agent" échouera de la même façon qu'avant tant que l'agent n'a pas été mis à jour manuellement (setup.exe) au moins une fois pour obtenir le script corrigé.
+- **Le script de continuation ne survivait pas à la fermeture de l'agent (v2.2.80)** — confirmé par l'utilisateur juste après le fix v2.2.79 : le téléchargement réussissait enfin, mais l'extraction/relance ne se produisait jamais ("il manque le dézip et la relance de l'exe"), sans aucune erreur loggée. Cause probable : le process de l'agent (packagé `pkg`) appartient à un Job Object Windows avec kill-on-close — tous ses enfants meurent avec lui, `detached: true` ne fait que créer un nouveau groupe de processus, ça ne l'exempte pas d'un job auquel il appartient déjà. Fix : lancement via une **tâche planifiée ponctuelle** (`schtasks /create ... /sc once /st 00:00 /f` puis `/run` immédiat — le `/st` factice n'a aucune importance, `/run` déclenche sur demande indépendamment du planning) — le service Task Scheduler lance le process entièrement en dehors de l'arborescence/job de l'agent, il survit donc quoi qu'il arrive à ce dernier. `update-agent.ps1` reçoit ses paramètres via un fichier JSON (`-ParamsPath`, un seul argument à passer proprement à travers `schtasks`) plutôt que 5 arguments nommés séparés. Le script se désinscrit lui-même de la tâche planifiée (`schtasks /delete`) en fin d'exécution, comme il supprimait déjà son propre fichier.
 
 ### 5.8 Watchdog (`watchdogManager.ts` + `assets/watchdog.ps1`, v2.2.67)
 
@@ -349,6 +350,7 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 ### 5.9 Redémarrage local (console de la tray, `handleLocalRestart()`)
 
 - **Avait le même bug cmd.exe que l'updater avant sa correction** — `set /a waitTime+=1` dans un bloc `if (...)` entre parenthèses ne s'incrémentait jamais dans la même itération (les blocs `cmd.exe` évaluent les `%var%` une seule fois, au moment où le bloc est lu). Corrigé (même passe que le watchdog, v2.2.67) avec la même approche PowerShell `Wait-Process`, relance via `start-agent.vbs` (avant : `start "" exe` direct, flash de fenêtre console).
+- **Même fix tâche-planifiée que l'updater (v2.2.80)** — script généré à la volée (pas un asset), valeurs (PID, chemins) injectées directement dans le texte du script en littéraux PowerShell single-quote-échappés plutôt que passées en arguments, donc la commande de la tâche planifiée n'a besoin que d'un seul chemin entre guillemets (`-File "<script>"`), zéro risque de mauvais échappement avec plusieurs chemins.
 
 ### 5.10 Autres gotchas agent
 

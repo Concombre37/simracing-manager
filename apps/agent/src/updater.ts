@@ -1,10 +1,13 @@
 import { promises as fs, createWriteStream } from 'fs';
 import path from 'path';
 import https from 'https';
-import { spawn } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import { Logger } from 'pino';
 import axios from 'axios';
 import { VERSION } from './version';
+
+const execFileAsync = promisify(execFile);
 
 const REPO = 'Concombre37/simracing-manager';
 const ASSET_NAME = 'sim-center-agent-win.zip';
@@ -68,43 +71,53 @@ export class Updater {
     // loop: cmd's `if (...)` blocks parse %var% once up front, so a `set`
     // inside the same block doesn't reflect until the *next* iteration — a
     // well-known footgun that left the old wait loop effectively stuck, on
-    // top of cmd.exe's console window not reliably staying hidden. Params
-    // are passed as real PowerShell arguments (not interpolated into the
-    // script text) to avoid any quoting/injection concerns from the paths.
+    // top of cmd.exe's console window not reliably staying hidden.
     const assetScript = path.join(__dirname, '..', 'assets', 'update-agent.ps1');
     const scriptContent = await fs.readFile(assetScript, 'utf-8');
     await fs.writeFile(scriptPath, scriptContent, 'utf-8');
     this.logger.info({ path: scriptPath }, 'Update script extracted');
 
-    spawn(
-      'powershell.exe',
-      [
-        '-WindowStyle',
-        'Hidden',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-File',
-        scriptPath,
-        '-AgentPid',
-        String(process.pid),
-        '-ZipPath',
+    const taskName = `SimRacingManagerUpdate-${attemptId}`;
+    const paramsPath = path.join(tmpDir, `update-params-${attemptId}.json`);
+    await fs.writeFile(
+      paramsPath,
+      JSON.stringify({
+        agentPid: process.pid,
         zipPath,
-        '-BaseDir',
         baseDir,
-        '-FinalExePath',
         finalExePath,
-        '-LauncherPath',
         launcherPath,
-      ],
-      {
-        cwd: baseDir,
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-      },
+        taskName,
+      }),
+      'utf-8',
     );
 
-    this.logger.info('Agent update started, exiting current process');
+    // A plain detached spawn() isn't reliable enough here — confirmed live:
+    // the download succeeded, but the extraction/relaunch step it should
+    // have led to never ran, with nothing to show for it. The most likely
+    // explanation is a Windows Job Object associated with this (pkg-built)
+    // process tree killing every child the instant this process exits,
+    // regardless of `detached: true` (which only creates a new process
+    // group — it doesn't exempt a process from a job it already belongs
+    // to). A one-shot Scheduled Task sidesteps that entirely: the Task
+    // Scheduler *service* launches the process, completely outside this
+    // process's tree/job, so it survives no matter what happens here.
+    const command = `powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "${scriptPath}" -ParamsPath "${paramsPath}"`;
+    await execFileAsync('schtasks', [
+      '/create',
+      '/tn',
+      taskName,
+      '/tr',
+      command,
+      '/sc',
+      'once',
+      '/st',
+      '00:00',
+      '/f',
+    ]);
+    await execFileAsync('schtasks', ['/run', '/tn', taskName]);
+
+    this.logger.info({ taskName }, 'Agent update scheduled task started, exiting current process');
     // Child processes (blanking window) don't die with the agent on
     // Windows: without this, the new version's agent spawns its own
     // blanking window on top of the orphaned one from this process.
@@ -123,7 +136,7 @@ export class Updater {
       const entries = await fs.readdir(tmpDir);
       await Promise.all(
         entries
-          .filter((name) => /^update-(agent-)?\d+\.(zip|ps1)$/.test(name))
+          .filter((name) => /^update-(agent-|params-)?\d+\.(zip|ps1|json)$/.test(name))
           .map((name) =>
             fs.unlink(path.join(tmpDir, name)).catch((err) => {
               this.logger.debug({ file: name, err }, 'Could not remove stale update file');

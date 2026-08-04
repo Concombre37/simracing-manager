@@ -3,7 +3,8 @@ import { Logger } from 'pino';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
-import { spawn } from 'child_process';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import {
   AgentToServerEvents,
   ServerToAgentEvents,
@@ -45,6 +46,8 @@ import { BlankingMediaSync } from './blankingMediaSync';
 import { sendWakeOnLan } from './wol';
 import { runWolDiagnostics } from './wolDiagnostics';
 import { WatchdogManager } from './watchdogManager';
+
+const execFileAsync = promisify(execFile);
 
 export class SimRacingAgent {
   private socket: Socket<ServerToAgentEvents, AgentToServerEvents> | null = null;
@@ -941,7 +944,10 @@ export class SimRacingAgent {
    * Updater.update() (PowerShell's Wait-Process, not a hand-rolled cmd.exe
    * loop — cmd's `if (...)` blocks parse %var% once up front, so a `set`
    * inside the same block doesn't reflect until the next iteration, the
-   * same footgun already found and fixed in the updater in v2.2.61).
+   * same footgun already found and fixed in the updater in v2.2.61), and
+   * the same one-shot Scheduled Task launch as Updater.update() (v2.2.80)
+   * — a plain detached spawn() isn't reliably exempt from a Windows Job
+   * Object killing every child process the instant this one exits.
    */
   private async handleLocalRestart(): Promise<void> {
     if (process.platform !== 'win32') {
@@ -952,39 +958,48 @@ export class SimRacingAgent {
       const currentExe = process.execPath;
       const baseDir = path.dirname(currentExe);
       const launcherPath = path.join(baseDir, 'start-agent.vbs');
-      const scriptPath = path.join(baseDir, 'restart-agent.ps1');
+      const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
+      await fs.mkdir(tmpDir, { recursive: true });
+      const attemptId = Date.now();
+      const scriptPath = path.join(tmpDir, `restart-agent-${attemptId}.ps1`);
+      const taskName = `SimRacingManagerRestart-${attemptId}`;
+      // Values baked directly into the generated script text (PowerShell
+      // single-quoted, '' escaping any embedded quote) rather than passed
+      // as -Name args: keeps the Scheduled Task's own command line down to
+      // a single quoted path, avoiding any risk of that outer quoting
+      // going wrong with several path arguments each of which could
+      // contain spaces.
+      const psQuote = (value: string) => `'${value.replace(/'/g, "''")}'`;
       const scriptContent = [
-        'param([int]$AgentPid, [string]$ExePath, [string]$LauncherPath)',
-        'try { Wait-Process -Id $AgentPid -Timeout 30 -ErrorAction SilentlyContinue } catch {}',
+        `try { Wait-Process -Id ${process.pid} -Timeout 30 -ErrorAction SilentlyContinue } catch {}`,
+        `$LauncherPath = ${psQuote(launcherPath)}`,
+        `$ExePath = ${psQuote(currentExe)}`,
         'if (Test-Path $LauncherPath) {',
         '  Start-Process -FilePath \'wscript.exe\' -ArgumentList "`"$LauncherPath`""',
         '} else {',
         '  Start-Process -FilePath $ExePath',
         '}',
+        `& schtasks /delete /tn ${psQuote(taskName)} /f *> $null`,
         'Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue',
       ].join('\r\n');
       await fs.writeFile(scriptPath, scriptContent, 'utf-8');
 
-      spawn(
-        'powershell.exe',
-        [
-          '-WindowStyle',
-          'Hidden',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-File',
-          scriptPath,
-          '-AgentPid',
-          String(process.pid),
-          '-ExePath',
-          currentExe,
-          '-LauncherPath',
-          launcherPath,
-        ],
-        { cwd: baseDir, detached: true, stdio: 'ignore', windowsHide: true },
-      );
+      const command = `powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "${scriptPath}"`;
+      await execFileAsync('schtasks', [
+        '/create',
+        '/tn',
+        taskName,
+        '/tr',
+        command,
+        '/sc',
+        'once',
+        '/st',
+        '00:00',
+        '/f',
+      ]);
+      await execFileAsync('schtasks', ['/run', '/tn', taskName]);
 
-      this.logger.info('Agent restart scheduled, exiting current process');
+      this.logger.info({ taskName }, 'Agent restart scheduled, exiting current process');
       this.blankingManager.shutdown();
       await this.watchdogManager.stop();
       process.exit(0);
@@ -1033,7 +1048,6 @@ export class SimRacingAgent {
     this.logger.info('Received shutdown command');
     try {
       if (process.platform === 'win32') {
-        const { execFile } = await import('child_process');
         execFile('shutdown', ['/s', '/t', '0']);
       } else {
         this.logger.warn('Shutdown command is only implemented on Windows');

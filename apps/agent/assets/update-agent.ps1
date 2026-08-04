@@ -1,10 +1,22 @@
 param(
-  [int]$AgentPid,
-  [string]$ZipPath,
-  [string]$BaseDir,
-  [string]$FinalExePath,
-  [string]$LauncherPath
+  [string]$ParamsPath
 )
+
+# Parameters come from a JSON file instead of individual -Name args: this
+# script is invoked through a one-shot Scheduled Task (see updater.ts) so
+# it survives the agent process exiting even if that process belongs to a
+# Windows Job Object that kills child processes on close (detached spawns
+# alone weren't reliable enough — confirmed live: the update downloaded
+# fine but the extraction/relaunch step never ran). A single quoted file
+# path is much simpler and safer to pass through schtasks' own command-line
+# parsing than five separate quoted path arguments would be.
+$params = Get-Content -Path $ParamsPath -Raw | ConvertFrom-Json
+$AgentPid = $params.agentPid
+$ZipPath = $params.zipPath
+$BaseDir = $params.baseDir
+$FinalExePath = $params.finalExePath
+$LauncherPath = $params.launcherPath
+$TaskName = $params.taskName
 
 $logPath = Join-Path $BaseDir 'update-agent.log'
 function Write-Log($msg) {
@@ -80,4 +92,8 @@ try {
   Write-Log "Relaunch FAILED: $_"
 }
 
+if ($TaskName) {
+  & schtasks /delete /tn $TaskName /f *> $null
+}
+Remove-Item -Path $ParamsPath -Force -ErrorAction SilentlyContinue
 Remove-Item -Path $PSCommandPath -Force -ErrorAction SilentlyContinue

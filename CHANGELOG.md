@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.80 — Le script de MAJ/redémarrage ne survivait pas à la fermeture de l'agent
+
+### Corrigé
+
+- **Confirmé par l'utilisateur juste après le fix v2.2.79 : le téléchargement fonctionnait enfin, mais "il manque le dézip et la relance de l'exe"** — a dû le faire à la main. Le script PowerShell chargé de continuer la mise à jour (extraction + relance) était lancé en `detached: true` classique, ce qui ne suffit pas toujours sur Windows : si le process de l'agent (packagé via `pkg`) appartient à un Job Object avec kill-on-close, **tous ses enfants meurent avec lui**, `detached: true` ne fait que créer un nouveau groupe de processus, ça ne l'exempte pas d'un job auquel il appartient déjà.
+- **Fix** : le script de continuation (mise à jour comme redémarrage local) est maintenant lancé via une **tâche planifiée Windows ponctuelle** (`schtasks /create ... /sc once /st 00:00 /f` puis `/run` immédiat) — le service Task Scheduler lance le process, entièrement en dehors de l'arborescence/job de l'agent, donc il survit quoi qu'il arrive à ce dernier. `update-agent.ps1` reçoit désormais ses paramètres via un fichier JSON (`-ParamsPath`, un seul argument à passer proprement à travers `schtasks`) plutôt que 5 arguments nommés séparés ; le script de redémarrage local a ses valeurs directement injectées dans le texte généré (aucun paramètre à passer du tout). Les deux se désinscrivent eux-mêmes de la tâche planifiée en fin d'exécution.
+
 ## v2.2.79 — La MAJ à distance échouait silencieusement (EPERM au téléchargement)
 
 ### Corrigé
