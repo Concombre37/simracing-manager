@@ -71,7 +71,9 @@ export class SimRacingAgent {
     timeout: NodeJS.Timeout | null;
     clientName?: string;
     carAcId?: string;
+    carName?: string;
     track?: string;
+    trackName?: string;
     trackLayout?: string;
     bestLapMs?: number;
     bestInvalidLapMs?: number;
@@ -747,7 +749,9 @@ export class SimRacingAgent {
     const cfg = (payload.config ?? {}) as Record<string, unknown>;
     this.blankingManager.showLaunching({
       carAcId: cfg.carId ? String(cfg.carId) : undefined,
+      carName: payload.carName,
       track: cfg.trackId ? String(cfg.trackId) : undefined,
+      trackName: payload.trackName,
       trackLayout: cfg.trackConfig ? String(cfg.trackConfig) : undefined,
     });
     try {
@@ -1111,7 +1115,9 @@ export class SimRacingAgent {
     httpPort: number;
     password?: string;
     carAcId: string;
+    carName?: string;
     track: string;
+    trackName?: string;
     trackLayout?: string;
     serverName?: string;
     durationMinutes?: number;
@@ -1132,7 +1138,9 @@ export class SimRacingAgent {
     this.blankingManager.showLaunching({
       clientName: payload.clientName,
       carAcId: payload.carAcId,
+      carName: payload.carName,
       track: payload.track,
+      trackName: payload.trackName,
       trackLayout: payload.trackLayout,
     });
     try {
@@ -1169,7 +1177,9 @@ export class SimRacingAgent {
           timeout: null,
           clientName: payload.clientName,
           carAcId: payload.carAcId,
+          carName: payload.carName,
           track: payload.track,
+          trackName: payload.trackName,
           trackLayout: payload.trackLayout,
         };
         this.logger.info(
@@ -1213,7 +1223,9 @@ export class SimRacingAgent {
       this.blankingManager.showResults({
         clientName: session.clientName,
         carAcId: session.carAcId,
+        carName: session.carName,
         track: session.track,
+        trackName: session.trackName,
         trackLayout: session.trackLayout,
         bestLapMs: session.bestLapMs,
         bestInvalidLapMs: session.bestInvalidLapMs,
@@ -1275,7 +1287,9 @@ export class SimRacingAgent {
         this.blankingManager.showResults({
           clientName: session.clientName,
           carAcId: session.carAcId,
+          carName: session.carName,
           track: session.track,
+          trackName: session.trackName,
           trackLayout: session.trackLayout,
           bestLapMs: session.bestLapMs,
           bestInvalidLapMs: session.bestInvalidLapMs,

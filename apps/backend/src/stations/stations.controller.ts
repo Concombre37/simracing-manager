@@ -24,8 +24,19 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { StationRole, UserRole } from '@simracing/shared';
+import {
+  StationRole,
+  UserRole,
+  formatCarName,
+  formatTrackName,
+} from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { ContentLabelsService } from '../content-labels/content-labels.service';
+
+interface StationContentShape {
+  cars?: { acId: string; name?: string }[];
+  tracks?: { acId: string; name?: string }[];
+}
 
 @Controller('stations')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -35,6 +46,7 @@ export class StationsController {
     private readonly sessionsService: SessionsService,
     private readonly agentGateway: AgentGateway,
     private readonly telemetryService: TelemetryService,
+    private readonly contentLabelsService: ContentLabelsService,
   ) {}
 
   @Post()
@@ -108,9 +120,36 @@ export class StationsController {
     });
     await this.sessionsService.start(session.id);
     const sessionConfig = (session.config ?? {}) as unknown;
+
+    // Resolved so the agent's blanking screens (launching/results) can show
+    // the customized display name instead of the raw acId — see
+    // packages/shared/src/naming.ts for the same fallback logic already
+    // used by the dashboard.
+    const cfg = (sessionConfig ?? {}) as Record<string, unknown>;
+    const carAcId = cfg.carId ? String(cfg.carId) : undefined;
+    const trackAcId = cfg.trackId ? String(cfg.trackId) : undefined;
+    const content = station.content as StationContentShape | null;
+    const labelMap = await this.contentLabelsService.getMap();
+    const carName = carAcId
+      ? formatCarName(
+          content?.cars?.find((c) => c.acId === carAcId)?.name,
+          carAcId,
+          labelMap,
+        )
+      : undefined;
+    const trackName = trackAcId
+      ? formatTrackName(
+          content?.tracks?.find((t) => t.acId === trackAcId)?.name,
+          trackAcId,
+          labelMap,
+        )
+      : undefined;
+
     await this.agentGateway.emitLaunch(station.stationId, {
       sessionId: session.id,
       config: sessionConfig,
+      carName,
+      trackName,
     });
     return session;
   }

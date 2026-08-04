@@ -4,9 +4,15 @@ import { DedicatedServersController } from './dedicated-servers.controller';
 import { AgentModule } from '../agent/agent.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ClientsModule } from '../clients/clients.module';
+import { ContentLabelsModule } from '../content-labels/content-labels.module';
 
 @Module({
-  imports: [forwardRef(() => AgentModule), PrismaModule, ClientsModule],
+  imports: [
+    forwardRef(() => AgentModule),
+    PrismaModule,
+    ClientsModule,
+    ContentLabelsModule,
+  ],
   controllers: [DedicatedServersController],
   providers: [DedicatedServersService],
   exports: [DedicatedServersService],

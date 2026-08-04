@@ -26,7 +26,12 @@ const MISSING_STREAK_THRESHOLD_DURING_SESSION = 3;
 interface SessionResultsSummary {
   clientName?: string;
   carAcId?: string;
+  /** Resolved display name (custom rename if set, else the cleaned raw AC
+   * name) — shown instead of carAcId when present. */
+  carName?: string;
   track?: string;
+  /** Same resolution as carName, for the track. */
+  trackName?: string;
   trackLayout?: string;
   bestLapMs?: number;
   /** Fastest lap AC rejected as invalid (cut, etc.) — only set when it would
@@ -41,7 +46,9 @@ interface SessionResultsSummary {
 interface SessionLaunchInfo {
   clientName?: string;
   carAcId?: string;
+  carName?: string;
   track?: string;
+  trackName?: string;
   trackLayout?: string;
 }
 
@@ -601,9 +608,11 @@ export class BlankingManager {
       summary.bestInvalidLapMs && summary.bestInvalidLapMs > 0
         ? formatLapTime(summary.bestInvalidLapMs)
         : null;
+    const trackLabel = summary.trackName ?? summary.track;
+    const carLabel = summary.carName ?? summary.carAcId;
     const trackDisplay = summary.trackLayout
-      ? `${summary.track} (${summary.trackLayout})`
-      : (summary.track ?? '-');
+      ? `${trackLabel} (${summary.trackLayout})`
+      : (trackLabel ?? '-');
     const leaderboard = summary.result
       ? this.renderLeaderboard(summary.result)
       : summary.pending
@@ -634,7 +643,7 @@ export class BlankingManager {
   <div class="bar"></div>
   <div class="driver-banner">
     <div class="driver-name">${this.escapeHtml(summary.clientName ?? 'Pilote')}</div>
-    <div class="driver-meta">${this.escapeHtml(summary.carAcId ?? '-')} · ${this.escapeHtml(trackDisplay)}</div>
+    <div class="driver-meta">${this.escapeHtml(carLabel ?? '-')} · ${this.escapeHtml(trackDisplay)}</div>
   </div>
   <div class="summary">
     <div class="tile">
@@ -643,7 +652,7 @@ export class BlankingManager {
     </div>
     <div class="tile">
       <div class="label">Voiture</div>
-      <div class="value">${this.escapeHtml(summary.carAcId ?? '-')}</div>
+      <div class="value">${this.escapeHtml(carLabel ?? '-')}</div>
     </div>
     <div class="tile best-lap">
       <div class="label">Meilleur tour vérifié</div>
@@ -670,9 +679,11 @@ export class BlankingManager {
   private generateLaunchingHtml(info: SessionLaunchInfo): void {
     const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
     const htmlPath = path.join(tmpDir, 'session-launching.html');
+    const trackLabel = info.trackName ?? info.track;
+    const carLabel = info.carName ?? info.carAcId;
     const trackDisplay = info.trackLayout
-      ? `${info.track} (${info.trackLayout})`
-      : (info.track ?? '-');
+      ? `${trackLabel} (${info.trackLayout})`
+      : (trackLabel ?? '-');
 
     const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -693,7 +704,7 @@ export class BlankingManager {
   <div class="bar"></div>
   <div class="driver-banner">
     <div class="driver-name">${this.escapeHtml(info.clientName ?? 'Pilote')}</div>
-    <div class="driver-meta">${this.escapeHtml(info.carAcId ?? '-')} · ${this.escapeHtml(trackDisplay)}</div>
+    <div class="driver-meta">${this.escapeHtml(carLabel ?? '-')} · ${this.escapeHtml(trackDisplay)}</div>
   </div>
   <div class="summary">
     <div class="tile">
@@ -702,7 +713,7 @@ export class BlankingManager {
     </div>
     <div class="tile launching">
       <div class="label">Voiture</div>
-      <div class="value">${this.escapeHtml(info.carAcId ?? '-')}</div>
+      <div class="value">${this.escapeHtml(carLabel ?? '-')}</div>
     </div>
   </div>
   <div class="leaderboard placeholder">

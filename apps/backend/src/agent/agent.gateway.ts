@@ -520,7 +520,9 @@ export class AgentGateway
       httpPort: number;
       password?: string;
       carAcId: string;
+      carName?: string;
       track: string;
+      trackName?: string;
       trackLayout?: string;
       serverName?: string;
       durationMinutes?: number;

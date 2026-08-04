@@ -1,5 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import type { ContentLabelMap } from '@simracing/shared';
 import { api } from './api';
+
+export type { ContentLabelMap };
 
 export interface KnownContentItem {
   type: 'car' | 'track';
@@ -7,11 +10,6 @@ export interface KnownContentItem {
   rawName: string;
   displayName: string | null;
   labelId: string | null;
-}
-
-export interface ContentLabelMap {
-  car: Record<string, string>;
-  track: Record<string, string>;
 }
 
 export const contentLabelsApi = {

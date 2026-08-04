@@ -8,5 +8,6 @@ import { PrismaModule } from '../prisma/prisma.module';
   imports: [AuthModule, PrismaModule],
   controllers: [ContentLabelsController],
   providers: [ContentLabelsService],
+  exports: [ContentLabelsService],
 })
 export class ContentLabelsModule {}

@@ -25,8 +25,19 @@ import { AgentGateway } from '../agent/agent.gateway';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { StationRole, UserRole } from '@simracing/shared';
+import {
+  StationRole,
+  UserRole,
+  formatCarName,
+  formatTrackName,
+} from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { ContentLabelsService } from '../content-labels/content-labels.service';
+
+interface StationContentShape {
+  cars?: { acId: string; name?: string }[];
+  tracks?: { acId: string; name?: string }[];
+}
 
 @Controller('dedicated-servers')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -38,6 +49,7 @@ export class DedicatedServersController {
     private readonly agentGateway: AgentGateway,
     private readonly prisma: PrismaService,
     private readonly clientsService: ClientsService,
+    private readonly contentLabelsService: ContentLabelsService,
   ) {}
 
   @Post()
@@ -120,6 +132,18 @@ export class DedicatedServersController {
     const port = server.tcpPort ?? 9600;
     const httpPort = server.httpPort ?? 8081;
 
+    // Resolved once for the whole call (same host content/labels for every
+    // pod) so the agent's blanking screens (launching/results) can show
+    // the customized display name instead of the raw acId — see
+    // packages/shared/src/naming.ts for the exact same fallback logic
+    // already used by the dashboard.
+    const hostContent = server.station.content as StationContentShape | null;
+    const labelMap = await this.contentLabelsService.getMap();
+    const rawTrackName = hostContent?.tracks?.find(
+      (t) => t.acId === server.track,
+    )?.name;
+    const trackName = formatTrackName(rawTrackName, server.track, labelMap);
+
     const sessions: { sessionId: string; stationId: string }[] = [];
 
     for (const pod of dto.pods) {
@@ -162,6 +186,11 @@ export class DedicatedServersController {
 
       sessions.push({ sessionId: session.id, stationId: pod.stationId });
 
+      const rawCarName = hostContent?.cars?.find(
+        (c) => c.acId === pod.carAcId,
+      )?.name;
+      const carName = formatCarName(rawCarName, pod.carAcId, labelMap);
+
       this.logger.log(`Emitting server:join to station:${pod.stationId}`);
       await this.agentGateway.emitJoinServer(pod.stationId, {
         host,
@@ -169,7 +198,9 @@ export class DedicatedServersController {
         httpPort,
         password: server.password ?? undefined,
         carAcId: pod.carAcId,
+        carName,
         track: server.track,
+        trackName,
         trackLayout: server.trackLayout ?? undefined,
         serverName: server.name,
         durationMinutes: dto.durationMinutes,

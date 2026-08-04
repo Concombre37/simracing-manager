@@ -50,7 +50,14 @@ export interface ServerToAgentEvents {
     httpPort: number;
     password?: string;
     carAcId: string;
+    /** Resolved display name (custom rename if set, else the cleaned raw AC
+     * name) — shown on the launching/results blanking screens instead of
+     * the raw acId. Optional so older backends without this field don't
+     * break the contract; the agent falls back to carAcId if absent. */
+    carName?: string;
     track: string;
+    /** Same resolution as carName, for the track. */
+    trackName?: string;
     trackLayout?: string;
     serverName?: string;
     durationMinutes?: number;
@@ -152,6 +159,11 @@ export interface LaunchSessionPayload {
   sessionId: string;
   config: unknown;
   stationConfig?: StationConfig;
+  /** Resolved display names for the blanking launching/results screens —
+   * see 'server:join' for the same fields on the join-a-dedicated-server
+   * path. */
+  carName?: string;
+  trackName?: string;
 }
 
 export interface LaunchDedicatedServerPayload {

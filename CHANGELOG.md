@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.81 — Les écrans de lancement/résultats affichent maintenant le nom personnalisé des voitures/circuits
+
+### Ajouté
+
+- **Demandé par l'utilisateur** : les écrans d'attente "Lancement en cours" et "Session terminée" affichaient le nom technique brut (`abarth500`, `spa`...) au lieu du nom personnalisé défini dans la page "Noms". Le backend résout désormais le nom d'affichage (renommage personnalisé, sinon nom AC nettoyé, sinon acId mis en forme — exactement la même logique que le dashboard) et l'inclut dans les payloads `session:launch`/`server:join` envoyés à l'agent (`carName`/`trackName`, en plus des `carAcId`/`track` techniques déjà utilisés pour le lancement réel). L'agent transporte ces noms dans le suivi de session et les affiche à la place de l'acId sur les deux écrans.
+- **Logique de formatage déplacée dans `packages/shared/src/naming.ts`** (`formatCarName`, `formatTrackName`, `cleanTrackName`, `formatTrackAcId`) — elle n'existait auparavant que côté frontend (`utils/track.ts`) ; le backend en a maintenant besoin aussi pour résoudre les noms avant de les envoyer à l'agent. Le frontend importe désormais ces fonctions depuis `@simracing/shared` au lieu d'en garder sa propre copie.
+
 ## v2.2.80 — Le script de MAJ/redémarrage ne survivait pas à la fermeture de l'agent
 
 ### Corrigé
