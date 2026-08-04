@@ -42,11 +42,10 @@ export function BlankingMedia() {
   };
 
   const toggleAll = () => {
-    if (!stations) return;
-    if (selectedIds.size === stations.length) {
+    if (selectedIds.size === simulatorStations.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(stations.map((s) => s.id)));
+      setSelectedIds(new Set(simulatorStations.map((s) => s.id)));
     }
   };
 
@@ -61,8 +60,13 @@ export function BlankingMedia() {
     handleFile(files[0]);
   };
 
-  const onlineStations = stations?.filter((s) => s.status !== 'offline') ?? [];
-  const offlineStations = stations?.filter((s) => s.status === 'offline') ?? [];
+  // Admin (hosting-only) stations never run the AC client and never show
+  // blanking at all (BlankingManager.setEnabled(role !== ADMIN) on the
+  // agent) — listing them here as a send target is misleading, nothing
+  // would ever actually display the media.
+  const simulatorStations = stations?.filter((s) => s.role !== 'admin') ?? [];
+  const onlineStations = simulatorStations.filter((s) => s.status !== 'offline');
+  const offlineStations = simulatorStations.filter((s) => s.status === 'offline');
 
   return (
     <PageShell
@@ -78,10 +82,10 @@ export function BlankingMedia() {
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <Monitor className="w-5 h-5 text-accent-orange" />
-                Sélection des postes ({selectedIds.size}/{stations.length})
+                Sélection des postes ({selectedIds.size}/{simulatorStations.length})
               </h3>
               <Button variant="secondary" size="sm" onClick={toggleAll}>
-                {selectedIds.size === stations.length ? (
+                {selectedIds.size === simulatorStations.length ? (
                   <>
                     <Square className="w-4 h-4" />
                     Tout désélectionner
@@ -95,30 +99,43 @@ export function BlankingMedia() {
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {[...onlineStations, ...offlineStations].map((station) => (
-                <label
-                  key={station.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                    selectedIds.has(station.id)
-                      ? 'bg-accent-orange/10 border-accent-orange'
-                      : 'bg-dark-900 border-dark-600 hover:border-dark-500'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-dark-500 text-accent-orange focus:ring-accent-orange bg-dark-800"
-                    checked={selectedIds.has(station.id)}
-                    onChange={() => toggleStation(station.id)}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{station.name}</p>
-                    <p className="text-xs text-gray-500 font-mono truncate">{station.stationId}</p>
-                  </div>
-                  <StatusBadge status={station.status} />
-                </label>
-              ))}
-            </div>
+            {simulatorStations.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-dark-600 bg-dark-900/50 py-10 text-center">
+                <AlertCircle className="mx-auto mb-2 h-10 w-10 text-gray-600" />
+                <p className="text-gray-400">Aucun poste simulateur.</p>
+                <p className="mt-1 text-sm text-gray-600">
+                  Seuls les postes de type "Simulateur" affichent un écran d'attente — les postes
+                  admin (hébergement) n'en ont pas.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {[...onlineStations, ...offlineStations].map((station) => (
+                  <label
+                    key={station.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedIds.has(station.id)
+                        ? 'bg-accent-orange/10 border-accent-orange'
+                        : 'bg-dark-900 border-dark-600 hover:border-dark-500'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-dark-500 text-accent-orange focus:ring-accent-orange bg-dark-800"
+                      checked={selectedIds.has(station.id)}
+                      onChange={() => toggleStation(station.id)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{station.name}</p>
+                      <p className="text-xs text-gray-500 font-mono truncate">
+                        {station.stationId}
+                      </p>
+                    </div>
+                    <StatusBadge status={station.status} />
+                  </label>
+                ))}
+              </div>
+            )}
           </Card>
 
           <Card className="space-y-4">
