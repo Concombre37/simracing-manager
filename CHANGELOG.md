@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.78 — Le nettoyage des acServer.exe orphelins (v2.2.75) ne suffisait pas, il ne tournait qu'au démarrage
+
+### Corrigé
+
+- **Signalé par l'utilisateur après avoir renommé une voiture/un circuit : le serveur ne voulait plus lancer.** Investigation en conditions réelles : le rename n'y était pour rien (reproduit avec le contenu renommé exact, ça fonctionne) — c'est le même bug de port squatté que v2.2.75 (`acServer.exe` orphelin qui panique sur bind échoué), mais qui **recommençait des heures après un redémarrage d'agent**, sans qu'aucun redémarrage n'ait eu lieu entre-temps. Le nettoyage de v2.2.75 ne tournait qu'**une fois au démarrage de l'agent** — un process orphelin apparu depuis (une tentative de lancement en apparence échouée peut laisser le process vivant) continuait de squatter son port indéfiniment.
+- **Fix** : `killOrphanedProcesses()` tourne désormais aussi **avant chaque lancement**, pas seulement au démarrage de l'agent — et ne tue plus que les process `acServer.exe` non suivis dans `servers` (comparaison par PID via `tasklist`), laissant intact un éventuel serveur légitimement en cours (le modèle de données supporte plusieurs serveurs dédiés simultanés par poste).
+
 ## v2.2.77 — Relancer une session très vite après la précédente pouvait perturber son blanking
 
 ### Corrigé

@@ -44,28 +44,67 @@ export class ServerLauncher {
    * restart) has no entry here anymore, so stop() can never find it again
    * ("No matching server process to stop"). The real acServer.exe keeps
    * running regardless, permanently squatting its port — every later launch
-   * that happens to land on that same port (9600 first, always, since
-   * nothing marks it used anymore) then fails: acServer.exe doesn't exit
-   * cleanly on a bind failure, it limps on with a null UDP socket and
+   * that happens to land on that same port then fails: acServer.exe doesn't
+   * exit cleanly on a bind failure, it limps on with a null UDP socket and
    * panics (nil pointer dereference) the moment it tries to use it, which
    * is what actually produces the instant "exited with code 2" symptom.
-   * Mirrors the exact same orphan-cleanup already done for the blanking
-   * window (BlankingManager.killOrphanedProcess) and for the AC client
-   * itself (AcLauncher.launchAcs() taskkill's acs.exe before every launch)
-   * — called once at agent startup, best-effort.
+   *
+   * A single cleanup at agent startup (the original fix) turned out not to
+   * be enough: confirmed live, the same squatted-port crash kept recurring
+   * *hours* into an agent's uptime, with no restart in between — some
+   * acServer.exe processes end up orphaned without an agent restart ever
+   * happening (a launch attempt that appeared to fail can still leave the
+   * process alive, for instance). So this now also runs right before every
+   * launch, not just once — and only kills processes this instance isn't
+   * currently tracking in `servers`, leaving a legitimately-running,
+   * already-tracked server alone (the data model supports more than one
+   * concurrent dedicated server per station). Mirrors the same orphan-kill
+   * precedent already used for the blanking window
+   * (BlankingManager.killOrphanedProcess) and the AC client itself
+   * (AcLauncher.launchAcs() taskkill's acs.exe before every launch).
    */
   async killOrphanedProcesses(): Promise<void> {
     if (process.platform !== 'win32') return;
+    const trackedPids = new Set(
+      Array.from(this.servers.values())
+        .map((s) => s.process.pid)
+        .filter((pid): pid is number => typeof pid === 'number'),
+    );
+    let stdout: string;
     try {
-      await execFileAsync('taskkill', ['/F', '/IM', 'acServer.exe']);
-      this.logger.info('Killed orphaned acServer.exe process(es) from a previous agent run');
+      ({ stdout } = await execFileAsync('tasklist', [
+        '/FI',
+        'IMAGENAME eq acServer.exe',
+        '/FO',
+        'CSV',
+        '/NH',
+      ]));
     } catch {
-      // Nothing was running — the common case, not an error.
+      return; // Nothing running at all — tasklist exits non-zero in that case.
+    }
+    const lines = stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.toLowerCase().includes('acserver.exe'));
+    for (const line of lines) {
+      const fields = parseCsvLine(line);
+      const pid = parseInt(fields[1] ?? '', 10);
+      if (!Number.isFinite(pid) || trackedPids.has(pid)) continue;
+      try {
+        await execFileAsync('taskkill', ['/F', '/PID', String(pid)]);
+        this.logger.info({ pid }, 'Killed untracked orphaned acServer.exe process');
+      } catch (err) {
+        this.logger.debug(
+          { pid, err },
+          'Failed to kill orphaned acServer.exe (likely already gone)',
+        );
+      }
     }
   }
 
   async launch(payload: LaunchDedicatedServerPayload): Promise<LaunchedServerInfo> {
     this.logger.info({ serverId: payload.serverId }, 'Launching dedicated server');
+    await this.killOrphanedProcesses();
 
     const acPath = await this.resolveAcPath();
     const serverExe = path.join(acPath, 'server', 'acServer.exe');
@@ -502,4 +541,11 @@ export class ServerLauncher {
 
     this.logger.info({ serverDir, mainPort, httpPort }, 'Server config written');
   }
+}
+
+/** Parses one `tasklist /FO CSV` line (comma-separated, double-quoted
+ * fields, no escaping of embedded quotes in practice for this output). */
+function parseCsvLine(line: string): string[] {
+  const matches = line.match(/"([^"]*)"/g) ?? [];
+  return matches.map((field) => field.slice(1, -1));
 }
