@@ -9,6 +9,7 @@ export const joinPodSchema = z.object({
     .enum([Difficulty.EASY, Difficulty.PRO, Difficulty.CUSTOM])
     .optional(),
   gearbox: z.enum([GearboxMode.MANUAL, GearboxMode.AUTO]).optional(),
+  delaySeconds: z.number().int().min(0).max(600).optional(),
 });
 
 export const joinServerSchema = z.object({

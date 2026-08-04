@@ -85,6 +85,7 @@ export const dedicatedServersApi = {
       clientName?: string;
       difficulty?: string;
       gearbox?: string;
+      delaySeconds?: number;
     }[],
     durationMinutes?: number,
   ) => api.post(`/dedicated-servers/${id}/join`, { pods, durationMinutes }).then((res) => res.data),

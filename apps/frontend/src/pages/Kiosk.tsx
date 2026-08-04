@@ -68,7 +68,17 @@ interface PodConfig {
   difficulty: Difficulty;
   gearbox: Gearbox;
   carAcId: string;
+  delaySeconds: number;
 }
+
+const DELAY_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Immédiat' },
+  { value: 5, label: '5s' },
+  { value: 10, label: '10s' },
+  { value: 30, label: '30s' },
+  { value: 60, label: '1 min' },
+  { value: 120, label: '2 min' },
+];
 
 const DIFFICULTIES: {
   value: Difficulty;
@@ -751,6 +761,7 @@ function SendPodsModal({
             difficulty: 'PRO',
             gearbox: 'MANUAL',
             carAcId: availableCars[0] ?? '',
+            delaySeconds: 0,
           },
         }
       : {},
@@ -767,6 +778,7 @@ function SendPodsModal({
           difficulty: 'PRO',
           gearbox: 'MANUAL',
           carAcId: availableCars[0] ?? '',
+          delaySeconds: 0,
         },
       }));
       return [...prev, stationId];
@@ -787,6 +799,7 @@ function SendPodsModal({
           clientName: cfg.clientName || undefined,
           difficulty: cfg.difficulty,
           gearbox: cfg.gearbox,
+          delaySeconds: cfg.delaySeconds || undefined,
         };
       });
       await dedicatedServersApi.join(server.id, pods, durationMinutes);
@@ -960,7 +973,10 @@ function PodConfigCard({
           <Monitor className="h-4 w-4 text-accent-orange" />
           <span className="font-bold text-white">{station.name}</span>
         </div>
-        <Clock4 className="h-4 w-4 text-gray-500" />
+        <span className="flex items-center gap-1.5 text-xs font-bold text-gray-400">
+          <Clock4 className="h-4 w-4" />
+          {config.delaySeconds > 0 ? `Départ +${config.delaySeconds}s` : 'Départ immédiat'}
+        </span>
       </div>
 
       <div className="grid gap-4 p-4 lg:grid-cols-[240px,1fr]">
@@ -971,6 +987,26 @@ function PodConfigCard({
               value={config.clientName}
               onChange={(clientName) => onChange({ clientName })}
             />
+          </div>
+
+          <div>
+            <Label>Départ</Label>
+            <div className="flex flex-wrap gap-2">
+              {DELAY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onChange({ delaySeconds: option.value })}
+                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${
+                    config.delaySeconds === option.value
+                      ? 'border-accent-orange bg-accent-orange/10 text-white'
+                      : 'border-dark-600 bg-dark-800 text-gray-400 hover:border-dark-500'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>

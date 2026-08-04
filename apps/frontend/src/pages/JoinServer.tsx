@@ -16,6 +16,7 @@ import {
   Send,
   Check,
   Clock,
+  Clock4,
   Infinity as InfinityIcon,
   Car as CarIcon,
   Feather,
@@ -33,7 +34,17 @@ interface PodConfig {
   difficulty: Difficulty;
   gearbox: Gearbox;
   carAcId: string;
+  delaySeconds: number;
 }
+
+const DELAY_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: 'Immédiat' },
+  { value: 5, label: '5s' },
+  { value: 10, label: '10s' },
+  { value: 30, label: '30s' },
+  { value: 60, label: '1 min' },
+  { value: 120, label: '2 min' },
+];
 
 const DIFFICULTIES: {
   value: Difficulty;
@@ -120,6 +131,7 @@ export function JoinServer() {
           difficulty: 'PRO',
           gearbox: 'MANUAL',
           carAcId: availableCars[0] ?? '',
+          delaySeconds: 0,
         },
       }));
       return [...prev, stationId];
@@ -141,6 +153,7 @@ export function JoinServer() {
           clientName: cfg.clientName || undefined,
           difficulty: cfg.difficulty,
           gearbox: cfg.gearbox,
+          delaySeconds: cfg.delaySeconds || undefined,
         };
       });
       await dedicatedServersApi.join(id, pods, durationMinutes);
@@ -335,9 +348,15 @@ function DriverSetupCard({
           <span className="font-bold text-white">{station.name}</span>
           <span className="font-mono text-xs text-gray-500">{station.stationId}</span>
         </div>
-        <Badge variant={station.status === 'in_game' ? 'blue' : 'green'}>
-          {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
-        </Badge>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-xs font-bold text-gray-400">
+            <Clock4 className="h-3.5 w-3.5" />
+            {config.delaySeconds > 0 ? `Départ +${config.delaySeconds}s` : 'Départ immédiat'}
+          </span>
+          <Badge variant={station.status === 'in_game' ? 'blue' : 'green'}>
+            {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
+          </Badge>
+        </div>
       </div>
 
       <div className="grid gap-6 p-5 lg:grid-cols-[280px,1fr]">
@@ -348,6 +367,29 @@ function DriverSetupCard({
               value={config.clientName}
               onChange={(clientName) => onChange({ clientName })}
             />
+          </div>
+
+          <div>
+            <Label>
+              <Clock4 className="mr-1 inline h-3.5 w-3.5" />
+              Départ
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {DELAY_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => onChange({ delaySeconds: option.value })}
+                  className={`rounded-lg border px-3 py-2 text-sm font-bold transition-all ${
+                    config.delaySeconds === option.value
+                      ? 'border-accent-orange bg-accent-orange/10 text-white ring-1 ring-accent-orange'
+                      : 'border-dark-600 bg-dark-900 text-gray-300 hover:border-dark-500'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div>
