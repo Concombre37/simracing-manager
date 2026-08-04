@@ -68,17 +68,8 @@ interface PodConfig {
   difficulty: Difficulty;
   gearbox: Gearbox;
   carAcId: string;
-  delaySeconds: number;
+  durationMinutes: number | undefined;
 }
-
-const DELAY_OPTIONS: { value: number; label: string }[] = [
-  { value: 0, label: 'Immédiat' },
-  { value: 5, label: '5s' },
-  { value: 10, label: '10s' },
-  { value: 30, label: '30s' },
-  { value: 60, label: '1 min' },
-  { value: 120, label: '2 min' },
-];
 
 const DIFFICULTIES: {
   value: Difficulty;
@@ -749,7 +740,6 @@ function SendPodsModal({
     [stations, server],
   );
 
-  const [durationMinutes, setDurationMinutes] = useState<number | undefined>(undefined);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     preselectStationId ? [preselectStationId] : [],
   );
@@ -761,7 +751,7 @@ function SendPodsModal({
             difficulty: 'PRO',
             gearbox: 'MANUAL',
             carAcId: availableCars[0] ?? '',
-            delaySeconds: 0,
+            durationMinutes: undefined,
           },
         }
       : {},
@@ -778,7 +768,7 @@ function SendPodsModal({
           difficulty: 'PRO',
           gearbox: 'MANUAL',
           carAcId: availableCars[0] ?? '',
-          delaySeconds: 0,
+          durationMinutes: undefined,
         },
       }));
       return [...prev, stationId];
@@ -799,10 +789,10 @@ function SendPodsModal({
           clientName: cfg.clientName || undefined,
           difficulty: cfg.difficulty,
           gearbox: cfg.gearbox,
-          delaySeconds: cfg.delaySeconds || undefined,
+          durationMinutes: cfg.durationMinutes,
         };
       });
-      await dedicatedServersApi.join(server.id, pods, durationMinutes);
+      await dedicatedServersApi.join(server.id, pods);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['stations'] });
@@ -831,30 +821,6 @@ function SendPodsModal({
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="mx-auto max-w-5xl space-y-6">
-          <section>
-            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
-              <Clock className="h-4 w-4 text-accent-orange" />
-              Durée de session
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {DURATION_OPTIONS.map((option) => (
-                <button
-                  key={option.label}
-                  type="button"
-                  onClick={() => setDurationMinutes(option.value)}
-                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition-all ${
-                    durationMinutes === option.value
-                      ? 'bg-accent-orange text-dark-900'
-                      : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
-                  }`}
-                >
-                  {option.value === undefined && <InfinityIcon className="h-4 w-4" />}
-                  {option.label}
-                </button>
-              ))}
-            </div>
-          </section>
-
           <section>
             <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
               <Monitor className="h-4 w-4 text-accent-orange" />
@@ -975,7 +941,7 @@ function PodConfigCard({
         </div>
         <span className="flex items-center gap-1.5 text-xs font-bold text-gray-400">
           <Clock4 className="h-4 w-4" />
-          {config.delaySeconds > 0 ? `Départ +${config.delaySeconds}s` : 'Départ immédiat'}
+          {config.durationMinutes ? `${config.durationMinutes} min` : 'Illimité'}
         </span>
       </div>
 
@@ -987,26 +953,6 @@ function PodConfigCard({
               value={config.clientName}
               onChange={(clientName) => onChange({ clientName })}
             />
-          </div>
-
-          <div>
-            <Label>Départ</Label>
-            <div className="flex flex-wrap gap-2">
-              {DELAY_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => onChange({ delaySeconds: option.value })}
-                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${
-                    config.delaySeconds === option.value
-                      ? 'border-accent-orange bg-accent-orange/10 text-white'
-                      : 'border-dark-600 bg-dark-800 text-gray-400 hover:border-dark-500'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div>
@@ -1107,6 +1053,30 @@ function PodConfigCard({
               })}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="border-t border-dark-700 p-4">
+        <Label>
+          <Clock className="mr-1 inline h-3.5 w-3.5" />
+          Durée de session
+        </Label>
+        <div className="flex flex-wrap gap-2">
+          {DURATION_OPTIONS.map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              onClick={() => onChange({ durationMinutes: option.value })}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-bold transition-all ${
+                config.durationMinutes === option.value
+                  ? 'border-accent-orange bg-accent-orange/10 text-white'
+                  : 'border-dark-600 bg-dark-800 text-gray-400 hover:border-dark-500'
+              }`}
+            >
+              {option.value === undefined && <InfinityIcon className="h-3.5 w-3.5" />}
+              {option.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

@@ -18,11 +18,7 @@ import {
   updateDedicatedServerSchema,
   UpdateDedicatedServerDto,
 } from './dto/update-dedicated-server.dto';
-import {
-  joinServerSchema,
-  JoinServerDto,
-  JoinPodDto,
-} from './dto/join-server.dto';
+import { joinServerSchema, JoinServerDto } from './dto/join-server.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { ClientsService } from '../clients/clients.service';
 import { AgentGateway } from '../agent/agent.gateway';
@@ -148,26 +144,21 @@ export class DedicatedServersController {
     )?.name;
     const trackName = formatTrackName(rawTrackName, server.track, labelMap);
 
-    // Each pod's own optional `delaySeconds` (UI: SendPodsModal / JoinServer)
-    // is honored by scheduling that pod's session-creation + server:join to
-    // fire independently later, rather than blocking the whole loop — pods
-    // sent together can still start at staggered real-world times instead
-    // of all simultaneously.
-    const launchPod = async (
-      pod: JoinPodDto,
-    ): Promise<{ sessionId: string; stationId: string } | null> => {
+    const sessions: { sessionId: string; stationId: string }[] = [];
+
+    for (const pod of dto.pods) {
       const station = await this.prisma.station.findUnique({
         where: { stationId: pod.stationId },
       });
       if (!station) {
         this.logger.warn(`Station ${pod.stationId} not found, skipping`);
-        return null;
+        continue;
       }
       if (station.role !== StationRole.SIMULATOR) {
         this.logger.warn(
           `Station ${pod.stationId} is not a simulator station, skipping join`,
         );
-        return null;
+        continue;
       }
 
       const client = pod.clientName?.trim()
@@ -186,12 +177,14 @@ export class DedicatedServersController {
           carAcId: pod.carAcId,
           track: server.track,
           trackLayout: server.trackLayout,
-          durationMinutes: dto.durationMinutes ?? null,
+          durationMinutes: pod.durationMinutes ?? null,
           config: {},
           status: 'running',
           startedAt: new Date(),
         },
       });
+
+      sessions.push({ sessionId: session.id, stationId: pod.stationId });
 
       const rawCarName = hostContent?.cars?.find(
         (c) => c.acId === pod.carAcId,
@@ -210,40 +203,14 @@ export class DedicatedServersController {
         trackName,
         trackLayout: server.trackLayout ?? undefined,
         serverName: server.name,
-        durationMinutes: dto.durationMinutes,
+        durationMinutes: pod.durationMinutes,
         clientName: pod.clientName,
         difficulty: pod.difficulty,
         gearbox: pod.gearbox,
         sessionId: session.id,
       });
-
-      return { sessionId: session.id, stationId: pod.stationId };
-    };
-
-    const sessions: { sessionId: string; stationId: string }[] = [];
-
-    for (const pod of dto.pods) {
-      const delayMs = (pod.delaySeconds ?? 0) * 1000;
-      if (delayMs > 0) {
-        this.logger.log(
-          `Scheduling server:join to station:${pod.stationId} in ${pod.delaySeconds}s`,
-        );
-        setTimeout(() => {
-          launchPod(pod).catch((err) =>
-            this.logger.error(
-              `Delayed join failed for station ${pod.stationId}: ${err}`,
-            ),
-          );
-        }, delayMs);
-        continue;
-      }
-      const result = await launchPod(pod);
-      if (result) sessions.push(result);
     }
 
-    // Pods with a delaySeconds > 0 are scheduled but not yet started when
-    // this responds — their sessions aren't in this array yet, they'll show
-    // up via the normal active-sessions polling once their timer fires.
     return { success: true, sessions };
   }
 }

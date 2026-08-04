@@ -9,14 +9,13 @@ export const joinPodSchema = z.object({
     .enum([Difficulty.EASY, Difficulty.PRO, Difficulty.CUSTOM])
     .optional(),
   gearbox: z.enum([GearboxMode.MANUAL, GearboxMode.AUTO]).optional(),
-  delaySeconds: z.number().int().min(0).max(600).optional(),
+  durationMinutes: z
+    .union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)])
+    .optional(),
 });
 
 export const joinServerSchema = z.object({
   pods: z.array(joinPodSchema).min(1),
-  durationMinutes: z
-    .union([z.literal(15), z.literal(30), z.literal(45), z.literal(60)])
-    .optional(),
 });
 
 export type JoinPodDto = z.infer<typeof joinPodSchema>;
