@@ -820,7 +820,7 @@ function SendPodsModal({
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        <div className="mx-auto max-w-5xl space-y-6">
+        <div className="mx-auto flex min-h-full max-w-6xl flex-col justify-center space-y-6">
           <section>
             <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400">
               <Monitor className="h-4 w-4 text-accent-orange" />
@@ -831,7 +831,7 @@ function SendPodsModal({
                 Aucun POD en ligne
               </p>
             ) : (
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {onlineStations.map((station) => {
                   const selected = selectedIds.includes(station.stationId);
                   return (
@@ -1013,7 +1013,7 @@ function PodConfigCard({
           {cars.length === 0 ? (
             <p className="text-sm text-gray-500">Aucune voiture disponible sur ce serveur.</p>
           ) : (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
               {cars.map((acId) => {
                 const car = carMap.get(acId);
                 const selected = config.carAcId === acId;
