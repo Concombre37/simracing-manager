@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.94 — Retrait du forçage FULLSCREEN au lancement
+
+### Corrigé
+
+- **Signalé par l'utilisateur : rétroviseur intérieur, app leaderboard CSP et drapeaux ne fonctionnaient plus sur certains PODs.** Root-cause trouvée en comparant `video.ini` d'un POD sain avec le code : le forçage inconditionnel de `FULLSCREEN=1` ajouté en v2.2.91 écrasait `FULLSCREEN=0` sur les PODs qui tournent en fenêtré sans bordure positionné manuellement via `_EXT_PLACEMENT` de CSP (technique utilisée pour les configs ultrawide/triple écran, ex. 5120x1440). Passer en plein écran exclusif cassait ce placement, avec pour effet de bord de casser le rendu des overlays CSP (mirror, leaderboard, drapeaux). `configureVideoIni()` ne touche plus à `FULLSCREEN` — chaque POD garde sa configuration vidéo existante.
+
 ## v2.2.93 — Correction du SUN_ANGLE pour viser vraiment 17h
 
 ### Corrigé

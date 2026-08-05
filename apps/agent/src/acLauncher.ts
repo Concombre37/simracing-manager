@@ -519,12 +519,11 @@ export class AcLauncher {
 
     try {
       const content = await fs.readFile(videoIniPath, 'utf-8');
-      let updated = this.setIniValue(content, 'CAMERA', 'MODE', targetMode);
-      // Every session must start in fullscreen — a client landing in a
-      // windowed client (or behind the taskbar) after a remote launch
-      // command looks completely broken from a kiosk, and there was
-      // nothing here forcing it either way before.
-      updated = this.setIniValue(updated, 'VIDEO', 'FULLSCREEN', '1');
+      // FULLSCREEN is intentionally left untouched — some pods run a
+      // borderless window manually positioned via CSP's _EXT_PLACEMENT
+      // (e.g. ultrawide/triple setups), and forcing exclusive fullscreen
+      // broke that layout and CSP overlays (mirror, leaderboard, flags).
+      const updated = this.setIniValue(content, 'CAMERA', 'MODE', targetMode);
       await fs.writeFile(videoIniPath, updated, 'utf-8');
       this.logger.info({ path: videoIniPath, mode: targetMode }, 'video.ini updated');
     } catch (err) {
