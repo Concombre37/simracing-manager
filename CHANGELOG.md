@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.87 — Un Assetto Corsa détecté ne peut plus jamais remonter 0 voiture/circuit
+
+### Renforcé
+
+- **Demandé par l'utilisateur : "si Assetto Corsa est détecté, 0 car et 0 track est impossible".** Trois renforts supplémentaires sur le pipeline de scan/envoi :
+  - **Listage de dossiers avec retry** : `content/cars` et `content/tracks` sont maintenant lus avec 3 tentatives (500ms d'écart) avant d'abandonner — un accès disque transitoire (antivirus en plein scan, disque réseau/USB pas encore monté) ne peut plus se faire passer pour "ce dossier est vide".
+  - **Alerte systématique, pas seulement en cas de régression** : si Assetto Corsa est détecté (chemin résolu, dossier `content/cars`/`content/tracks` trouvé) mais que le scan remonte 0 voiture ou 0 circuit, c'est désormais toujours signalé en erreur — même pour un tout premier scan sans historique — puisqu'une install AC réelle n'est jamais vide.
+  - **L'envoi refuse un résultat vide suspect** : si un scan revient à 0 voiture ou 0 circuit alors que l'agent avait déjà synchronisé du contenu réel avant (cache local non vide), l'envoi au backend est bloqué — le contenu déjà connu côté serveur n'est jamais écrasé par un scan raté ponctuel. Un poste tout juste installé, sans aucun historique, continue lui d'envoyer normalement pour ne pas rester bloqué en "jamais synchronisé".
+
 ## v2.2.86 — Vérification, alerte et détection élargie pour les voitures/circuits (mods inclus)
 
 ### Ajouté

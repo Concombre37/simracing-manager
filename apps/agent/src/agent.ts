@@ -717,6 +717,23 @@ export class SimRacingAgent {
           tracks: content.tracks.length,
         });
       }
+      // A scan that comes back empty right after a scan that had real
+      // content is far more likely a transient glitch (locked file, drive
+      // briefly unavailable, antivirus scan mid-read) than AC genuinely
+      // losing its entire car/track roster — never let that overwrite
+      // known-good content already synced to the backend. A brand-new
+      // station with nothing to protect still uploads normally so it isn't
+      // stuck showing stale "never synced" state forever.
+      if (
+        (content.cars.length === 0 || content.tracks.length === 0) &&
+        this.contentScanner.hadKnownGoodContent()
+      ) {
+        this.logger.error(
+          { cars: content.cars.length, tracks: content.tracks.length },
+          'Refusing to upload suspiciously empty content — keeping previously synced content on the backend',
+        );
+        return;
+      }
       const hash = crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex');
       if (hash === this.lastContentHash) {
         this.logger.info('Content unchanged, skipping upload');

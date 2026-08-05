@@ -184,6 +184,39 @@ async function pathExists(filePath: string): Promise<boolean> {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Retries a directory listing a few times before giving up — a transient
+ * failure here (antivirus scan mid-read, a network/USB drive hiccup, a
+ * removable Steam library not fully mounted yet) must never be allowed to
+ * masquerade as "this car/track folder is genuinely empty", since that
+ * silently wipes out real content on the next upload. */
+async function readDirWithRetry(
+  logger: Logger,
+  dir: string,
+  attempts = 3,
+  delayMs = 500,
+): Promise<string[]> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fs.readdir(dir);
+    } catch (err) {
+      lastErr = err;
+      if (attempt < attempts) {
+        await sleep(delayMs);
+      }
+    }
+  }
+  logger.error(
+    { dir, attempts, err: lastErr instanceof Error ? lastErr.message : String(lastErr) },
+    'Failed to list directory after retries',
+  );
+  return [];
+}
+
 /**
  * A multi-layout AC track's per-layout ui_track.json/preview normally lives
  * under `<track>/ui/<layout>/`, not `<track>/<layout>/` (that sibling folder
@@ -277,6 +310,8 @@ async function findTrackPreview(
 export class ContentScanner {
   private readonly cache: ContentCache;
   private lastScanWarning: string | undefined;
+  private hadPreviousCars = false;
+  private hadPreviousTracks = false;
 
   constructor(
     private readonly logger: Logger,
@@ -295,12 +330,24 @@ export class ContentScanner {
     return this.lastScanWarning;
   }
 
+  /** Whether the local cache remembered real content from a prior
+   * successful scan, as of the most recent scan() call — lets the caller
+   * (agent.ts) decide whether an empty/anomalous result is safe to upload
+   * (a genuinely fresh station has nothing to protect) or must be withheld
+   * to avoid overwriting good content already on the backend with a
+   * transient bad scan. */
+  hadKnownGoodContent(): boolean {
+    return this.hadPreviousCars || this.hadPreviousTracks;
+  }
+
   async scan(): Promise<AcContent> {
     const content: AcContent = { cars: [], tracks: [] };
     this.lastScanWarning = undefined;
     await this.cache.load();
     const previousCarCount = this.cache.carCount();
     const previousTrackCount = this.cache.trackCount();
+    this.hadPreviousCars = previousCarCount > 0;
+    this.hadPreviousTracks = previousTrackCount > 0;
 
     const acPath = await this.resolveAcPath();
     if (!acPath) {
@@ -319,7 +366,7 @@ export class ContentScanner {
 
     const carsDir = path.join(acPath, 'content', 'cars');
     if (await this.pathExists(carsDir)) {
-      const entries = await fs.readdir(carsDir);
+      const entries = await readDirWithRetry(this.logger, carsDir);
       for (const entry of entries) {
         const carDir = path.join(carsDir, entry);
         const stat = await fs.stat(carDir).catch(() => null);
@@ -373,7 +420,7 @@ export class ContentScanner {
 
     const tracksDir = path.join(acPath, 'content', 'tracks');
     if (await this.pathExists(tracksDir)) {
-      const entries = await fs.readdir(tracksDir);
+      const entries = await readDirWithRetry(this.logger, tracksDir);
       for (const entry of entries) {
         const trackDir = path.join(tracksDir, entry);
         const stat = await fs.stat(trackDir).catch(() => null);
@@ -443,8 +490,26 @@ export class ContentScanner {
       previousCarCount >= 10 && content.cars.length < previousCarCount * REGRESSION_RATIO;
     const tracksRegressed =
       previousTrackCount >= 5 && content.tracks.length < previousTrackCount * REGRESSION_RATIO;
-    if (carsRegressed || tracksRegressed) {
-      this.lastScanWarning = `Content dropped sharply since the last scan: cars ${previousCarCount} -> ${content.cars.length}, tracks ${previousTrackCount} -> ${content.tracks.length} (acPath=${acPath})`;
+    // AC being found at all (acPath resolved, content/cars or content/tracks
+    // exists) but the scan still coming back with zero of either is never a
+    // legitimate outcome for a real install — every AC install ships with a
+    // base roster of cars and tracks. Flag this unconditionally, even for a
+    // brand-new station with no prior scan to regress from (previousCarCount
+    // === 0), instead of only catching drops from a previously-known count.
+    const carsImpossiblyEmpty = content.cars.length === 0;
+    const tracksImpossiblyEmpty = content.tracks.length === 0;
+
+    if (carsRegressed || tracksRegressed || carsImpossiblyEmpty || tracksImpossiblyEmpty) {
+      const reasons: string[] = [];
+      if (carsImpossiblyEmpty) reasons.push('0 cars found despite Assetto Corsa being detected');
+      if (tracksImpossiblyEmpty)
+        reasons.push('0 tracks found despite Assetto Corsa being detected');
+      if (carsRegressed && !carsImpossiblyEmpty)
+        reasons.push(`cars dropped ${previousCarCount} -> ${content.cars.length}`);
+      if (tracksRegressed && !tracksImpossiblyEmpty)
+        reasons.push(`tracks dropped ${previousTrackCount} -> ${content.tracks.length}`);
+
+      this.lastScanWarning = `Content scan anomaly at ${acPath}: ${reasons.join('; ')}`;
       this.logger.error(
         {
           previousCarCount,
@@ -452,8 +517,9 @@ export class ContentScanner {
           previousTrackCount,
           trackCount: content.tracks.length,
           acPath,
+          reasons,
         },
-        'Content scan found dramatically fewer cars/tracks than the previous scan',
+        'Content scan anomaly detected',
       );
     }
 
