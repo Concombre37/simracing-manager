@@ -7,6 +7,11 @@ export interface AgentToServerEvents {
   'agent:log': (payload: LogPayload) => void;
   'agent:results': (payload: ResultsPayload) => void;
   'agent:status': (payload: StatusPayload) => void;
+  /** Sent once per session, the moment the player can actually drive
+   * (blanking confirmed torn down) — not at launch/join time. The backend
+   * stamps Session.startedAt on receipt so the duration countdown shown on
+   * the dashboard doesn't tick down during the loading screen. */
+  'agent:session:started': (payload: { sessionId: string }) => void;
   'agent:session:ended': (payload: { sessionId: string }) => void;
   'agent:content': (payload: { stationId: string; content: Record<string, unknown> }) => void;
   'agent:telemetry': (payload: TelemetrySnapshot) => void;

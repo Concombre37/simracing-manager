@@ -12,7 +12,9 @@ export interface ActiveSession {
   trackLayout?: string | null;
   durationMinutes?: number;
   status: string;
-  startedAt: string;
+  /** Null until the player can actually drive (blanking confirmed torn down
+   * on the agent) — the duration countdown withholds until then. */
+  startedAt: string | null;
   endedAt?: string | null;
   station: {
     id: string;

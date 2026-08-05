@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.98 — Le décompte de session démarre au retrait du blanking, pas au lancement
+
+### Changé
+
+- **Demandé par l'utilisateur : "lance le décompte du timer après avoir retiré le blanking screen drive, en gros quand il peut commencer à rouler".** Pour un join de serveur dédié avec une durée fixée, `Session.startedAt` (et donc le décompte affiché sur `/en-cours`, `/en-cours/kiosk` et `/kiosk`) était fixé à l'instant où la commande de join était reçue par le backend — avant même que l'agent lance Content Manager/AC. Le chargement (CM, AC, circuit) pouvait manger 10-15s de la durée sans que le pilote ait pu rouler une seconde.
+- **Nouveau point d'ancrage : le moment où le blanking est réellement retiré et le jeu confirmé au premier plan** (`BlankingManager.revealThenStop()` → nouveau callback `onSessionRevealed`, câblé depuis `agent.ts#handleSessionRevealed()`). L'agent n'appelle plus `scheduleSessionEnd()` (le timer d'arrêt auto réel) au moment du join, mais seulement à ce moment-là — et envoie un nouvel événement `agent:session:started` au backend, qui met à jour `Session.startedAt` et republie `session:updated`. Si le staff prolonge la session pendant que l'écran de chargement est encore affiché, la nouvelle durée est mémorisée mais le décompte ne démarre toujours qu'au reveal.
+- `Session.startedAt` n'est plus renseigné à la création pour un join de serveur dédié — reste `null` jusqu'au reveal ; le frontend traitait déjà ce cas (aucun décompte affiché tant qu'il est absent), un seul ajustement nécessaire (tri par date + calcul du temps écoulé sur `/kiosk`/`/en-cours/kiosk`, qui ne géraient pas encore ce cas).
+
 ## v2.2.97 — Retrait du nom de layout sur les écrans de lancement/résultats
 
 ### Changé

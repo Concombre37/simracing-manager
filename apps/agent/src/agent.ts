@@ -68,6 +68,11 @@ export class SimRacingAgent {
     /** null means unlimited ("Illimité" join) — no auto-end is scheduled. */
     durationMinutes: number | null;
     startedAt: number;
+    /** True once the player can actually drive (blanking confirmed torn
+     * down, see handleSessionRevealed()) — the duration countdown and its
+     * auto-end timeout must not start before this, even if an extend command
+     * arrives while the session is still on the loading screen. */
+    revealed: boolean;
     timeout: NodeJS.Timeout | null;
     clientName?: string;
     carAcId?: string;
@@ -133,7 +138,11 @@ export class SimRacingAgent {
     this.processMonitor = new ProcessMonitor(logger);
     this.raceResultReader = new RaceResultReader(logger);
     this.kioskManager = new KioskManager(logger);
-    this.blankingManager = new BlankingManager(logger, () => this.kioskManager.revealGame());
+    this.blankingManager = new BlankingManager(
+      logger,
+      () => this.kioskManager.revealGame(),
+      () => this.handleSessionRevealed(),
+    );
     this.acSharedMemory = new AcSharedMemoryChecker(logger);
     this.lapTelemetryRecorder = new LapTelemetryRecorder(logger);
     this.trayManager = new TrayManager(logger, {
@@ -899,7 +908,31 @@ export class SimRacingAgent {
       void this.endSession();
       return;
     }
-    this.scheduleSessionEnd();
+    // Still on the loading screen — handleSessionRevealed() schedules the
+    // auto-end timeout itself once the player can actually drive, using
+    // whatever durationMinutes is stored by then (just updated above).
+    if (this.currentSession.revealed) {
+      this.scheduleSessionEnd();
+    }
+  }
+
+  /**
+   * Wired to BlankingManager's onSessionRevealed callback — fires exactly
+   * once per session, right when blanking is confirmed torn down and the
+   * player can actually drive (see revealThenStop() in blankingManager.ts).
+   * Requested by the user: the duration countdown must start from this
+   * moment, not from when the join/launch command was received — the
+   * loading screen (Content Manager/AC startup, track loading) can easily
+   * eat 10-15s that would otherwise silently come out of the session length.
+   */
+  private handleSessionRevealed(): void {
+    if (!this.currentSession || this.currentSession.revealed) return;
+    this.currentSession.revealed = true;
+    this.currentSession.startedAt = Date.now();
+    this.socket?.emit('agent:session:started', { sessionId: this.currentSession.sessionId });
+    if (this.currentSession.durationMinutes !== null) {
+      this.scheduleSessionEnd();
+    }
   }
 
   private scheduleSessionEnd(): void {
@@ -1213,6 +1246,7 @@ export class SimRacingAgent {
           sessionId: payload.sessionId,
           durationMinutes: hasDuration ? (payload.durationMinutes as number) : null,
           startedAt: Date.now(),
+          revealed: false,
           timeout: null,
           clientName: payload.clientName,
           carAcId: payload.carAcId,
@@ -1223,11 +1257,13 @@ export class SimRacingAgent {
         };
         this.logger.info(
           { sessionId: payload.sessionId, durationMinutes: payload.durationMinutes ?? 'unlimited' },
-          'Session tracking started',
+          'Session tracking started, duration countdown withheld until the player can drive',
         );
-        if (hasDuration) {
-          this.scheduleSessionEnd();
-        }
+        // No scheduleSessionEnd() here — handleSessionRevealed() (wired to
+        // BlankingManager's onSessionRevealed callback) starts the countdown
+        // once blanking is actually confirmed torn down, requested by the
+        // user: the duration must not tick down while the game is still
+        // loading behind the "Lancement en cours" screen.
       }
     } catch (err) {
       this.logger.error({ err }, 'Failed to execute join server command');

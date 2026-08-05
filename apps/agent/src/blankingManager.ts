@@ -123,6 +123,10 @@ export class BlankingManager {
      * KioskManager.revealGame); the test suite's synchronous mocks (or no
      * callback at all) resolve inline with no behavior change. */
     private readonly onGameRevealed?: () => Promise<boolean> | void,
+    /** Called exactly once per session, right when the game is *confirmed*
+     * in the foreground and blanking is actually torn down — i.e. the
+     * moment the player can really start driving. See markRevealed(). */
+    private readonly onSessionRevealed?: () => void,
   ) {}
 
   /** Configurable from the dashboard (Paramètres), pushed over the socket. */
@@ -1126,7 +1130,7 @@ export class BlankingManager {
     }
     const result = this.onGameRevealed?.();
     if (!result || typeof (result as Promise<boolean>).then !== 'function') {
-      this.gameRevealedThisSession = true;
+      this.markRevealed();
       this.stopBlanking();
       return;
     }
@@ -1136,7 +1140,7 @@ export class BlankingManager {
       this.revealing = false;
       if (confirmed || attempt >= maxAttempts) {
         if (confirmed) {
-          this.gameRevealedThisSession = true;
+          this.markRevealed();
         } else {
           this.logger.error(
             { attempt },
@@ -1149,6 +1153,15 @@ export class BlankingManager {
       this.logger.warn({ attempt }, 'Game window not confirmed in foreground yet, retrying');
       this.revealThenStop(attempt + 1);
     });
+  }
+
+  /** Marks the game as confirmed revealed for this session (idempotent —
+   * only fires onSessionRevealed the first time per session, since it
+   * resets to false in setPodInGame(true) at the start of the next one). */
+  private markRevealed(): void {
+    if (this.gameRevealedThisSession) return;
+    this.gameRevealedThisSession = true;
+    this.onSessionRevealed?.();
   }
 
   private stopBlanking(): void {

@@ -180,7 +180,12 @@ export class DedicatedServersController {
           durationMinutes: pod.durationMinutes ?? null,
           config: {},
           status: 'running',
-          startedAt: new Date(),
+          // startedAt intentionally left unset: the frontend countdown only
+          // starts once the agent confirms the player can actually drive
+          // (agent:session:started, handled in AgentGateway), not at join
+          // time — the loading screen shouldn't silently eat into the
+          // session's duration. Sessions.tsx already treats a null
+          // startedAt as "no countdown yet" everywhere it's read.
         },
       });
 

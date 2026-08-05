@@ -348,6 +348,26 @@ export class AgentGateway
     );
   }
 
+  @SubscribeMessage('agent:session:started')
+  async handleSessionStarted(
+    _client: AuthenticatedSocket,
+    payload: { sessionId: string },
+  ): Promise<void> {
+    try {
+      const session = await this.sessionsService.start(payload.sessionId);
+      this.dashboardGateway.server.emit('session:updated', {
+        sessionId: payload.sessionId,
+        stationId: session.stationId,
+        status: session.status,
+      });
+    } catch (err) {
+      this.logger.warn(
+        { err, sessionId: payload.sessionId },
+        'Failed to mark session as started',
+      );
+    }
+  }
+
   @SubscribeMessage('agent:session:ended')
   async handleSessionEnded(
     _client: AuthenticatedSocket,

@@ -642,10 +642,9 @@ function PodSessionCell({
           ),
         )
       : undefined;
-  const elapsedSeconds = Math.max(
-    0,
-    Math.round((now - new Date(session.startedAt).getTime()) / 1000),
-  );
+  const elapsedSeconds = session.startedAt
+    ? Math.max(0, Math.round((now - new Date(session.startedAt).getTime()) / 1000))
+    : 0;
   const expired = remainingSeconds !== undefined && remainingSeconds <= 0;
   const critical = !expired && remainingSeconds !== undefined && remainingSeconds <= 60;
   const stale = !telemetry || now - telemetry.timestamp > STALE_MS;

@@ -91,7 +91,15 @@ export function SessionsKiosk() {
 
   const displayedSessions = useMemo(() => {
     return [...(sessions ?? [])]
-      .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime())
+      .sort(
+        // Still-loading sessions (startedAt not set yet, see
+        // agent:session:started) sort as "now" instead of epoch — they're
+        // the most recent activity, not the oldest, and must not get pushed
+        // out of the MAX_PODS slice below by long-running sessions.
+        (a, b) =>
+          (b.startedAt ? new Date(b.startedAt).getTime() : Date.now()) -
+          (a.startedAt ? new Date(a.startedAt).getTime() : Date.now()),
+      )
       .slice(0, MAX_PODS);
   }, [sessions]);
 
@@ -190,10 +198,9 @@ function KioskCard({
           ),
         )
       : undefined;
-  const elapsedSeconds = Math.max(
-    0,
-    Math.round((now - new Date(session.startedAt).getTime()) / 1000),
-  );
+  const elapsedSeconds = session.startedAt
+    ? Math.max(0, Math.round((now - new Date(session.startedAt).getTime()) / 1000))
+    : 0;
   const expired = remainingSeconds !== undefined && remainingSeconds <= 0;
   const critical = !expired && remainingSeconds !== undefined && remainingSeconds <= 60;
 

@@ -539,6 +539,33 @@ describe('BlankingManager', () => {
     expect(onGameRevealed).toHaveBeenCalledTimes(1);
   });
 
+  it('fires onSessionRevealed exactly once per session, not on every reveal', () => {
+    const onSessionRevealed = vi.fn();
+    const m = new BlankingManager(mockLogger, vi.fn(), onSessionRevealed);
+    (m as unknown as { scriptPath: string }).scriptPath = path.join(os.tmpdir(), 'blanking.ps1');
+    (m as unknown as { playlistPath: string }).playlistPath = path.join(
+      os.tmpdir(),
+      'blanking-playlist.json',
+    );
+
+    // A new session starts, game reveals — fires once.
+    m.setPodInGame(true);
+    m.setAcRunning(true);
+    m.hide();
+    expect(onSessionRevealed).toHaveBeenCalledTimes(1);
+
+    // Same session, another manual hide/reveal cycle — must not fire again.
+    m.setAuto();
+    m.hide();
+    expect(onSessionRevealed).toHaveBeenCalledTimes(1);
+
+    // A brand new session starts and reveals — fires again.
+    m.setPodInGame(false);
+    m.setPodInGame(true);
+    m.hide();
+    expect(onSessionRevealed).toHaveBeenCalledTimes(2);
+  });
+
   it('does not reveal/sweep on a manual hide override while idle (no session running or loading)', () => {
     // A manual "hide" override is also used for maintenance when nothing is
     // running at all — minimizing whatever the operator has open in that
