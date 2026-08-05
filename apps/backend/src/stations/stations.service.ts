@@ -213,14 +213,39 @@ export class StationsService {
     result.tracks = await this.processInBatches(
       tracks,
       async (track: Record<string, unknown>) => {
+        const trackAcId = String(track.acId ?? '');
         const previewUrl = await this.upsertPreview(
           stationDbId,
           'track',
-          String(track.acId ?? ''),
+          trackAcId,
           String(track.name ?? ''),
           track.preview,
         );
-        return { ...track, preview: previewUrl };
+        // A multi-layout track's own preview is only ever the top-level
+        // one — each layout carries its own separate preview image, which
+        // was never routed through upsertPreview here. Left as raw
+        // data:image/png;base64 strings straight from the agent, those
+        // accumulated directly in the `content` column forever (confirmed
+        // live: a single 9-layout track added ~4.6MB to one station's
+        // content, ballooning /api/stations to 100MB+ and exhausting the
+        // Postgres connection pool under normal polling).
+        const layouts = Array.isArray(track.layouts) ? [...track.layouts] : [];
+        const processedLayouts = await this.processInBatches(
+          layouts,
+          async (layout: Record<string, unknown>) => {
+            const layoutName = String(layout.name ?? '');
+            const layoutPreviewUrl = await this.upsertPreview(
+              stationDbId,
+              'track-layout',
+              `${trackAcId}:${layoutName}`,
+              `${trackAcId} ${layoutName}`,
+              layout.preview,
+            );
+            return { ...layout, preview: layoutPreviewUrl };
+          },
+          25,
+        );
+        return { ...track, preview: previewUrl, layouts: processedLayouts };
       },
       25,
     );
