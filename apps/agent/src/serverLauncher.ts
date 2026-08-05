@@ -448,12 +448,13 @@ export class ServerLauncher {
       // Requested default for every dedicated server: clear weather
       // (already covered below by [WEATHER_0] GRAPHICS=3_clear) at ~17:00.
       // AC has no direct "hour" field, only this sun-angle-from-solar-noon
-      // value — mirrors the existing SUN_ANGLE=-48 already used elsewhere
-      // in this codebase for regular session launches (race.ini), just on
-      // the other side of noon: same well-lit, non-extreme magnitude,
-      // shifted to late afternoon instead of morning. Best-effort without
-      // in-game verification — adjust if the actual displayed time is off.
-      'SUN_ANGLE=48',
+      // value. Calibrated live: SUN_ANGLE=48 showed as ~15:00 in-game,
+      // i.e. 48 units = 3h past noon (SUN_ANGLE=0) => ~16 units/hour =>
+      // 80 units for 17:00 (5h past noon). Track-dependent (real solar
+      // position varies with each track's location), so treat as a close
+      // approximation rather than an exact clock — nudge by ~16/hour if a
+      // specific track still looks noticeably off.
+      'SUN_ANGLE=80',
       'PICKUP_MODE_ENABLED=1',
       'LOOP_MODE=1',
       'SLEEP_TIME=1',

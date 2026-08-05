@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.93 — Correction du SUN_ANGLE pour viser vraiment 17h
+
+### Corrigé
+
+- **Signalé par l'utilisateur juste après le déploiement de v2.2.92 : "SUN_ANGLE=48 correspond à environ 15h en jeu, pas 17h".** Calibré avec ce point de mesure réel : 48 unités = 3h après midi (SUN_ANGLE=0 = 12h) → ~16 unités/heure → 80 unités pour 17h (5h après midi). Reste une approximation (la position solaire réelle dépend de la localisation de chaque circuit), mais nettement plus proche que la valeur précédente.
+
 ## v2.2.92 — Météo claire et 17h par défaut pour tous les serveurs dédiés
 
 ### Ajouté
