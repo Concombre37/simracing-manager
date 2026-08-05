@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.90 — Le délai avant retrait du blanking part du Drive automatique, pas de la détection du jeu
+
+### Changé
+
+- **Demandé par l'utilisateur : "si on met drive en soi le jeu est lancé".** Le délai configurable (Paramètres → "Délai avant le retrait du blanking une fois le jeu lancé") ne démarrait son compte à rebours qu'une fois `acRunning`/`acLoaded` détecté par sondage (toutes les ~2s) — quelques secondes après le moment réel où le Drive automatique (`luaBridge.autoStart()`) est déclenché, puisque celui-ci a lieu dès la fin du lancement/join, avant que le sondage n'ait la moindre chance de voir le jeu.
+- **Fix** : nouveau `BlankingManager.notifyDriveTriggered()`, appelé juste après le Drive automatique dans `handleLaunch()`/`handleJoinServer()` — démarre le compte à rebours immédiatement à cet instant. L'ancien déclenchement par sondage `acRunning`/`acLoaded` reste en filet de sécurité (ne se redéclenche pas si un compte à rebours est déjà en cours).
+
 ## v2.2.89 — Le scan de contenu ne tourne plus en boucle toutes les 60s
 
 ### Changé

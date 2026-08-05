@@ -130,6 +130,28 @@ export class BlankingManager {
     this.logger.info({ hideDelaySeconds: seconds }, 'Blanking hide delay updated');
   }
 
+  /** Starts the hide-delay countdown from the moment "Drive" was triggered
+   * automatically (luaBridge.autoStart()), instead of waiting for
+   * acRunning/acLoaded to be polled true — requested by the user: once
+   * Drive has been pressed the session is effectively already launched,
+   * well before the exe/menu detection in evaluate() would otherwise start
+   * the same countdown a few seconds later. evaluate()'s acRunning-based
+   * scheduling is left in place as a fallback for any launch path that
+   * never calls this (its own `!this.pendingHideTimeout` check means it
+   * simply no-ops once this has already scheduled the timer). */
+  notifyDriveTriggered(): void {
+    if (!this.isBlankingActive() || this.pendingHideTimeout) return;
+    this.missingDuringSessionStreak = 0;
+    this.logger.info(
+      { hideDelaySeconds: this.hideDelaySeconds },
+      'Drive triggered — starting blanking hide-delay countdown',
+    );
+    this.pendingHideTimeout = setTimeout(() => {
+      this.pendingHideTimeout = null;
+      this.revealThenStop();
+    }, this.hideDelaySeconds * 1000);
+  }
+
   async init(): Promise<void> {
     try {
       const src = path.join(__dirname, '..', 'assets', 'blanking.ps1');

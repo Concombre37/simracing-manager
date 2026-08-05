@@ -145,6 +145,43 @@ describe('BlankingManager', () => {
     vi.useRealTimers();
   });
 
+  it('starts the hide-delay countdown on notifyDriveTriggered() before AC is even detected running', () => {
+    // Requested by the user: once Drive has been triggered automatically,
+    // the session is effectively already launched — the countdown should
+    // start there rather than waiting for the next acRunning/acLoaded poll
+    // (which lags a few seconds behind the actual Drive press).
+    vi.useFakeTimers();
+    manager.setAuto();
+    expect(manager.isBlankingActive()).toBe(true);
+    manager.notifyDriveTriggered();
+    vi.advanceTimersByTime(9999);
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('does not schedule a second countdown if notifyDriveTriggered() is called again while one is already pending', () => {
+    vi.useFakeTimers();
+    manager.setHideDelaySeconds(10);
+    manager.setAuto();
+    manager.notifyDriveTriggered();
+    vi.advanceTimersByTime(6000);
+    manager.notifyDriveTriggered();
+    // If this second call had reset the timer, blanking would still be
+    // active here (10s from the second call); it must not have.
+    vi.advanceTimersByTime(4000);
+    expect(manager.isBlankingActive()).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('does nothing when notifyDriveTriggered() is called while blanking is already hidden', () => {
+    manager.hide();
+    expect(manager.isBlankingActive()).toBe(false);
+    manager.notifyDriveTriggered();
+    expect(manager.isBlankingActive()).toBe(false);
+  });
+
   it('shows blanking again once AC stops running and shared memory unmaps', () => {
     vi.useFakeTimers();
     manager.setAuto();
