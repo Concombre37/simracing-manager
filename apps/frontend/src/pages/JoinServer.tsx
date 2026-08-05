@@ -121,7 +121,7 @@ export function JoinServer() {
           difficulty: 'PRO',
           gearbox: 'MANUAL',
           carAcId: availableCars[0] ?? '',
-          durationMinutes: undefined,
+          durationMinutes: 15,
         },
       }));
       return [...prev, stationId];
