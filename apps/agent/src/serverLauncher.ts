@@ -445,6 +445,15 @@ export class ServerLauncher {
       `TCP_PORT=${mainPort}`,
       `HTTP_PORT=${httpPort}`,
       `SERVER_IP=0.0.0.0`,
+      // Requested default for every dedicated server: clear weather
+      // (already covered below by [WEATHER_0] GRAPHICS=3_clear) at ~17:00.
+      // AC has no direct "hour" field, only this sun-angle-from-solar-noon
+      // value — mirrors the existing SUN_ANGLE=-48 already used elsewhere
+      // in this codebase for regular session launches (race.ini), just on
+      // the other side of noon: same well-lit, non-extreme magnitude,
+      // shifted to late afternoon instead of morning. Best-effort without
+      // in-game verification — adjust if the actual displayed time is off.
+      'SUN_ANGLE=48',
       'PICKUP_MODE_ENABLED=1',
       'LOOP_MODE=1',
       'SLEEP_TIME=1',

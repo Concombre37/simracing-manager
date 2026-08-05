@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.92 — Météo claire et 17h par défaut pour tous les serveurs dédiés
+
+### Ajouté
+
+- **Demandé par l'utilisateur : "sur toutes les créations de serveur soit en weather clear et à 17h".** La météo `3_clear` (ciel dégagé) était déjà appliquée par défaut à chaque serveur dédié ; il manquait l'heure — aucun `SUN_ANGLE` n'était écrit dans `server_cfg.ini`, laissant AC sur son heure par défaut. Ajouté `SUN_ANGLE=48` dans la section `[SERVER]`, en miroir du `SUN_ANGLE=-48` déjà utilisé ailleurs pour les sessions classiques (même magnitude bien éclairée, côté après-midi/soir au lieu du matin).
+- **Non vérifié en jeu** : AC n'a pas de champ "heure" direct, seulement cet angle solaire — la valeur est une estimation raisonnée, pas testée en conditions réelles. À ajuster si l'heure affichée en jeu ne correspond pas exactement à 17h.
+
 ## v2.2.91 — Sécurité fin de session, plein écran forcé, écrans de blanking adaptés au 5120x1440
 
 ### Ajouté
