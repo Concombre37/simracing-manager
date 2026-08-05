@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.97 — Retrait du nom de layout sur les écrans de lancement/résultats
+
+### Changé
+
+- **Demandé par l'utilisateur : "retire le nom des layout pas besoin".** Les écrans de lancement et de résultats affichaient `Circuit (Layout)` quand un layout était renseigné (ex. "Spa-Francorchamps (gp)") — n'affichent plus que le nom du circuit.
+
 ## v2.2.96 — Refonte visuelle des écrans de lancement/résultats + config globale
 
 ### Changé

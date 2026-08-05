@@ -614,9 +614,7 @@ export class BlankingManager {
         : null;
     const trackLabel = summary.trackName ?? summary.track;
     const carLabel = summary.carName ?? summary.carAcId;
-    const trackDisplay = summary.trackLayout
-      ? `${trackLabel} (${summary.trackLayout})`
-      : (trackLabel ?? '-');
+    const trackDisplay = trackLabel ?? '-';
 
     const entries = summary.result ? getLeaderboard(summary.result) : [];
     const ownEntry = entries.find(
@@ -726,9 +724,7 @@ export class BlankingManager {
     const htmlPath = path.join(tmpDir, 'session-launching.html');
     const trackLabel = info.trackName ?? info.track;
     const carLabel = info.carName ?? info.carAcId;
-    const trackDisplay = info.trackLayout
-      ? `${trackLabel} (${info.trackLayout})`
-      : (trackLabel ?? '-');
+    const trackDisplay = trackLabel ?? '-';
     const backgroundImage = this.pickRandomLaunchingImage();
 
     const html = `<!DOCTYPE html>
