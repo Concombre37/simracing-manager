@@ -107,6 +107,18 @@ export class ContentCache {
     this.data.acPath = acPath;
   }
 
+  /** Counts as of the last `load()` — read these before a scan starts
+   * calling `setCar`/`setTrack`, which mutate this same in-memory data, to
+   * get a genuine "previous scan" baseline instead of the scan-in-progress
+   * count. */
+  carCount(): number {
+    return this.data.cars.length;
+  }
+
+  trackCount(): number {
+    return this.data.tracks.length;
+  }
+
   private rebuildMaps(): void {
     this.carMap = new Map(this.data.cars.map((c) => [c.acId, c]));
     this.trackMap = new Map(this.data.tracks.map((t) => [t.acId, t]));

@@ -30,6 +30,7 @@ import {
   Gamepad2,
   Server,
   Terminal,
+  AlertTriangle,
 } from 'lucide-react';
 
 type StatusFilter = 'all' | Station['status'];
@@ -248,6 +249,7 @@ export function Stations() {
                     <StatusBadge status={station.status} />
                     <RoleBadge role={station.role} />
                     <BlankingLed active={station.blankingActive} />
+                    <ContentWarningBadge station={station} />
 
                     <div className="ml-auto mr-2 hidden grid-cols-3 gap-6 xl:grid">
                       <Cell label="IP locale" value={station.localIp ?? '—'} />
@@ -615,6 +617,30 @@ function RoleBadge({ role }: { role: Station['role'] }) {
     <Badge variant="purple">Admin</Badge>
   ) : (
     <Badge variant="blue">Simulateur</Badge>
+  );
+}
+
+/**
+ * Flags a station reporting zero cars or zero tracks despite being
+ * connected — this is exactly the failure mode that went unnoticed on
+ * pod04/pcelsassvap for hours (agent online, scanning successfully, just
+ * finding nothing to send): a well-formed empty content payload never
+ * looked like an error anywhere else in the UI.
+ */
+function ContentWarningBadge({ station }: { station: Station }) {
+  if (station.status === 'offline') return null;
+  const content = station.content as { cars?: unknown[]; tracks?: unknown[] } | null;
+  const carCount = content?.cars?.length ?? 0;
+  const trackCount = content?.tracks?.length ?? 0;
+  if (carCount > 0 && trackCount > 0) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-yellow-700/60 bg-yellow-900/40 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-yellow-300"
+      title="Aucune voiture/circuit détecté sur ce poste — vérifier que Assetto Corsa y est bien installé, ou renseigner AC_PATH dans le .env de l'agent"
+    >
+      <AlertTriangle className="h-3 w-3" />
+      Aucun contenu
+    </span>
   );
 }
 

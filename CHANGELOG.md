@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.86 — Vérification, alerte et détection élargie pour les voitures/circuits (mods inclus)
+
+### Ajouté
+
+- **Demandé par l'utilisateur en suite du bug pod04/pcelsassvap : "rectification vérification alerte et analyse pour la recherche des track et car compatible avec mod".** Renforce le pipeline de bout en bout au lieu de ne corriger qu'un seul chemin d'installation :
+  - **Détection Steam via le registre Windows** (`HKCU\SOFTWARE\Valve\Steam`, `HKLM...\Valve\Steam`) en plus des chemins devinés — c'est l'endroit où Steam enregistre lui-même son install, quel que soit le dossier choisi à l'installation, donc ça couvre des cas que la liste de chemins codés en dur ne peut jamais deviner.
+  - **Alerte de régression** : si un scan trouve subitement beaucoup moins de voitures/circuits que le scan précédent (ex: bibliothèque Steam débranchée, dossier de contenu corrompu), c'est maintenant loggué en erreur et remonté au backend via `agent:log` à chaque cycle — jusqu'ici un scan "réussi" avec un résultat quasi vide ne se distinguait en rien d'un scan normal.
+  - **Alerte visible dans le dashboard** : un badge "Aucun contenu" apparaît sur la page Postes pour tout poste connecté qui remonte 0 voiture ou 0 circuit, et un avertissement similaire s'affiche directement dans le sélecteur de poste hôte de l'assistant de création de serveur dédié (l'écran réellement concerné par le bug pod04/pcelsassvap, puisque c'est le contenu du poste hôte qui alimente le picker voiture/circuit) — plus besoin d'aller fouiller les logs distants pour s'en apercevoir.
+- Les mods (voitures/circuits ajoutés manuellement ou via Content Manager) étaient déjà pris en compte par le scan une fois le dossier `content/cars`/`content/tracks` d'Assetto Corsa localisé — le vrai point de défaillance était uniquement la localisation de ce dossier, maintenant couverte par la détection registre + bibliothèques Steam (v2.2.85) + ce fix.
+
 ## v2.2.85 — La détection auto d'Assetto Corsa ratait les installs sur une bibliothèque Steam secondaire
 
 ### Corrigé

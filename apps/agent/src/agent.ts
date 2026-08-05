@@ -704,6 +704,19 @@ export class SimRacingAgent {
     try {
       this.logger.info('Scanning content for upload');
       const content = await this.contentScanner.scan();
+      const scanWarning = this.contentScanner.getLastScanWarning();
+      if (scanWarning) {
+        // Pushed to the backend's own logs on every scan cycle (not just
+        // once) so a persisting content problem stays visible rather than
+        // scrolling out of the agent's local ring buffer unnoticed — this
+        // is exactly the class of bug that went undiagnosed on pod04 and
+        // pcelsassvap until someone happened to open the "envoyer les POD"
+        // screen and saw no car images.
+        this.sendLog('error', scanWarning, {
+          cars: content.cars.length,
+          tracks: content.tracks.length,
+        });
+      }
       const hash = crypto.createHash('sha256').update(JSON.stringify(content)).digest('hex');
       if (hash === this.lastContentHash) {
         this.logger.info('Content unchanged, skipping upload');

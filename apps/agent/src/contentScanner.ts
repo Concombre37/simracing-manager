@@ -276,6 +276,7 @@ async function findTrackPreview(
 
 export class ContentScanner {
   private readonly cache: ContentCache;
+  private lastScanWarning: string | undefined;
 
   constructor(
     private readonly logger: Logger,
@@ -285,14 +286,29 @@ export class ContentScanner {
     this.cache = new ContentCache(cachePath ?? path.join(baseDir, 'content-cache.json'), logger);
   }
 
+  /** Set whenever the latest scan() found dramatically fewer cars/tracks
+   * than the previous successful scan — a signal worth surfacing loudly
+   * (e.g. via sendLog to the backend) since a scan that "succeeds" with
+   * near-zero content is functionally the same failure as one that errors
+   * out, just silent about it otherwise. Cleared at the start of scan(). */
+  getLastScanWarning(): string | undefined {
+    return this.lastScanWarning;
+  }
+
   async scan(): Promise<AcContent> {
     const content: AcContent = { cars: [], tracks: [] };
+    this.lastScanWarning = undefined;
     await this.cache.load();
+    const previousCarCount = this.cache.carCount();
+    const previousTrackCount = this.cache.trackCount();
 
     const acPath = await this.resolveAcPath();
     if (!acPath) {
+      const tried = await this.getCandidatePaths();
+      this.lastScanWarning =
+        'Assetto Corsa directory not found — no cars/tracks to send. Set AC_PATH in .env if the game is installed elsewhere.';
       this.logger.warn(
-        { tried: await this.getCandidatePaths() },
+        { tried },
         'Assetto Corsa directory not found. Set AC_PATH in .env if the game is installed elsewhere.',
       );
       return content;
@@ -415,6 +431,32 @@ export class ContentScanner {
 
     await this.cache.save();
 
+    // A scan that "succeeds" but silently returns far less content than
+    // last time (AC_PATH now pointing at an empty/wrong folder, a Steam
+    // library that went offline, a botched mod cleanup...) is functionally
+    // the same failure as one that errors out — it just never surfaces as
+    // one, since the payload sent to the backend is still well-formed.
+    // Flag it loudly instead of only ever showing up as "car X is missing"
+    // days later.
+    const REGRESSION_RATIO = 0.5;
+    const carsRegressed =
+      previousCarCount >= 10 && content.cars.length < previousCarCount * REGRESSION_RATIO;
+    const tracksRegressed =
+      previousTrackCount >= 5 && content.tracks.length < previousTrackCount * REGRESSION_RATIO;
+    if (carsRegressed || tracksRegressed) {
+      this.lastScanWarning = `Content dropped sharply since the last scan: cars ${previousCarCount} -> ${content.cars.length}, tracks ${previousTrackCount} -> ${content.tracks.length} (acPath=${acPath})`;
+      this.logger.error(
+        {
+          previousCarCount,
+          carCount: content.cars.length,
+          previousTrackCount,
+          trackCount: content.tracks.length,
+          acPath,
+        },
+        'Content scan found dramatically fewer cars/tracks than the previous scan',
+      );
+    }
+
     const carsWithoutPreview = content.cars.filter((c) => !c.preview).map((c) => c.acId);
     const tracksWithoutPreview = content.tracks.filter((t) => !t.preview).map((t) => t.acId);
 
@@ -461,6 +503,18 @@ export class ContentScanner {
       return candidates;
     }
 
+    const steamDirs = new Set<string>();
+
+    // The registry is the one place Steam itself always records where it
+    // was installed — a guessed list of folder names can never cover every
+    // possible custom install location (a user can point Steam's installer
+    // anywhere), but this registry key is written by Steam on every install
+    // regardless of where that is.
+    const registrySteamDir = await this.getSteamInstallPathFromRegistry();
+    if (registrySteamDir) {
+      steamDirs.add(registrySteamDir);
+    }
+
     const programFiles = process.env.ProgramFiles;
     const programFilesX86 = process.env['ProgramFiles(x86)'];
     const steamPrefixes = [
@@ -471,7 +525,6 @@ export class ContentScanner {
       'C:\\Steam',
     ].filter((p): p is string => !!p);
 
-    const steamDirs = new Set<string>();
     for (const prefix of steamPrefixes) {
       steamDirs.add(path.join(prefix, 'Steam'));
     }
@@ -501,6 +554,37 @@ export class ContentScanner {
     }
 
     return candidates;
+  }
+
+  /** Reads Steam's own install path out of the Windows registry — checks
+   * both the per-user key (written by the standard installer) and the
+   * machine-wide 32-bit-view key (used by some all-users installs), since
+   * either can be the one actually populated depending on how Steam was
+   * originally set up on a given PC. */
+  private async getSteamInstallPathFromRegistry(): Promise<string | undefined> {
+    const queries: [string, string][] = [
+      ['HKCU\\SOFTWARE\\Valve\\Steam', 'SteamPath'],
+      ['HKLM\\SOFTWARE\\WOW6432Node\\Valve\\Steam', 'InstallPath'],
+      ['HKLM\\SOFTWARE\\Valve\\Steam', 'InstallPath'],
+    ];
+    for (const [key, valueName] of queries) {
+      try {
+        const { stdout } = await execFileAsync('reg', ['query', key, '/v', valueName], {
+          timeout: 5000,
+        });
+        const match = stdout.match(new RegExp(`${valueName}\\s+REG_SZ\\s+(.+)`));
+        const value = match?.[1]?.trim();
+        if (value) {
+          return value;
+        }
+      } catch (err) {
+        this.logger.debug(
+          { key, valueName, err: err instanceof Error ? err.message : String(err) },
+          'Steam registry key not found',
+        );
+      }
+    }
+    return undefined;
   }
 
   /** Parses the `"path"  "..."` entries out of Steam's libraryfolders.vdf.

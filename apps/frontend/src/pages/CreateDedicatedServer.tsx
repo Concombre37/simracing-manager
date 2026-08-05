@@ -471,6 +471,8 @@ function StepStation({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stations.map((station) => {
           const selected = selectedId === station.id;
+          const content = station.content as { cars?: unknown[]; tracks?: unknown[] } | null;
+          const hasNoContent = !content?.cars?.length || !content?.tracks?.length;
           return (
             <button
               key={station.id}
@@ -509,6 +511,12 @@ function StepStation({
                   {station.localIp ?? '—'}
                 </span>
               </div>
+              {hasNoContent && (
+                <p className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-yellow-400">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  Aucune voiture/circuit détecté sur ce poste
+                </p>
+              )}
             </button>
           );
         })}
