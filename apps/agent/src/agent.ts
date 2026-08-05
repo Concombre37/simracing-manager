@@ -820,6 +820,7 @@ export class SimRacingAgent {
     const myGeneration = this.sessionGeneration;
     this.blankingManager.show();
     await this.blankingManager.waitUntilShown();
+    await this.applyEndOfSessionSafety();
     this.acSharedMemoryReader?.stop();
     await this.luaBridge.quit();
     await this.acLauncher.stop();
@@ -1237,6 +1238,27 @@ export class SimRacingAgent {
   }
 
   /**
+   * Requested safety measure: the end-of-session blanking screen is up, but
+   * the car is still on track and driveable for however long acLauncher's
+   * quit()/stop() then takes (up to 15s) — long enough for it to keep
+   * rolling into a wall, kicking the wheel's force feedback into whoever's
+   * still holding it. One second after blanking is confirmed shown, send
+   * the car to the pits (stops it, resets position) and open AC's own
+   * pause menu (Escape) so no further input reaches the car either way.
+   * Both are best-effort: a failure here must never block the actual
+   * session teardown that follows.
+   */
+  private async applyEndOfSessionSafety(): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await this.luaBridge
+      .teleportToPits()
+      .catch((err) => this.logger.warn({ err }, 'Failed to teleport to pits after session end'));
+    await this.acLauncher
+      .pressEscapeKey()
+      .catch((err) => this.logger.warn({ err }, 'Failed to open pause menu after session end'));
+  }
+
+  /**
    * Ends a tracked session and shows the results screen, no matter why it
    * ended: duration expired naturally, was reduced to zero via extend, or
    * was stopped manually — all three must behave identically.
@@ -1278,6 +1300,7 @@ export class SimRacingAgent {
     // the exposure gap this was meant to close just moves a few hundred ms
     // later instead of disappearing.
     await this.blankingManager.waitUntilShown();
+    await this.applyEndOfSessionSafety();
 
     try {
       await this.acLauncher.quit();

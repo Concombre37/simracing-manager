@@ -1,6 +1,7 @@
 import { spawn, ChildProcess, execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { promisify } from 'util';
 import { Logger } from 'pino';
 import { config } from './config';
 import { LaunchSessionPayload } from '@simracing/shared';
@@ -8,6 +9,8 @@ import { LuaBridge } from './luaBridge';
 import { findContentManagerExe } from './cmLocator';
 import { ProcessMonitor } from './processMonitor';
 import { resolveAcInstallPath } from './acPathResolver';
+
+const execFileAsync = promisify(execFile);
 
 export interface JoinServerConfig {
   host: string;
@@ -53,6 +56,8 @@ export class AcLauncher {
       password: cfg.password ? String(cfg.password) : undefined,
       serverName: cfg.serverName ? String(cfg.serverName) : undefined,
     });
+
+    await this.configureVideoIni(documentsPath);
 
     if (config.LAUNCH_MODE === 'cm') {
       await this.ensureLuaAppInstalled();
@@ -117,6 +122,31 @@ export class AcLauncher {
       await this.killProcess('acs.exe');
       await this.killProcess('acShowroom.exe');
       await this.killProcess('ContentManager.exe');
+    }
+  }
+
+  /**
+   * Simulates an Escape key press on whatever window currently has focus —
+   * used as an end-of-session safety measure (paired with a pits teleport)
+   * to pull AC into its pause menu right away, rather than leaving the car
+   * driveable/moving for however long it then takes to actually quit. Goes
+   * through the OS input queue (System.Windows.Forms.SendKeys) rather than
+   * a Lua/CSP command: CSP's `trySimKeyPressCommand` only recognizes a
+   * fixed set of named toggles (Ideal Line, Auto Shifter, ...), not raw
+   * keys like Escape, so this can't go through the same path as those.
+   */
+  async pressEscapeKey(): Promise<void> {
+    try {
+      await execFileAsync('powershell.exe', [
+        '-NoProfile',
+        '-WindowStyle',
+        'Hidden',
+        '-Command',
+        "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('{ESC}')",
+      ]);
+      this.logger.info('Sent Escape key to open the pause menu');
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to send Escape key');
     }
   }
 
@@ -489,7 +519,12 @@ export class AcLauncher {
 
     try {
       const content = await fs.readFile(videoIniPath, 'utf-8');
-      const updated = this.setIniValue(content, 'CAMERA', 'MODE', targetMode);
+      let updated = this.setIniValue(content, 'CAMERA', 'MODE', targetMode);
+      // Every session must start in fullscreen — a client landing in a
+      // windowed client (or behind the taskbar) after a remote launch
+      // command looks completely broken from a kiosk, and there was
+      // nothing here forcing it either way before.
+      updated = this.setIniValue(updated, 'VIDEO', 'FULLSCREEN', '1');
       await fs.writeFile(videoIniPath, updated, 'utf-8');
       this.logger.info({ path: videoIniPath, mode: targetMode }, 'video.ini updated');
     } catch (err) {

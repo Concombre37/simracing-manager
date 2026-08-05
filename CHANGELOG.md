@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.91 — Sécurité fin de session, plein écran forcé, écrans de blanking adaptés au 5120x1440
+
+### Ajouté
+
+- **Sécurité demandée par l'utilisateur : éviter qu'un client soit blessé par le retour de force si la voiture percute un mur pendant la fenêtre (jusqu'à 15s) entre la fin de session et la fermeture réelle du jeu.** 1 seconde après l'affichage de l'écran de blanking de fin, la voiture est automatiquement envoyée aux stands (`ac.tryToTeleportToPits()`, arrête et repositionne la voiture) puis le menu pause d'AC s'ouvre (touche Echap simulée via `System.Windows.Forms.SendKeys`) — les deux avant que la commande de fermeture du jeu ne soit envoyée. Appliqué aux deux chemins de fin de session (session suivie et arrêt manuel non suivi).
+- **Plein écran forcé au lancement d'une session** : `video.ini` (`[VIDEO] FULLSCREEN=1`) est désormais toujours appliqué au lancement, y compris pour le lancement direct/Content Manager qui ne le configurait pas du tout auparavant (seul le join d'un serveur dédié le faisait).
+- **Écrans de blanking (lancement + fin) adaptés à la résolution ultra-wide 5120x1440** : le dimensionnement (polices, espacements) était calculé en `vw` par rapport à une référence 16:9 — sur un écran 32:9, ça produisait un texte dimensionné par rapport à une largeur énorme plutôt que la hauteur réelle (1440px), assez surdimensionné pour faire déborder le classement hors de l'écran. Nouveau bloc `@media (min-width: 5120px)` recalculant chaque valeur en `vh` (proportionnel à la hauteur, comme prévu à l'origine) — vérifié visuellement en 5120x1440 et 1920x1080 (aucune régression sur les résolutions standards).
+
 ## v2.2.90 — Le délai avant retrait du blanking part du Drive automatique, pas de la détection du jeu
 
 ### Changé

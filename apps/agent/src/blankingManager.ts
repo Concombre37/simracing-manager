@@ -619,6 +619,36 @@ export class BlankingManager {
       font-size: 0.9vw;
       text-transform: uppercase;
       letter-spacing: 0.15em;
+    }
+    /* All the sizing above is vw-based, tuned against a ~16:9 reference —
+       on a 5120x1440 ultrawide (32:9) that same vw math produces text sized
+       off the huge width instead of the short 1440px height, oversized
+       enough to push the leaderboard rows past the viewport (clipped, since
+       body has overflow:hidden). Every value below is the same design
+       converted to vh instead (vw_original * 1920/1080), which sizes off
+       height regardless of how wide the screen is. IE11 supports both vh
+       and this min-width media feature, so no fallback needed. */
+    @media (min-width: 5120px) {
+      header { gap: 2.13vh; padding: 3.91vh 7.11vh 1.07vh; }
+      .flag { font-size: 4.62vh; }
+      h1 { font-size: 6.4vh; }
+      .bar { width: 10.67vh; margin: 1.07vh auto 2.84vh; }
+      .driver-banner { padding: 0 7.11vh; margin-bottom: 3.2vh; }
+      .driver-name { font-size: 5.51vh; }
+      .driver-meta { margin-top: 0.71vh; font-size: 2.31vh; }
+      .summary { gap: 1.6vh; margin: 0 auto 3.56vh; }
+      .tile { gap: 1.78vh; padding: 1.6vh 2.49vh; }
+      .tile .label { font-size: 1.78vh; }
+      .tile .value { font-size: 2.67vh; }
+      .tile.best-lap .value, .tile.invalid-lap .value { font-size: 3.2vh; }
+      .leaderboard { margin-bottom: 3.56vh; }
+      .leaderboard.placeholder { gap: 1.42vh; padding: 3.91vh; font-size: 1.96vh; }
+      .spinner { width: 3.56vh; height: 3.56vh; }
+      table { font-size: 2.4vh; }
+      th { padding: 1.6vh 1.42vh; font-size: 1.6vh; }
+      td { padding: 1.42vh; }
+      .pos-badge { min-width: 3.91vh; padding: 0.44vh 0.89vh; }
+      footer { padding: 2.13vh 0 2.84vh; font-size: 1.6vh; }
     }`;
   }
 
