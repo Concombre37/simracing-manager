@@ -7,6 +7,7 @@ import { LaunchSessionPayload } from '@simracing/shared';
 import { LuaBridge } from './luaBridge';
 import { findContentManagerExe } from './cmLocator';
 import { ProcessMonitor } from './processMonitor';
+import { resolveAcInstallPath } from './acPathResolver';
 
 export interface JoinServerConfig {
   host: string;
@@ -343,7 +344,12 @@ export class AcLauncher {
   }
 
   private async launchAcs(): Promise<void> {
-    const acPath = this.getAcPath();
+    const acPath = await this.getAcPath();
+    if (!acPath) {
+      throw new Error(
+        `Assetto Corsa non trouvé. Définis AC_PATH dans le .env à côté de l'exécutable.`,
+      );
+    }
     const acsExe = path.join(acPath, 'acs.exe');
     if (!(await this.pathExists(acsExe))) {
       throw new Error(`acs.exe introuvable à ${acsExe}. Vérifie AC_PATH dans le .env.`);
@@ -367,8 +373,8 @@ export class AcLauncher {
     this.logger.info({ exe: acsExe }, 'Launched acs.exe');
   }
 
-  private getAcPath(): string {
-    return config.AC_PATH ?? 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\assettocorsa';
+  private async getAcPath(): Promise<string | undefined> {
+    return resolveAcInstallPath(this.logger, 'acs.exe');
   }
 
   private async writeJoinRaceIni(
@@ -573,9 +579,9 @@ export class AcLauncher {
       this.logger.debug('Lua app install skipped: not Windows');
       return;
     }
-    const acPath = config.AC_PATH;
+    const acPath = await resolveAcInstallPath(this.logger, 'acs.exe');
     if (!acPath) {
-      this.logger.warn('Lua app install skipped: AC_PATH not set');
+      this.logger.warn('Lua app install skipped: Assetto Corsa not found');
       return;
     }
 

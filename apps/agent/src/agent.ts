@@ -29,7 +29,7 @@ import { getLocalIp, getMacAddress } from './network';
 import { Updater } from './updater';
 import { findContentManagerExe, normalizeCmPath } from './cmLocator';
 import { promptForContentManagerPath, validateFilePath } from './dialogs';
-import { resolveAcPath } from './acPathResolver';
+import { resolveAcInstallPath } from './acPathResolver';
 import { TelemetryReceiver } from './telemetryReceiver';
 import { TelemetryFileReader } from './telemetryFileReader';
 import { AcSharedMemoryReader } from './acSharedMemoryReader';
@@ -282,7 +282,7 @@ export class SimRacingAgent {
 
   private async resolveAcPath(): Promise<void> {
     if (!config.AC_PATH) {
-      const acPath = await resolveAcPath();
+      const acPath = await resolveAcInstallPath(this.logger, path.join('content', 'cars'));
       if (acPath) {
         config.AC_PATH = acPath;
         try {

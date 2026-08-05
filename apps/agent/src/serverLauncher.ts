@@ -5,8 +5,8 @@ import net from 'net';
 import dgram from 'dgram';
 import { promisify } from 'util';
 import { Logger } from 'pino';
-import { config } from './config';
 import { LaunchDedicatedServerPayload } from '@simracing/shared';
+import { resolveAcInstallPath } from './acPathResolver';
 
 const execFileAsync = promisify(execFile);
 
@@ -217,41 +217,13 @@ export class ServerLauncher {
   }
 
   private async resolveAcPath(): Promise<string> {
-    if (config.AC_PATH) {
-      return config.AC_PATH;
+    const acPath = await resolveAcInstallPath(this.logger, path.join('server', 'acServer.exe'));
+    if (!acPath) {
+      throw new Error(
+        `Assetto Corsa non trouvé. Définis AC_PATH dans le .env à côté de l'exécutable.`,
+      );
     }
-
-    const candidates: string[] = [];
-    if (process.platform === 'win32') {
-      const prefixes = [
-        process.env.ProgramFiles,
-        process.env['ProgramFiles(x86)'],
-        'C:\\Program Files',
-        'C:\\Program Files (x86)',
-        'C:\\Steam',
-      ].filter((p): p is string => !!p);
-      const seen = new Set<string>();
-      for (const prefix of prefixes) {
-        const candidate = path.join(prefix, 'Steam', 'steamapps', 'common', 'assettocorsa');
-        if (!seen.has(candidate)) {
-          seen.add(candidate);
-          candidates.push(candidate);
-        }
-      }
-    }
-
-    for (const candidate of candidates) {
-      try {
-        await fs.access(path.join(candidate, 'server', 'acServer.exe'));
-        return candidate;
-      } catch {
-        // try next
-      }
-    }
-
-    throw new Error(
-      `Assetto Corsa non trouvé. Définis AC_PATH dans le .env à côté de l'exécutable.`,
-    );
+    return acPath;
   }
 
   /**

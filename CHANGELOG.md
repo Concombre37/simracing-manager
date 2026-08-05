@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.88 — Trois détections d'Assetto Corsa indépendantes fusionnées en une seule
+
+### Corrigé
+
+- **Signalé par l'utilisateur : création d'un serveur dédié échouée sur `pcelsassvap` avec "Assetto Corsa non trouvé", alors que le scan de contenu venait de trouver 214 voitures / 65 circuits sur `D:\SteamLibrary\...\assettocorsa` quelques secondes plus tôt.** Confirmé via les logs distants : la détection Steam (registre + bibliothèques secondaires, v2.2.85) n'avait été appliquée qu'au scan de contenu (`contentScanner.ts`) — le lancement de serveur dédié (`serverLauncher.ts`) et le lancement du jeu (`acLauncher.ts`) avaient chacun leur **propre copie, non mise à jour**, de la logique de détection (l'une limitée aux chemins Steam par défaut, l'autre encore plus sommaire : un unique chemin codé en dur si `AC_PATH` n'était pas configuré). Un `acPathResolver.ts` déjà présent dans le dépôt (jamais fini d'être branché) portait d'ailleurs une version encore plus ancienne de cette même logique, utilisée uniquement au démarrage de l'agent pour pré-remplir `AC_PATH`.
+- **Fix** : toute la détection (registre Windows, bibliothèques Steam secondaires, chemins par défaut) vit maintenant dans un seul module partagé (`acPathResolver.ts`), utilisé par les quatre points qui en ont besoin — scan de contenu, lancement de serveur dédié, lancement du jeu, et résolution de `AC_PATH` au démarrage de l'agent. Impossible désormais qu'une installation Steam soit trouvée par l'un et invisible pour les autres.
+
 ## v2.2.87 — Un Assetto Corsa détecté ne peut plus jamais remonter 0 voiture/circuit
 
 ### Renforcé
