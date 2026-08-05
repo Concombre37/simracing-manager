@@ -54,7 +54,6 @@ export class SimRacingAgent {
   private socket: Socket<ServerToAgentEvents, AgentToServerEvents> | null = null;
   private heartbeatRunning = false;
   private heartbeatTimeout: NodeJS.Timeout | null = null;
-  private contentInterval: NodeJS.Timeout | null = null;
   private acRunning = false;
   private acLoaded = false;
   private lastReportedStatus: StationStatus | null = null;
@@ -422,8 +421,12 @@ export class SimRacingAgent {
       void this.writeStationConfig();
       this.startTelemetry();
       this.startHeartbeat();
+      // Scanned once per agent connection, not on a recurring timer — a
+      // full AC install scan (hundreds of cars/tracks, reading every
+      // preview image) is real, repeated I/O/CPU work for content that
+      // essentially never changes while the agent keeps running. Content
+      // added later (new mods) shows up on the next agent restart.
       void this.sendContent();
-      this.startContentSync();
       void this.blankingMediaSync.sync(config.STATION_ID, this.apiKey);
 
       this.acSharedMemoryReader = new AcSharedMemoryReader(
@@ -461,7 +464,6 @@ export class SimRacingAgent {
     this.socket.on('disconnect', (reason) => {
       this.logger.warn({ reason }, 'Disconnected from backend');
       this.stopHeartbeat();
-      this.stopContentSync();
       this.stopTelemetry();
       // Reconnect using the same API key after a short delay unless the key was invalidated.
       if (this.apiKey && reason !== 'io client disconnect') {
@@ -554,7 +556,6 @@ export class SimRacingAgent {
 
   async stop(): Promise<void> {
     this.stopHeartbeat();
-    this.stopContentSync();
     this.stopTelemetry();
     this.acSharedMemoryReader?.stop();
     this.trayManager.stop();
@@ -684,19 +685,6 @@ export class SimRacingAgent {
       this.sendLog('warn', 'Failed to write station config', {
         error: err instanceof Error ? err.message : String(err),
       });
-    }
-  }
-
-  private startContentSync(): void {
-    this.contentInterval = setInterval(() => {
-      void this.sendContent();
-    }, 60000);
-  }
-
-  private stopContentSync(): void {
-    if (this.contentInterval) {
-      clearInterval(this.contentInterval);
-      this.contentInterval = null;
     }
   }
 

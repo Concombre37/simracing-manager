@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.89 — Le scan de contenu ne tourne plus en boucle toutes les 60s
+
+### Changé
+
+- **Demandé par l'utilisateur : "il faut vraiment une fois au lancement de l'agent seulement".** Le scan des voitures/circuits (lecture de centaines de dossiers et d'images de preview) tournait sur une boucle de 60s pendant toute la durée de connexion de l'agent, en plus du scan initial à la connexion — un travail disque/CPU répété pour un contenu qui ne change quasiment jamais une fois l'agent démarré.
+- **Fix** : le scan ne se déclenche plus qu'une seule fois, à la connexion de l'agent. Un nouveau mod ajouté sur le poste sera pris en compte au prochain redémarrage de l'agent.
+
 ## v2.2.88 — Trois détections d'Assetto Corsa indépendantes fusionnées en une seule
 
 ### Corrigé
