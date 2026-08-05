@@ -80,7 +80,8 @@ export type BlankingMediaCategory = 'idle' | 'launching' | 'results';
 
 export interface BlankingMediaFile {
   id: string;
-  stationId: string;
+  /** Null for global media (launching/results — shared by every pod). */
+  stationId: string | null;
   category: BlankingMediaCategory;
   filename: string;
   mimeType: string;

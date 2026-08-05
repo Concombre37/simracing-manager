@@ -119,8 +119,14 @@ export class AgentGateway
 
     this.eventEmitter.on(
       'blanking.mediaUpdated',
-      async (payload: { stationId: string }) => {
-        await this.emitBlankingMediaUpdated(payload.stationId);
+      async (payload: { stationId: string | null }) => {
+        if (payload.stationId) {
+          await this.emitBlankingMediaUpdated(payload.stationId);
+        } else {
+          // Global media (launching/results) applies to every pod — same
+          // no-room broadcast pattern as settings.updated below.
+          this.server.emit('blanking:mediaUpdated');
+        }
       },
     );
 

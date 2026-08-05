@@ -165,7 +165,7 @@ export function BlankingMediaModal({
   );
 }
 
-function MediaItem({
+export function MediaItem({
   media,
   index,
   total,

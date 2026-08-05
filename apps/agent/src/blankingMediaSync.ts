@@ -9,6 +9,10 @@ import { BlankingManager } from './blankingManager';
 const MEDIA_ROOT_DIR = path.join(process.env.TEMP || '/tmp', 'simracing-manager', 'blanking-media');
 
 const CATEGORIES: BlankingMediaCategory[] = ['idle', 'launching', 'results'];
+/** "launching" and "results" are shared by every pod (same launch photos,
+ * same results logo everywhere) — fetched from the global endpoint instead
+ * of a per-station one. Only "idle" still differs per pod. */
+const GLOBAL_CATEGORIES: BlankingMediaCategory[] = ['launching', 'results'];
 
 export class BlankingMediaSync {
   constructor(
@@ -39,13 +43,13 @@ export class BlankingMediaSync {
     token: string,
   ): Promise<string[]> {
     this.logger.info({ category }, 'Syncing blanking media');
-    const { data: mediaList } = await axios.get<BlankingMediaFile[]>(
-      `${config.SERVER_URL}/api/stations/${stationId}/blanking-media`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { category },
-      },
-    );
+    const url = GLOBAL_CATEGORIES.includes(category)
+      ? `${config.SERVER_URL}/api/blanking-media/global`
+      : `${config.SERVER_URL}/api/stations/${stationId}/blanking-media`;
+    const { data: mediaList } = await axios.get<BlankingMediaFile[]>(url, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { category },
+    });
 
     const dir = path.join(MEDIA_ROOT_DIR, category);
     await fs.mkdir(dir, { recursive: true });

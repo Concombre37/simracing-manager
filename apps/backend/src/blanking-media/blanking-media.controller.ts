@@ -35,11 +35,21 @@ const VALID_CATEGORIES: BlankingMediaCategory[] = [
   'launching',
   'results',
 ];
+const GLOBAL_CATEGORIES: BlankingMediaCategory[] = ['launching', 'results'];
 
 function parseCategory(raw: string | undefined): BlankingMediaCategory {
   if (!raw) return 'idle';
   if (!VALID_CATEGORIES.includes(raw as BlankingMediaCategory)) {
     throw new BadRequestException(`Invalid category: ${raw}`);
+  }
+  return raw as BlankingMediaCategory;
+}
+
+function parseGlobalCategory(raw: string | undefined): BlankingMediaCategory {
+  if (!raw || !GLOBAL_CATEGORIES.includes(raw as BlankingMediaCategory)) {
+    throw new BadRequestException(
+      `Category must be one of: ${GLOBAL_CATEGORIES.join(', ')}`,
+    );
   }
   return raw as BlankingMediaCategory;
 }
@@ -104,6 +114,54 @@ export class BlankingMediaController {
     @Param('mediaId') mediaId: string,
   ) {
     await this.blankingMediaService.remove(stationId, mediaId);
+    return { success: true };
+  }
+
+  // Global (station-less) media — "launching" and "results" are identical on
+  // every pod, so they're configured once here instead of per-station.
+  @Get('blanking-media/global')
+  @UseGuards(AdminOrStationAuthGuard)
+  async findGlobal(@Query('category') category?: string) {
+    return this.blankingMediaService.findGlobal(parseGlobalCategory(category));
+  }
+
+  @Post('blanking-media/global')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadGlobal(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('category') category?: string,
+  ) {
+    if (!file) {
+      throw new NotFoundException('No file uploaded');
+    }
+    return this.blankingMediaService.uploadGlobal(
+      file,
+      parseGlobalCategory(category),
+    );
+  }
+
+  @Patch('blanking-media/global/reorder')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async reorderGlobal(
+    @Body(new ZodValidationPipe(reorderBlankingMediaSchema))
+    dto: ReorderBlankingMediaDto,
+    @Query('category') category?: string,
+  ) {
+    await this.blankingMediaService.reorderGlobal(
+      dto.mediaIds,
+      parseGlobalCategory(category),
+    );
+    return { success: true };
+  }
+
+  @Delete('blanking-media/global/:mediaId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async removeGlobal(@Param('mediaId') mediaId: string) {
+    await this.blankingMediaService.removeGlobal(mediaId);
     return { success: true };
   }
 

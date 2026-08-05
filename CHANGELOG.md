@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.96 — Refonte visuelle des écrans de lancement/résultats + config globale
+
+### Changé
+
+- **Refonte complète du design des écrans "Lancement" et "Résultats"**, à partir d'une maquette fournie par l'utilisateur (Claude Design, projet "Assetto Corsa HUD Design") : nouveau panneau HUD translucide centré (bordure fine, coins en équerre cyan, barres d'accent bleu racing/violet), typographie condensée en majuscules, thème bleu racing (`#0057ff`→`#00c2ff`) avec l'orange conservé uniquement en petite touche (meilleur tour). Écran de résultats : position finale affichée en tête (or/argent/bronze), classement en lignes (plus un tableau HTML), 3 tuiles d'info (circuit/voiture/meilleur tour, + tuile tour non-validé si présent). Toute la mise en page utilise une seule unité (vw dérivée du design natif 5120x1440) au lieu du système précédent vw+override vh à 5120px — fonctionne nativement aux deux résolutions (1920x1080 et 5120x1440) sans double réglage, vérifié visuellement aux deux tailles.
+- **Compatibilité IE11 (moteur de rendu de `blanking.ps1`)** : le design source utilise `backdrop-filter`/`clip-path`/`display:grid`, tous non supportés par IE11 — remplacés respectivement par une transparence simple (opacité de fond), des coins droits, et des lignes flexbox (déjà éprouvé dans ce moteur via `gap`).
+- **Demandé par l'utilisateur : "vu que tous les simus auront le même écran de chargement et de fin, configurer ça au même endroit pour tous les pods"** — `BlankingMedia.stationId` devient nullable ; les catégories `launching` (plusieurs images, une choisie au hasard par lancement, en fond plein écran) et `results` (un seul logo, incrusté en filigrane centré) passent en **médias globaux** (un seul jeu de fichiers pour toute la flotte), avec deux nouveaux endpoints `/api/blanking-media/global` (list/upload/reorder) et `/api/blanking-media/global/:id` (delete). L'écran d'attente (`idle`) reste per-station, inchangé. Nouvelle diffusion WebSocket : une mise à jour de média global notifie tous les agents connectés (`server.emit`, même mécanisme que `settings:updated`) au lieu de cibler une seule room de station.
+- Les boutons "Images de lancement"/"Logo écran de fin" retirés du panneau par-station (page Postes) ; remplacés par deux sections toujours visibles en haut de la page `/blanking-media`, à côté de l'envoi groupé existant pour l'écran d'attente.
+
 ## v2.2.95 — Images personnalisées pour les écrans de lancement et de fin
 
 ### Ajouté

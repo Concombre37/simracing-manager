@@ -5,7 +5,17 @@ import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Upload, Monitor, CheckSquare, Square, AlertCircle, CheckCircle } from 'lucide-react';
+import { MediaItem } from '../components/BlankingMediaModal';
+import {
+  Upload,
+  Monitor,
+  CheckSquare,
+  Square,
+  AlertCircle,
+  CheckCircle,
+  Rocket,
+  Award,
+} from 'lucide-react';
 
 export function BlankingMedia() {
   const queryClient = useQueryClient();
@@ -71,9 +81,26 @@ export function BlankingMedia() {
   return (
     <PageShell
       title="Écrans"
-      accent="d'attente"
-      subtitle="Envoie une image ou une vidéo vers plusieurs postes en une seule fois"
+      accent="de blanking"
+      subtitle="Lancement et résultats sont communs à tous les postes ; l'écran d'attente se configure poste par poste ci-dessous"
     >
+      <GlobalMediaSection
+        category="launching"
+        icon={Rocket}
+        title="Images de lancement"
+        description="Communes à tous les postes — une image est choisie au hasard à chaque lancement de session. Sans image, l'écran garde son fond par défaut."
+        imagesOnly
+      />
+
+      <GlobalMediaSection
+        category="results"
+        icon={Award}
+        title="Logo écran de fin"
+        description="Commun à tous les postes — un seul logo, affiché en incrustation sur l'écran de résultats. Un nouvel envoi remplace l'ancien."
+        imagesOnly
+        maxItems={1}
+      />
+
       {isLoading && <p className="text-gray-500">Chargement des postes...</p>}
 
       {!isLoading && stations && (
@@ -225,6 +252,140 @@ export function BlankingMedia() {
         </>
       )}
     </PageShell>
+  );
+}
+
+function GlobalMediaSection({
+  category,
+  icon: Icon,
+  title,
+  description,
+  imagesOnly,
+  maxItems,
+}: {
+  category: 'launching' | 'results';
+  icon: typeof Rocket;
+  title: string;
+  description: string;
+  imagesOnly?: boolean;
+  maxItems?: number;
+}) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const queryKey = ['blanking-media', 'global', category];
+
+  const { data: media, isLoading } = useQuery({
+    queryKey,
+    queryFn: () => stationsApi.getGlobalBlankingMedia(category),
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => stationsApi.uploadGlobalBlankingMedia(file, category),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (mediaId: string) => stationsApi.deleteGlobalBlankingMedia(mediaId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const reorderMutation = useMutation({
+    mutationFn: (mediaIds: string[]) => stationsApi.reorderGlobalBlankingMedia(mediaIds, category),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+  });
+
+  const handleFiles = (files: FileList | null) => {
+    if (!files) return;
+    const toUpload = maxItems === 1 ? Array.from(files).slice(-1) : Array.from(files);
+    toUpload.forEach((file) => uploadMutation.mutate(file));
+  };
+
+  const moveItem = (index: number, direction: -1 | 1) => {
+    if (!media) return;
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= media.length) return;
+    const reordered = [...media];
+    const [item] = reordered.splice(index, 1);
+    reordered.splice(newIndex, 0, item);
+    reorderMutation.mutate(reordered.map((m) => m.id));
+  };
+
+  const atCapacity = maxItems !== undefined && (media?.length ?? 0) >= maxItems;
+
+  return (
+    <Card className="space-y-4">
+      <div>
+        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <Icon className="w-5 h-5 text-accent-orange" />
+          {title}
+        </h3>
+        <p className="text-sm text-gray-500 mt-1">{description}</p>
+      </div>
+
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          handleFiles(e.dataTransfer.files);
+        }}
+        onClick={() => fileInputRef.current?.click()}
+        className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+          dragOver
+            ? 'border-accent-orange bg-accent-orange/10'
+            : 'border-dark-600 hover:border-dark-500 bg-dark-900'
+        }`}
+      >
+        <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+        <p className="text-sm text-gray-300">
+          {atCapacity
+            ? 'Glisse-dépose une image ici pour remplacer celle en place'
+            : 'Glisse-dépose des images ici, ou clique pour sélectionner'}
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          {imagesOnly ? 'PNG, JPG, WEBP' : 'PNG, JPG, WEBP, MP4, WEBM'} — max 100 Mo
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple={maxItems !== 1}
+          accept={
+            imagesOnly
+              ? 'image/png,image/jpeg,image/jpg,image/webp'
+              : 'image/png,image/jpeg,image/jpg,image/webp,video/mp4,video/webm'
+          }
+          className="hidden"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+      </div>
+
+      {isLoading && <p className="text-gray-500">Chargement...</p>}
+
+      {media && media.length === 0 && !isLoading && (
+        <p className="text-center text-gray-500 text-sm">Aucun média pour l'instant.</p>
+      )}
+
+      {media && media.length > 0 && (
+        <div className="space-y-2">
+          {media.map((m, index) => (
+            <MediaItem
+              key={m.id}
+              media={m}
+              index={index}
+              total={media.length}
+              onMove={maxItems === 1 ? undefined : moveItem}
+              onDelete={() => deleteMutation.mutate(m.id)}
+              isDeleting={deleteMutation.isPending && deleteMutation.variables === m.id}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }
 

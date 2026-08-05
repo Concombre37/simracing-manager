@@ -434,253 +434,174 @@ export class BlankingManager {
   // clamp()/conic-gradient. Layout uses flexbox/vw units and a
   // repeating-linear-gradient checkerboard, all supported in IE11 edge mode
   // (see the FEATURE_BROWSER_EMULATION fix in blanking.ps1).
-  private commonStyles(background?: { imagePath: string; fit: 'cover' | 'logo' }): string {
-    const imageLayer = background
-      ? background.fit === 'cover'
-        ? `linear-gradient(rgba(5,5,8,0.45), rgba(5,5,8,0.45)), url('${this.toFileUrl(background.imagePath)}') center/cover no-repeat,`
-        : `url('${this.toFileUrl(background.imagePath)}') center/auto 30vh no-repeat,`
-      : '';
+  // Design source: Claude Design project "Assetto Corsa HUD Design"
+  // (Race HUD.dc.html), built natively at 5120x1440. Every pixel value below
+  // is that design's own px converted to vw (px / 5120 * 100) and used as
+  // the SOLE unit — unlike the previous vw-base/vh-5120-override split, this
+  // works at both 1920x1080 and 5120x1440 without a second tuned copy
+  // because the design is a compact centered card (not edge-to-edge text),
+  // so proportional width-scaling alone looks right at either aspect ratio.
+  // Hairline thicknesses (borders, dividers, accent bars ≤5px) are kept as
+  // fixed px instead of scaled, same convention as the previous version.
+  // Rendered inside a WPF WebBrowser control (IE11 engine): no
+  // backdrop-filter, no clip-path, no CSS grid — translucency comes from
+  // background opacity alone, panel corners are square, and every row/column
+  // layout below uses flexbox (with `gap`, already proven to work in this
+  // exact engine by the pre-existing header/summary rules) instead of grid.
+  private commonStyles(screen: 'launch' | 'results', photoPath?: string): string {
+    const sceneBackground = photoPath
+      ? `linear-gradient(rgba(5,5,8,0.5), rgba(5,5,8,0.5)), url('${this.toFileUrl(photoPath)}') center/cover no-repeat, #08080c`
+      : screen === 'launch'
+        ? 'radial-gradient(120% 100% at 18% 40%, #1b2740 0%, #12141f 45%, #08080c 100%)'
+        : 'radial-gradient(90% 120% at 50% 45%, #172033 0%, #0f1119 50%, #07070b 100%)';
+
     return `
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
     body {
-      background:
-        radial-gradient(circle at 50% -10%, rgba(255,51,51,0.16) 0%, transparent 55%),
-        radial-gradient(circle at 50% 110%, rgba(168,85,247,0.12) 0%, transparent 55%),
-        ${imageLayer}
-        #050508;
-      color: #fff;
+      background: #08080c;
+      color: #f4f4f7;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      text-align: center;
-      animation: fadeIn 0.4s ease-out;
     }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes revealUp {
-      from { opacity: 0; transform: translateY(18px); }
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(14px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    header, .driver-banner, .summary, .leaderboard {
-      opacity: 0;
-      animation: revealUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-    header { animation-delay: 0.05s; }
-    .driver-banner { animation-delay: 0.15s; }
-    .summary { animation-delay: 0.25s; }
-    .leaderboard { animation-delay: 0.35s; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .checkers {
+    @keyframes loadPulse { 0% { width: 15%; } 50% { width: 70%; } 100% { width: 15%; } }
+    .scene {
+      position: relative;
       width: 100%;
-      height: 14px;
-      background-image:
-        linear-gradient(45deg, #0a0a0f 25%, transparent 25%, transparent 75%, #0a0a0f 75%, #0a0a0f),
-        linear-gradient(45deg, #0a0a0f 25%, #e8e8e8 25%, #e8e8e8 75%, #0a0a0f 75%, #0a0a0f);
-      background-size: 14px 14px;
-      background-position: 0 0, 7px 7px;
-      flex-shrink: 0;
-    }
-    header {
+      height: 100%;
+      overflow: hidden;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 1.2vw;
-      padding: 2.2vw 4vw 0.6vw;
+      background: ${sceneBackground};
+      animation: fadeIn 0.4s ease-out;
     }
-    .flag { font-size: 2.6vw; line-height: 1; }
-    h1 {
-      font-size: 3.6vw;
-      margin: 0;
-      color: #fff;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-weight: 800;
-      text-shadow: 0 0 24px rgba(255,51,51,0.55);
+    .scene-texture {
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(108deg, rgba(255,255,255,0.035) 0 2px, rgba(255,255,255,0) 2px 160px);
     }
-    .bar {
-      width: 6vw;
-      height: 5px;
-      background: linear-gradient(90deg, #ff3333, #ff6b35);
-      border-radius: 3px;
-      margin: 0.6vw auto 1.6vw;
+    .scene-glow-launch {
+      position: absolute; left: 0; right: 0; bottom: 0; height: 10.156vw;
+      background: linear-gradient(to top, rgba(0,87,255,0.14), rgba(0,0,0,0));
     }
-    .driver-banner { padding: 0 4vw; margin-bottom: 1.8vw; }
-    .driver-name {
-      font-size: 3.1vw;
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
-    }
-    .driver-meta {
-      margin-top: 0.4vw;
-      font-size: 1.3vw;
-      color: #9a9aa8;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-    .summary {
-      display: flex;
-      flex-direction: column;
-      gap: 0.9vw;
-      width: 70%;
-      max-width: 900px;
-      margin: 0 auto 2vw;
-    }
-    .tile {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1vw;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 14px;
-      padding: 0.9vw 1.4vw;
-      text-align: left;
-    }
-    .tile .label {
-      color: #8a8a96;
-      font-size: 1vw;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      white-space: nowrap;
-    }
-    .tile .value {
-      font-size: 1.5vw;
-      font-weight: 700;
-      text-align: right;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .tile.best-lap {
-      background: linear-gradient(135deg, rgba(168,85,247,0.22), rgba(168,85,247,0.06));
-      border-color: rgba(168,85,247,0.5);
-      box-shadow: 0 0 30px -8px rgba(168,85,247,0.5);
-    }
-    .tile.best-lap .label { color: #c9a3fb; }
-    .tile.best-lap .value {
-      color: #c084fc;
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 1.8vw;
-    }
-    .tile.invalid-lap {
-      background: linear-gradient(135deg, rgba(255,51,51,0.16), rgba(255,51,51,0.05));
-      border-color: rgba(255,51,51,0.4);
-    }
-    .tile.invalid-lap .label { color: #ff9a9a; }
-    .tile.invalid-lap .value {
-      color: #ff6b6b;
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 1.8vw;
-    }
-    .tile.launching {
-      background: linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,212,255,0.05));
-      border-color: rgba(0,212,255,0.4);
-    }
-    .tile.launching .label { color: #9fe6ff; }
-    .tile.launching .value { color: #00d4ff; }
-    .leaderboard {
-      width: 92%;
-      max-width: 1400px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 14px;
-      overflow: hidden;
-      margin-bottom: 2vw;
-    }
-    .leaderboard.placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.8vw;
-      padding: 2.2vw;
-      color: #8a8a96;
-      font-size: 1.1vw;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-    .spinner {
-      width: 2vw;
-      height: 2vw;
+    .scene-glow-blob {
+      position: absolute; left: 8%; top: 12%; width: 27.344vw; height: 19.531vw;
       border-radius: 50%;
-      border: 3px solid rgba(255,255,255,0.12);
-      border-top-color: #ff6b35;
-      animation: spin 0.8s linear infinite;
+      background: radial-gradient(circle, rgba(168,85,247,0.14), rgba(0,0,0,0) 70%);
     }
-    table { width: 100%; border-collapse: collapse; font-size: 1.35vw; }
-    th {
-      background: rgba(255,51,51,0.14);
-      color: #ff8a7a;
-      padding: 0.9vw 0.8vw;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      font-size: 0.9vw;
-      text-align: left;
+    .scene-ring {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: 29.297vw; height: 29.297vw; border-radius: 50%;
+      border: 3px solid rgba(0,194,255,0.12);
+      box-shadow: inset 0 0 200px rgba(0,87,255,0.10);
     }
-    th.num, td.num { text-align: center; }
-    td {
-      padding: 0.8vw;
-      border-bottom: 1px solid rgba(255,255,255,0.06);
+    .scene-watermark-text {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      font-size: 10.156vw; font-weight: 700; letter-spacing: 0.2em;
+      color: rgba(255,255,255,0.035);
     }
-    tr:last-child td { border-bottom: none; }
-    tr.p1 td { background: rgba(255,215,0,0.08); }
-    tr.p2 td { background: rgba(192,192,192,0.06); }
-    tr.p3 td { background: rgba(205,127,50,0.06); }
-    td.pos { text-align: center; }
-    .pos-badge {
-      display: inline-block;
-      min-width: 2.2vw;
-      padding: 0.25vw 0.5vw;
-      border-radius: 6px;
-      font-weight: 800;
-      font-family: 'Consolas', 'Courier New', monospace;
+    .scene-watermark-logo {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: 16vw; height: auto; opacity: 0.14;
     }
-    .p1 .pos-badge { background: linear-gradient(135deg, #ffd700, #b8860b); color: #1a1500; }
-    .p2 .pos-badge { background: linear-gradient(135deg, #d8d8d8, #9a9a9a); color: #1a1a1a; }
-    .p3 .pos-badge { background: linear-gradient(135deg, #cd8a4a, #8a5a26); color: #1a0f00; }
-    .pos-badge.other { background: rgba(255,255,255,0.08); color: #ccc; }
-    td.time { font-family: 'Consolas', 'Courier New', monospace; }
-    footer {
-      margin-top: auto;
-      padding: 1.2vw 0 1.6vw;
-      color: #55555f;
-      font-size: 0.9vw;
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
+    .panel {
+      position: relative;
+      box-sizing: border-box;
+      width: 66.406vw;
+      background: rgba(5,5,8,0.64);
+      border: 1px solid rgba(255,255,255,0.10);
+      box-shadow: 0 0 0 1px rgba(0,120,255,0.16), 0 40px 120px rgba(0,0,0,0.55), 0 0 170px rgba(0,87,255,0.10);
+      animation: panelIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
     }
-    /* All the sizing above is vw-based, tuned against a ~16:9 reference —
-       on a 5120x1440 ultrawide (32:9) that same vw math produces text sized
-       off the huge width instead of the short 1440px height, oversized
-       enough to push the leaderboard rows past the viewport (clipped, since
-       body has overflow:hidden). Every value below is the same design
-       converted to vh instead (vw_original * 1920/1080), which sizes off
-       height regardless of how wide the screen is. IE11 supports both vh
-       and this min-width media feature, so no fallback needed. */
-    @media (min-width: 5120px) {
-      header { gap: 2.13vh; padding: 3.91vh 7.11vh 1.07vh; }
-      .flag { font-size: 4.62vh; }
-      h1 { font-size: 6.4vh; }
-      .bar { width: 10.67vh; margin: 1.07vh auto 2.84vh; }
-      .driver-banner { padding: 0 7.11vh; margin-bottom: 3.2vh; }
-      .driver-name { font-size: 5.51vh; }
-      .driver-meta { margin-top: 0.71vh; font-size: 2.31vh; }
-      .summary { gap: 1.6vh; margin: 0 auto 3.56vh; }
-      .tile { gap: 1.78vh; padding: 1.6vh 2.49vh; }
-      .tile .label { font-size: 1.78vh; }
-      .tile .value { font-size: 2.67vh; }
-      .tile.best-lap .value, .tile.invalid-lap .value { font-size: 3.2vh; }
-      .leaderboard { margin-bottom: 3.56vh; }
-      .leaderboard.placeholder { gap: 1.42vh; padding: 3.91vh; font-size: 1.96vh; }
-      .spinner { width: 3.56vh; height: 3.56vh; }
-      table { font-size: 2.4vh; }
-      th { padding: 1.6vh 1.42vh; font-size: 1.6vh; }
-      td { padding: 1.42vh; }
-      .pos-badge { min-width: 3.91vh; padding: 0.44vh 0.89vh; }
-      footer { padding: 2.13vh 0 2.84vh; font-size: 1.6vh; }
-    }`;
+    .accent-blue { position: absolute; top: 0; left: 0; width: 4.688vw; height: 5px; background: linear-gradient(90deg,#0057ff,#00c2ff); }
+    .accent-purple { position: absolute; top: 0; right: 0; width: 1.758vw; height: 5px; background: rgba(168,85,247,0.75); }
+    .corner {
+      position: absolute; width: 2.148vw; height: 2.148vw;
+      border-color: rgba(0,194,255,0.55); border-style: solid; border-width: 0;
+    }
+    .corner.tl { left: 0.898vw; top: 0.898vw; border-left-width: 3px; border-top-width: 3px; }
+    .corner.br { right: 0.898vw; bottom: 0.898vw; border-right-width: 3px; border-bottom-width: 3px; }
+    .hud-label-row { display: flex; align-items: center; gap: 0.625vw; }
+    .hud-dot { width: 0.313vw; height: 0.313vw; min-width: 6px; min-height: 6px; background: #00c2ff; box-shadow: 0 0 26px rgba(0,194,255,0.85); transform: rotate(45deg); }
+    .hud-label { font-size: 0.898vw; font-weight: 600; letter-spacing: 0.42em; text-transform: uppercase; color: #00c2ff; white-space: nowrap; }
+    .driver-name {
+      font-weight: 700; letter-spacing: -0.015em; text-transform: uppercase; color: #f4f4f7;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .driver-name.xl { font-size: 4.180vw; line-height: 0.92; }
+    .driver-name.lg { font-size: 2.266vw; line-height: 0.95; }
+
+    /* Launch screen */
+    .launch-panel { padding: 1.875vw 2.539vw 2.031vw; }
+    .launch-spacer-1 { height: 0.898vw; }
+    .launch-spacer-2 { height: 0.859vw; }
+    .subtitle-row { display: flex; align-items: center; gap: 0.781vw; font-size: 1.094vw; font-weight: 400; letter-spacing: 0.10em; text-transform: uppercase; color: rgba(244,244,247,0.60); overflow: hidden; }
+    .subtitle-row span:not(.subtitle-dot) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .subtitle-dot { flex-shrink: 0; width: 0.234vw; height: 0.234vw; min-width: 5px; min-height: 5px; border-radius: 50%; background: #a855f7; box-shadow: 0 0 18px rgba(168,85,247,0.9); }
+    .load-spacer { height: 1.797vw; }
+    .load-row { display: flex; align-items: center; gap: 0.859vw; }
+    .load-track { flex: 1; height: 4px; background: rgba(255,255,255,0.10); }
+    .load-fill { height: 100%; background: linear-gradient(90deg,#0057ff,#00c2ff); box-shadow: 0 0 22px rgba(0,194,255,0.65); animation: loadPulse 1.8s ease-in-out infinite; }
+    .load-label { font-size: 0.586vw; font-weight: 600; letter-spacing: 0.34em; text-transform: uppercase; color: rgba(244,244,247,0.45); white-space: nowrap; }
+
+    /* Results screen */
+    .results-panel { padding: 1.211vw 1.953vw 1.328vw; }
+    .results-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1vw; }
+    .results-head-left .hud-dot { width: 0.273vw; height: 0.273vw; min-width: 6px; min-height: 6px; }
+    .results-head-left .hud-label { font-size: 0.820vw; }
+    .results-head-spacer { height: 0.586vw; }
+    .results-head-right { text-align: right; flex-shrink: 0; }
+    .pos-label { font-size: 0.508vw; font-weight: 600; letter-spacing: 0.34em; text-transform: uppercase; color: rgba(244,244,247,0.42); white-space: nowrap; }
+    .pos-spacer { height: 0.234vw; }
+    .pos-value { font-size: 2.031vw; line-height: 1; font-weight: 700; color: #f4f4f7; }
+    .pos-value.p1 { color: #ffd700; }
+    .pos-value.p2 { color: #c0c0c0; }
+    .pos-value.p3 { color: #cd7f32; }
+    .divider-spacer-1 { height: 0.781vw; }
+    .divider { height: 1px; background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.16) 20%, rgba(255,255,255,0.16) 80%, rgba(255,255,255,0)); }
+    .divider-spacer-2 { height: 0.703vw; }
+    .tiles { display: flex; flex-wrap: wrap; gap: 0.547vw; }
+    .tile { flex: 1; min-width: 12vw; padding: 0.508vw 0.625vw; background: rgba(255,255,255,0.035); border: 1px solid rgba(255,255,255,0.08); border-top: 2px solid rgba(0,194,255,0.40); text-align: left; }
+    .tile.accent-orange { border-top-color: rgba(255,107,53,0.65); }
+    .tile-label { font-size: 0.508vw; font-weight: 600; letter-spacing: 0.30em; text-transform: uppercase; color: rgba(244,244,247,0.45); white-space: nowrap; }
+    .tile-spacer { height: 0.352vw; }
+    .tile-value { font-size: 0.859vw; font-weight: 600; color: #f4f4f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tile-value.accent-orange { font-weight: 700; letter-spacing: 0.02em; color: #ff6b35; }
+    .tiles-spacer { height: 0.781vw; }
+    .placeholder-box { padding: 1.5vw; text-align: center; color: rgba(244,244,247,0.5); font-size: 0.9vw; text-transform: uppercase; letter-spacing: 0.15em; }
+    .placeholder-box .spinner { margin: 0 auto 0.8vw; }
+    .spinner { width: 1.6vw; height: 1.6vw; min-width: 24px; min-height: 24px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.12); border-top-color: #00c2ff; animation: spin 0.8s linear infinite; }
+
+    .lb-row-flex { display: flex; align-items: center; gap: 0.781vw; }
+    .lb-col-pos { flex: none; width: 2.148vw; }
+    .lb-col-name, .lb-col-car { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-col-laps { flex: none; width: 2.539vw; text-align: right; }
+    .lb-col-time { flex: none; width: 6.836vw; text-align: right; }
+    .lb-head { padding: 0 0.586vw 0.352vw; font-size: 0.508vw; font-weight: 600; letter-spacing: 0.30em; text-transform: uppercase; color: rgba(244,244,247,0.40); }
+    .lb-divider { height: 1px; background: rgba(255,255,255,0.10); }
+    .lb-row { padding: 0.352vw 0.586vw; border-left: 4px solid rgba(255,255,255,0.10); }
+    .lb-row.p1 { border-left-color: #ffd700; background: linear-gradient(90deg, rgba(255,215,0,0.10), rgba(255,215,0,0)); }
+    .lb-row.p2 { border-left-color: #c0c0c0; background: linear-gradient(90deg, rgba(192,192,192,0.10), rgba(192,192,192,0)); }
+    .lb-row.p3 { border-left-color: #cd7f32; background: linear-gradient(90deg, rgba(205,127,50,0.10), rgba(205,127,50,0)); }
+    .lb-pos { font-weight: 700; }
+    .lb-row.top3 .lb-pos { font-size: 0.898vw; }
+    .lb-row.other .lb-pos { font-size: 0.859vw; font-weight: 600; color: rgba(244,244,247,0.55); }
+    .lb-row.p1 .lb-pos { color: #ffd700; }
+    .lb-row.p2 .lb-pos { color: #c0c0c0; }
+    .lb-row.p3 .lb-pos { color: #cd7f32; }
+    .lb-row.top3 .lb-col-name { font-size: 0.859vw; font-weight: 600; color: #f4f4f7; }
+    .lb-row.other .lb-col-name { font-size: 0.859vw; font-weight: 500; color: rgba(244,244,247,0.85); }
+    .lb-row.top3 .lb-col-car, .lb-row.top3 .lb-col-laps { font-size: 0.664vw; color: rgba(244,244,247,0.62); }
+    .lb-row.other .lb-col-car, .lb-row.other .lb-col-laps { font-size: 0.664vw; color: rgba(244,244,247,0.50); }
+    .lb-row.top3 .lb-col-time { font-size: 0.781vw; font-weight: 600; color: #f4f4f7; }
+    .lb-row.other .lb-col-time { font-size: 0.781vw; font-weight: 500; color: rgba(244,244,247,0.75); }
+    `;
   }
 
   private generateResultsHtml(summary: SessionResultsSummary): void {
@@ -696,16 +617,32 @@ export class BlankingManager {
     const trackDisplay = summary.trackLayout
       ? `${trackLabel} (${summary.trackLayout})`
       : (trackLabel ?? '-');
-    const leaderboard = summary.result
-      ? this.renderLeaderboard(summary.result)
-      : summary.pending
-        ? `<div class="leaderboard placeholder">
-  <div class="spinner"></div>
-  <p>Chargement du classement…</p>
-</div>`
-        : `<div class="leaderboard placeholder">
-  <p>Classement indisponible</p>
-</div>`;
+
+    const entries = summary.result ? getLeaderboard(summary.result) : [];
+    const ownEntry = entries.find(
+      (e) => e.name.trim().toLowerCase() === (summary.clientName ?? '').trim().toLowerCase(),
+    );
+    const posClass = ownEntry
+      ? ownEntry.position === 1
+        ? 'p1'
+        : ownEntry.position === 2
+          ? 'p2'
+          : ownEntry.position === 3
+            ? 'p3'
+            : ''
+      : '';
+    const posDisplay = ownEntry ? `P${ownEntry.position}` : '-';
+
+    const leaderboard =
+      entries.length > 0
+        ? this.renderLeaderboard(entries)
+        : summary.pending
+          ? `<div class="placeholder-box"><div class="spinner"></div>Chargement du classement…</div>`
+          : `<div class="placeholder-box">Classement indisponible</div>`;
+
+    const watermark = this.resultsLogoPath
+      ? `<img class="scene-watermark-logo" src="${this.toFileUrl(this.resultsLogoPath)}" alt="">`
+      : `<div class="scene-watermark-text">AC</div>`;
 
     const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -713,45 +650,70 @@ export class BlankingManager {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Session terminée</title>
-  <style>${this.commonStyles(this.resultsLogoPath ? { imagePath: this.resultsLogoPath, fit: 'logo' } : undefined)}
-  </style>
+  <style>${this.commonStyles('results')}</style>
 </head>
 <body>
-  <div class="checkers"></div>
-  <header>
-    <span class="flag">🏁</span>
-    <h1>Session terminée</h1>
-    <span class="flag">🏁</span>
-  </header>
-  <div class="bar"></div>
-  <div class="driver-banner">
-    <div class="driver-name">${this.escapeHtml(summary.clientName ?? 'Pilote')}</div>
-    <div class="driver-meta">${this.escapeHtml(carLabel ?? '-')} · ${this.escapeHtml(trackDisplay)}</div>
+  <div class="scene">
+    <div class="scene-texture"></div>
+    <div class="scene-ring"></div>
+    ${watermark}
+    <div class="panel results-panel">
+      <div class="accent-blue"></div>
+      <div class="accent-purple"></div>
+      <div class="corner tl"></div>
+      <div class="corner br"></div>
+
+      <div class="results-head">
+        <div class="results-head-left">
+          <div class="hud-label-row">
+            <div class="hud-dot"></div>
+            <div class="hud-label">Session terminée</div>
+          </div>
+          <div class="results-head-spacer"></div>
+          <div class="driver-name lg">${this.escapeHtml(summary.clientName ?? 'Pilote')}</div>
+        </div>
+        <div class="results-head-right">
+          <div class="pos-label">Position finale</div>
+          <div class="pos-spacer"></div>
+          <div class="pos-value ${posClass}">${posDisplay}</div>
+        </div>
+      </div>
+
+      <div class="divider-spacer-1"></div>
+      <div class="divider"></div>
+      <div class="divider-spacer-2"></div>
+
+      <div class="tiles">
+        <div class="tile">
+          <div class="tile-label">Circuit</div>
+          <div class="tile-spacer"></div>
+          <div class="tile-value">${this.escapeHtml(trackDisplay)}</div>
+        </div>
+        <div class="tile">
+          <div class="tile-label">Voiture</div>
+          <div class="tile-spacer"></div>
+          <div class="tile-value">${this.escapeHtml(carLabel ?? '-')}</div>
+        </div>
+        <div class="tile accent-orange">
+          <div class="tile-label">Meilleur tour</div>
+          <div class="tile-spacer"></div>
+          <div class="tile-value accent-orange">${bestLap}</div>
+        </div>
+        ${
+          bestInvalidLap
+            ? `<div class="tile accent-orange">
+          <div class="tile-label">Meilleur tour non valide (cut)</div>
+          <div class="tile-spacer"></div>
+          <div class="tile-value accent-orange">${bestInvalidLap}</div>
+        </div>`
+            : ''
+        }
+      </div>
+
+      <div class="tiles-spacer"></div>
+      ${leaderboard}
+    </div>
   </div>
-  <div class="summary">
-    <div class="tile">
-      <div class="label">Circuit</div>
-      <div class="value">${this.escapeHtml(trackDisplay)}</div>
-    </div>
-    <div class="tile">
-      <div class="label">Voiture</div>
-      <div class="value">${this.escapeHtml(carLabel ?? '-')}</div>
-    </div>
-    <div class="tile best-lap">
-      <div class="label">Meilleur tour vérifié</div>
-      <div class="value">${bestLap}</div>
-    </div>
-    ${
-      bestInvalidLap
-        ? `<div class="tile invalid-lap">
-      <div class="label">Meilleur tour non valide (cut)</div>
-      <div class="value">${bestInvalidLap}</div>
-    </div>`
-        : ''
-    }
-  </div>
-  ${leaderboard}
-  <footer>SimRacing Manager</footer>
 </body>
 </html>`;
 
@@ -775,36 +737,43 @@ export class BlankingManager {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lancement de la session</title>
-  <style>${this.commonStyles(backgroundImage ? { imagePath: backgroundImage, fit: 'cover' } : undefined)}
-  </style>
+  <style>${this.commonStyles('launch', backgroundImage ?? undefined)}</style>
 </head>
 <body>
-  <div class="checkers"></div>
-  <header>
-    <span class="flag">🏁</span>
-    <h1>Lancement en cours</h1>
-    <span class="flag">🏁</span>
-  </header>
-  <div class="bar"></div>
-  <div class="driver-banner">
-    <div class="driver-name">${this.escapeHtml(info.clientName ?? 'Pilote')}</div>
-    <div class="driver-meta">${this.escapeHtml(carLabel ?? '-')} · ${this.escapeHtml(trackDisplay)}</div>
-  </div>
-  <div class="summary">
-    <div class="tile">
-      <div class="label">Circuit</div>
-      <div class="value">${this.escapeHtml(trackDisplay)}</div>
+  <div class="scene">
+    ${
+      backgroundImage
+        ? ''
+        : `<div class="scene-texture"></div><div class="scene-glow-launch"></div><div class="scene-glow-blob"></div>`
+    }
+    <div class="panel launch-panel">
+      <div class="accent-blue"></div>
+      <div class="accent-purple"></div>
+      <div class="corner tl"></div>
+      <div class="corner br"></div>
+
+      <div class="hud-label-row">
+        <div class="hud-dot"></div>
+        <div class="hud-label">Lancement en cours</div>
+      </div>
+
+      <div class="launch-spacer-1"></div>
+      <div class="driver-name xl">${this.escapeHtml(info.clientName ?? 'Pilote')}</div>
+      <div class="launch-spacer-2"></div>
+
+      <div class="subtitle-row">
+        <span>${this.escapeHtml(carLabel ?? '-')}</span>
+        <span class="subtitle-dot"></span>
+        <span>${this.escapeHtml(trackDisplay)}</span>
+      </div>
+
+      <div class="load-spacer"></div>
+      <div class="load-row">
+        <div class="load-track"><div class="load-fill"></div></div>
+        <div class="load-label">Chargement</div>
+      </div>
     </div>
-    <div class="tile launching">
-      <div class="label">Voiture</div>
-      <div class="value">${this.escapeHtml(carLabel ?? '-')}</div>
-    </div>
   </div>
-  <div class="leaderboard placeholder">
-    <div class="spinner"></div>
-    <p>Chargement d'Assetto Corsa…</p>
-  </div>
-  <footer>SimRacing Manager</footer>
 </body>
 </html>`;
 
@@ -812,9 +781,18 @@ export class BlankingManager {
     this.launchingHtmlPath = htmlPath;
   }
 
-  private renderLeaderboard(result: RaceResultData): string {
-    const entries = getLeaderboard(result);
-    if (entries.length === 0) return '';
+  private renderLeaderboard(
+    entries: { position: number; name: string; car: string; laps: number; bestLapMs: number }[],
+  ): string {
+    const header = `<div class="lb-row-flex lb-head">
+    <div class="lb-col-pos">Pos</div>
+    <div class="lb-col-name">Pilote</div>
+    <div class="lb-col-car">Voiture</div>
+    <div class="lb-col-laps">Tours</div>
+    <div class="lb-col-time">Temps</div>
+  </div>
+  <div class="lb-divider"></div>`;
+
     const rows = entries
       .map((entry) => {
         const posClass =
@@ -825,30 +803,18 @@ export class BlankingManager {
               : entry.position === 3
                 ? 'p3'
                 : '';
-        const badgeClass = posClass || 'other';
-        return `<tr class="${posClass}">
-      <td class="pos"><span class="pos-badge ${badgeClass}">P${entry.position}</span></td>
-      <td>${this.escapeHtml(entry.name)}</td>
-      <td>${this.escapeHtml(entry.car)}</td>
-      <td class="num">${entry.laps}</td>
-      <td class="time">${formatLapTime(entry.bestLapMs)}</td>
-    </tr>`;
+        const tierClass = posClass ? 'top3' : 'other';
+        return `<div class="lb-row-flex lb-row ${posClass} ${tierClass}">
+    <div class="lb-col-pos lb-pos">${entry.position}</div>
+    <div class="lb-col-name">${this.escapeHtml(entry.name)}</div>
+    <div class="lb-col-car">${this.escapeHtml(entry.car)}</div>
+    <div class="lb-col-laps">${entry.laps}</div>
+    <div class="lb-col-time">${formatLapTime(entry.bestLapMs)}</div>
+  </div>`;
       })
       .join('');
-    return `<div class="leaderboard">
-  <table>
-    <thead>
-      <tr>
-        <th class="num">Pos</th>
-        <th>Pilote</th>
-        <th>Voiture</th>
-        <th class="num">Tours</th>
-        <th>Meilleur tour</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-</div>`;
+
+    return `${header}${rows}`;
   }
 
   private pickRandomLaunchingImage(): string | null {

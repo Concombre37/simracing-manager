@@ -41,7 +41,8 @@ export type BlankingMediaCategory = 'idle' | 'launching' | 'results';
 
 export interface BlankingMediaFile {
   id: string;
-  stationId: string;
+  /** Null for global media (launching/results — shared by every pod). */
+  stationId: string | null;
   category: BlankingMediaCategory;
   filename: string;
   mimeType: string;
@@ -114,6 +115,28 @@ export const stationsApi = {
         { mediaIds },
         { params: { category } },
       )
+      .then((res) => res.data),
+  // Global (station-less) media — "launching" and "results" only, shared by
+  // every pod. See BlankingMedia.category in @simracing/shared.
+  getGlobalBlankingMedia: (category: 'launching' | 'results') =>
+    api
+      .get<BlankingMediaFile[]>('/blanking-media/global', { params: { category } })
+      .then((res) => res.data),
+  uploadGlobalBlankingMedia: (file: File, category: 'launching' | 'results') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api
+      .post<BlankingMediaFile>('/blanking-media/global', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { category },
+      })
+      .then((res) => res.data);
+  },
+  deleteGlobalBlankingMedia: (mediaId: string) =>
+    api.delete(`/blanking-media/global/${mediaId}`).then((res) => res.data),
+  reorderGlobalBlankingMedia: (mediaIds: string[], category: 'launching' | 'results') =>
+    api
+      .patch('/blanking-media/global/reorder', { mediaIds }, { params: { category } })
       .then((res) => res.data),
   wake: (id: string) =>
     api

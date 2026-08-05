@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import { stationsApi, type Station, type BlankingMediaCategory } from '../services/stations';
+import { stationsApi, type Station } from '../services/stations';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import { downloadEnvFile } from '../utils/downloadEnv';
@@ -27,8 +27,6 @@ import {
   Eye,
   EyeOff,
   ImageIcon,
-  Rocket,
-  Award,
   Gamepad2,
   Server,
   Terminal,
@@ -65,10 +63,6 @@ export function Stations() {
     apiKey: string;
   } | null>(null);
   const [blankingStation, setBlankingStation] = useState<Station | null>(null);
-  const [mediaModalTarget, setMediaModalTarget] = useState<{
-    station: Station;
-    category: BlankingMediaCategory;
-  } | null>(null);
   const [logsStation, setLogsStation] = useState<Station | null>(null);
   const socket = useSocket('/');
 
@@ -365,22 +359,6 @@ export function Stations() {
                                 <Chip icon={ImageIcon} onClick={() => setBlankingStation(station)}>
                                   Écran d'attente
                                 </Chip>
-                                <Chip
-                                  icon={Rocket}
-                                  onClick={() =>
-                                    setMediaModalTarget({ station, category: 'launching' })
-                                  }
-                                >
-                                  Images de lancement
-                                </Chip>
-                                <Chip
-                                  icon={Award}
-                                  onClick={() =>
-                                    setMediaModalTarget({ station, category: 'results' })
-                                  }
-                                >
-                                  Logo écran de fin
-                                </Chip>
                               </CommandGroup>
                             </div>
                           )}
@@ -500,29 +478,6 @@ export function Stations() {
 
       {blankingStation && (
         <BlankingMediaModal station={blankingStation} onClose={() => setBlankingStation(null)} />
-      )}
-
-      {mediaModalTarget?.category === 'launching' && (
-        <BlankingMediaModal
-          station={mediaModalTarget.station}
-          category="launching"
-          title={`Images de lancement — ${mediaModalTarget.station.name}`}
-          emptyHint="Aucune image pour l'instant. L'écran de lancement restera en fond uni par défaut. Une image est choisie au hasard à chaque lancement de session."
-          imagesOnly
-          onClose={() => setMediaModalTarget(null)}
-        />
-      )}
-
-      {mediaModalTarget?.category === 'results' && (
-        <BlankingMediaModal
-          station={mediaModalTarget.station}
-          category="results"
-          title={`Logo écran de fin — ${mediaModalTarget.station.name}`}
-          emptyHint="Aucun logo pour l'instant. L'écran de fin de session restera en fond uni par défaut."
-          imagesOnly
-          maxItems={1}
-          onClose={() => setMediaModalTarget(null)}
-        />
       )}
 
       {logsStation && <LogsModal station={logsStation} onClose={() => setLogsStation(null)} />}

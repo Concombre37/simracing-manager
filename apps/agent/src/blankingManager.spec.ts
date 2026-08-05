@@ -487,7 +487,7 @@ describe('BlankingManager', () => {
     });
     const { resultsHtmlPath } = lastSpawnArgs();
     const html = readFileSync(resultsHtmlPath!, 'utf-8');
-    expect(html).toContain('Meilleur tour vérifié');
+    expect(html).toContain('Meilleur tour');
     expect(html).toContain('non valide (cut)');
   });
 
