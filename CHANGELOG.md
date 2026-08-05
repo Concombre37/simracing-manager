@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.99 — Le logo devient le vrai fond de l'écran de résultats
+
+### Changé
+
+- **Demandé par l'utilisateur : "il faut les images et le logo que je donne, pas le fond par défaut".** Le logo de résultats (catégorie globale `results`) n'était affiché qu'en petit filigrane centré, faiblement opaque, par-dessus le dégradé de fond par défaut — qui restait donc toujours visible. Le logo est désormais utilisé comme **vrai fond d'écran** (plein cadre, même traitement `cover` + voile sombre que les photos de lancement), et le dégradé/texture/anneau/texte "AC" par défaut ne s'affichent plus du tout dès qu'un logo est configuré — exactement le même comportement que l'écran de lancement avec ses photos.
+
 ## v2.2.98 — Le décompte de session démarre au retrait du blanking, pas au lancement
 
 ### Changé

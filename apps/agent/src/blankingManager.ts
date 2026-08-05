@@ -510,10 +510,6 @@ export class BlankingManager {
       font-size: 10.156vw; font-weight: 700; letter-spacing: 0.2em;
       color: rgba(255,255,255,0.035);
     }
-    .scene-watermark-logo {
-      position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
-      width: 16vw; height: auto; opacity: 0.14;
-    }
     .panel {
       position: relative;
       box-sizing: border-box;
@@ -642,23 +638,21 @@ export class BlankingManager {
           ? `<div class="placeholder-box"><div class="spinner"></div>Chargement du classement…</div>`
           : `<div class="placeholder-box">Classement indisponible</div>`;
 
-    const watermark = this.resultsLogoPath
-      ? `<img class="scene-watermark-logo" src="${this.toFileUrl(this.resultsLogoPath)}" alt="">`
-      : `<div class="scene-watermark-text">AC</div>`;
-
     const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Session terminée</title>
-  <style>${this.commonStyles('results')}</style>
+  <style>${this.commonStyles('results', this.resultsLogoPath ?? undefined)}</style>
 </head>
 <body>
   <div class="scene">
-    <div class="scene-texture"></div>
-    <div class="scene-ring"></div>
-    ${watermark}
+    ${
+      this.resultsLogoPath
+        ? ''
+        : `<div class="scene-texture"></div><div class="scene-ring"></div><div class="scene-watermark-text">AC</div>`
+    }
     <div class="panel results-panel">
       <div class="accent-blue"></div>
       <div class="accent-purple"></div>
