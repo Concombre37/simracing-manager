@@ -2,11 +2,13 @@ import fs from 'fs/promises';
 import path from 'path';
 import axios from 'axios';
 import { Logger } from 'pino';
-import { BlankingMediaFile } from '@simracing/shared';
+import { BlankingMediaCategory, BlankingMediaFile } from '@simracing/shared';
 import { config } from './config';
 import { BlankingManager } from './blankingManager';
 
-const MEDIA_DIR = path.join(process.env.TEMP || '/tmp', 'simracing-manager', 'blanking-media');
+const MEDIA_ROOT_DIR = path.join(process.env.TEMP || '/tmp', 'simracing-manager', 'blanking-media');
+
+const CATEGORIES: BlankingMediaCategory[] = ['idle', 'launching', 'results'];
 
 export class BlankingMediaSync {
   constructor(
@@ -15,60 +17,89 @@ export class BlankingMediaSync {
   ) {}
 
   async sync(stationId: string, apiKey?: string): Promise<void> {
-    try {
-      const token = apiKey ?? config.API_KEY;
-      if (!token) {
-        this.logger.warn('No API key available, skipping blanking media sync');
-        return;
+    const token = apiKey ?? config.API_KEY;
+    if (!token) {
+      this.logger.warn('No API key available, skipping blanking media sync');
+      return;
+    }
+
+    for (const category of CATEGORIES) {
+      try {
+        const keptPaths = await this.syncCategory(stationId, category, token);
+        this.applyPaths(category, keptPaths);
+      } catch (err) {
+        this.logger.error({ err, category }, 'Failed to sync blanking media');
       }
-
-      this.logger.info('Syncing blanking media');
-      const { data: mediaList } = await axios.get<BlankingMediaFile[]>(
-        `${config.SERVER_URL}/api/stations/${stationId}/blanking-media`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      await fs.mkdir(MEDIA_DIR, { recursive: true });
-
-      const localFiles = await this.listLocalFiles();
-      const remoteIds = new Set<string>();
-      const keptPaths: string[] = [];
-
-      for (const media of mediaList) {
-        remoteIds.add(media.id);
-        const ext = path.extname(media.filename) || this.mimeToExt(media.mimeType);
-        const localPath = path.join(MEDIA_DIR, `${media.id}${ext}`);
-        keptPaths.push(localPath);
-
-        if (!localFiles.has(`${media.id}${ext}`)) {
-          await this.downloadMedia(media, localPath, token);
-        }
-      }
-
-      // Remove local files no longer in the remote list
-      for (const localFile of localFiles) {
-        const localPath = path.join(MEDIA_DIR, localFile);
-        const fileId = path.basename(localFile, path.extname(localFile));
-        if (!remoteIds.has(fileId)) {
-          try {
-            await fs.unlink(localPath);
-            this.logger.debug({ localPath }, 'Removed stale blanking media');
-          } catch (err) {
-            this.logger.debug({ err, localPath }, 'Failed to remove stale blanking media');
-          }
-        }
-      }
-
-      this.blankingManager.setMediaPaths(keptPaths);
-      this.logger.info({ count: keptPaths.length }, 'Blanking media sync complete');
-    } catch (err) {
-      this.logger.error({ err }, 'Failed to sync blanking media');
     }
   }
 
-  private async listLocalFiles(): Promise<Set<string>> {
+  private async syncCategory(
+    stationId: string,
+    category: BlankingMediaCategory,
+    token: string,
+  ): Promise<string[]> {
+    this.logger.info({ category }, 'Syncing blanking media');
+    const { data: mediaList } = await axios.get<BlankingMediaFile[]>(
+      `${config.SERVER_URL}/api/stations/${stationId}/blanking-media`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { category },
+      },
+    );
+
+    const dir = path.join(MEDIA_ROOT_DIR, category);
+    await fs.mkdir(dir, { recursive: true });
+
+    const localFiles = await this.listLocalFiles(dir);
+    const remoteIds = new Set<string>();
+    const keptPaths: string[] = [];
+
+    for (const media of mediaList) {
+      remoteIds.add(media.id);
+      const ext = path.extname(media.filename) || this.mimeToExt(media.mimeType);
+      const localPath = path.join(dir, `${media.id}${ext}`);
+      keptPaths.push(localPath);
+
+      if (!localFiles.has(`${media.id}${ext}`)) {
+        await this.downloadMedia(media, localPath, token);
+      }
+    }
+
+    // Remove local files no longer in the remote list
+    for (const localFile of localFiles) {
+      const localPath = path.join(dir, localFile);
+      const fileId = path.basename(localFile, path.extname(localFile));
+      if (!remoteIds.has(fileId)) {
+        try {
+          await fs.unlink(localPath);
+          this.logger.debug({ localPath }, 'Removed stale blanking media');
+        } catch (err) {
+          this.logger.debug({ err, localPath }, 'Failed to remove stale blanking media');
+        }
+      }
+    }
+
+    this.logger.info({ category, count: keptPaths.length }, 'Blanking media sync complete');
+    return keptPaths;
+  }
+
+  private applyPaths(category: BlankingMediaCategory, paths: string[]): void {
+    switch (category) {
+      case 'idle':
+        this.blankingManager.setMediaPaths(paths);
+        break;
+      case 'launching':
+        this.blankingManager.setLaunchingMediaPaths(paths);
+        break;
+      case 'results':
+        this.blankingManager.setResultsLogoPath(paths[0] ?? null);
+        break;
+    }
+  }
+
+  private async listLocalFiles(dir: string): Promise<Set<string>> {
     try {
-      const entries = await fs.readdir(MEDIA_DIR, { withFileTypes: true });
+      const entries = await fs.readdir(dir, { withFileTypes: true });
       return new Set(entries.filter((e) => e.isFile()).map((e) => e.name));
     } catch {
       return new Set();

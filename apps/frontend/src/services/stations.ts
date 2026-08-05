@@ -37,9 +37,12 @@ export interface StationWithApiKey extends Station {
   apiKey: string;
 }
 
+export type BlankingMediaCategory = 'idle' | 'launching' | 'results';
+
 export interface BlankingMediaFile {
   id: string;
   stationId: string;
+  category: BlankingMediaCategory;
   filename: string;
   mimeType: string;
   sizeBytes: number;
@@ -65,23 +68,31 @@ export const stationsApi = {
   syncContent: (id: string) => api.post(`/stations/${id}/sync-content`).then((res) => res.data),
   getLogs: (id: string) =>
     api.get<{ lines: string[] }>(`/stations/${id}/logs`).then((res) => res.data),
-  getBlankingMedia: (id: string) =>
-    api.get<BlankingMediaFile[]>(`/stations/${id}/blanking-media`).then((res) => res.data),
-  uploadBlankingMedia: (id: string, file: File) => {
+  getBlankingMedia: (id: string, category: BlankingMediaCategory = 'idle') =>
+    api
+      .get<BlankingMediaFile[]>(`/stations/${id}/blanking-media`, { params: { category } })
+      .then((res) => res.data),
+  uploadBlankingMedia: (id: string, file: File, category: BlankingMediaCategory = 'idle') => {
     const formData = new FormData();
     formData.append('file', file);
     return api
       .post<BlankingMediaFile>(`/stations/${id}/blanking-media`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        params: { category },
       })
       .then((res) => res.data);
   },
   deleteBlankingMedia: (stationId: string, mediaId: string) =>
     api.delete(`/stations/${stationId}/blanking-media/${mediaId}`).then((res) => res.data),
-  uploadBlankingMediaBulk: (stationIds: string[], file: File) => {
+  uploadBlankingMediaBulk: (
+    stationIds: string[],
+    file: File,
+    category: BlankingMediaCategory = 'idle',
+  ) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('stationIds', JSON.stringify(stationIds));
+    formData.append('category', category);
     return api
       .post<{ success: number; failed: { stationId: string; reason: string }[] }>(
         '/blanking-media/bulk',
@@ -92,9 +103,17 @@ export const stationsApi = {
       )
       .then((res) => res.data);
   },
-  reorderBlankingMedia: (stationId: string, mediaIds: string[]) =>
+  reorderBlankingMedia: (
+    stationId: string,
+    mediaIds: string[],
+    category: BlankingMediaCategory = 'idle',
+  ) =>
     api
-      .patch(`/stations/${stationId}/blanking-media/reorder`, { mediaIds })
+      .patch(
+        `/stations/${stationId}/blanking-media/reorder`,
+        { mediaIds },
+        { params: { category } },
+      )
       .then((res) => res.data),
   wake: (id: string) =>
     api

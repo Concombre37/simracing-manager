@@ -76,9 +76,12 @@ export interface RacePlayer {
   laps: number;
 }
 
+export type BlankingMediaCategory = 'idle' | 'launching' | 'results';
+
 export interface BlankingMediaFile {
   id: string;
   stationId: string;
+  category: BlankingMediaCategory;
   filename: string;
   mimeType: string;
   sizeBytes: number;

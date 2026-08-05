@@ -5,6 +5,7 @@ import {
   Patch,
   Delete,
   Param,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFile,
@@ -21,7 +22,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminOrStationAuthGuard } from '../auth/guards/admin-or-station-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '@simracing/shared';
+import { UserRole, BlankingMediaCategory } from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { BlankingMediaService } from './blanking-media.service';
 import {
@@ -29,14 +30,34 @@ import {
   ReorderBlankingMediaDto,
 } from './dto/reorder-blanking-media.dto';
 
+const VALID_CATEGORIES: BlankingMediaCategory[] = [
+  'idle',
+  'launching',
+  'results',
+];
+
+function parseCategory(raw: string | undefined): BlankingMediaCategory {
+  if (!raw) return 'idle';
+  if (!VALID_CATEGORIES.includes(raw as BlankingMediaCategory)) {
+    throw new BadRequestException(`Invalid category: ${raw}`);
+  }
+  return raw as BlankingMediaCategory;
+}
+
 @Controller()
 export class BlankingMediaController {
   constructor(private readonly blankingMediaService: BlankingMediaService) {}
 
   @Get('stations/:id/blanking-media')
   @UseGuards(AdminOrStationAuthGuard)
-  async findByStation(@Param('id') stationId: string) {
-    return this.blankingMediaService.findByStation(stationId);
+  async findByStation(
+    @Param('id') stationId: string,
+    @Query('category') category?: string,
+  ) {
+    return this.blankingMediaService.findByStation(
+      stationId,
+      parseCategory(category),
+    );
   }
 
   @Post('stations/:id/blanking-media')
@@ -46,11 +67,16 @@ export class BlankingMediaController {
   async upload(
     @Param('id') stationId: string,
     @UploadedFile() file: Express.Multer.File,
+    @Query('category') category?: string,
   ) {
     if (!file) {
       throw new NotFoundException('No file uploaded');
     }
-    return this.blankingMediaService.upload(stationId, file);
+    return this.blankingMediaService.upload(
+      stationId,
+      file,
+      parseCategory(category),
+    );
   }
 
   @Patch('stations/:id/blanking-media/reorder')
@@ -60,8 +86,13 @@ export class BlankingMediaController {
     @Param('id') stationId: string,
     @Body(new ZodValidationPipe(reorderBlankingMediaSchema))
     dto: ReorderBlankingMediaDto,
+    @Query('category') category?: string,
   ) {
-    await this.blankingMediaService.reorder(stationId, dto.mediaIds);
+    await this.blankingMediaService.reorder(
+      stationId,
+      dto.mediaIds,
+      parseCategory(category),
+    );
     return { success: true };
   }
 
@@ -82,6 +113,7 @@ export class BlankingMediaController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadBulk(
     @Body('stationIds') stationIdsRaw: string,
+    @Body('category') category: string | undefined,
     @UploadedFile() file: Express.Multer.File,
   ) {
     if (!file) {
@@ -109,7 +141,11 @@ export class BlankingMediaController {
       throw new BadRequestException('At least one station must be selected');
     }
 
-    return this.blankingMediaService.uploadToStations(stationIds, file);
+    return this.blankingMediaService.uploadToStations(
+      stationIds,
+      file,
+      parseCategory(category),
+    );
   }
 
   @Get('blanking-media/:id/download')

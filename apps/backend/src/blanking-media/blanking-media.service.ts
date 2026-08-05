@@ -8,6 +8,7 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { BlankingMediaCategory } from '@simracing/shared';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'blanking-media');
 
@@ -21,9 +22,16 @@ const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
 const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
 
+// Only the idle waiting screen supports video slideshows; the launching
+// screen (rotating background images) and the results screen (a single
+// static logo) are both still images rendered under HTML text overlays.
+const IMAGE_ONLY_CATEGORIES: BlankingMediaCategory[] = ['launching', 'results'];
+const SINGLE_ITEM_CATEGORIES: BlankingMediaCategory[] = ['results'];
+
 export interface BlankingMediaFile {
   id: string;
   stationId: string;
+  category: BlankingMediaCategory;
   filename: string;
   mimeType: string;
   sizeBytes: number;
@@ -40,17 +48,21 @@ export class BlankingMediaService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async findByStation(stationId: string): Promise<BlankingMediaFile[]> {
+  async findByStation(
+    stationId: string,
+    category: BlankingMediaCategory = 'idle',
+  ): Promise<BlankingMediaFile[]> {
     const station = await this.findStationByIdOrStationId(stationId);
 
     const media = await this.prisma.blankingMedia.findMany({
-      where: { stationId: station.id },
+      where: { stationId: station.id, category },
       orderBy: { order: 'asc' },
     });
 
     return media.map((m) => ({
       id: m.id,
       stationId: m.stationId,
+      category: m.category as BlankingMediaCategory,
       filename: m.filename,
       mimeType: m.mimeType,
       sizeBytes: m.sizeBytes,
@@ -64,19 +76,21 @@ export class BlankingMediaService {
   async upload(
     stationId: string,
     file: Express.Multer.File,
+    category: BlankingMediaCategory = 'idle',
   ): Promise<BlankingMediaFile> {
     const station = await this.findStationByIdOrStationId(stationId);
-    return this.saveMediaForStation(station, file);
+    return this.saveMediaForStation(station, file, category);
   }
 
   async uploadToStations(
     stationIds: string[],
     file: Express.Multer.File,
+    category: BlankingMediaCategory = 'idle',
   ): Promise<{
     success: number;
     failed: { stationId: string; reason: string }[];
   }> {
-    this.validateFile(file);
+    this.validateFile(file, category);
 
     const stations = await this.prisma.station.findMany({
       where: { id: { in: stationIds } },
@@ -94,7 +108,7 @@ export class BlankingMediaService {
     let success = 0;
     for (const station of stations) {
       try {
-        await this.saveMediaForStation(station, file);
+        await this.saveMediaForStation(station, file, category);
         success++;
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error';
@@ -105,11 +119,15 @@ export class BlankingMediaService {
     return { success, failed };
   }
 
-  async reorder(stationId: string, mediaIds: string[]): Promise<void> {
+  async reorder(
+    stationId: string,
+    mediaIds: string[],
+    category: BlankingMediaCategory = 'idle',
+  ): Promise<void> {
     const station = await this.findStationByIdOrStationId(stationId);
 
     const media = await this.prisma.blankingMedia.findMany({
-      where: { stationId: station.id },
+      where: { stationId: station.id, category },
     });
 
     const mediaIdsSet = new Set(media.map((m) => m.id));
@@ -152,9 +170,10 @@ export class BlankingMediaService {
       // Ignore cleanup errors
     }
 
-    // Compact remaining orders
+    // Compact remaining orders (scoped to the same category — order is
+    // only meaningful within a category's own playlist/slot)
     const remaining = await this.prisma.blankingMedia.findMany({
-      where: { stationId: station.id },
+      where: { stationId: station.id, category: media.category },
       orderBy: { order: 'asc' },
     });
     await this.prisma.$transaction(
@@ -192,10 +211,16 @@ export class BlankingMediaService {
     };
   }
 
-  private validateFile(file: Express.Multer.File): void {
-    if (!ALLOWED_TYPES.includes(file.mimetype)) {
+  private validateFile(
+    file: Express.Multer.File,
+    category: BlankingMediaCategory,
+  ): void {
+    const allowedTypes = IMAGE_ONLY_CATEGORIES.includes(category)
+      ? ALLOWED_IMAGE_TYPES
+      : ALLOWED_TYPES;
+    if (!allowedTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        `File type not allowed: ${file.mimetype}. Allowed: ${ALLOWED_TYPES.join(', ')}`,
+        `File type not allowed: ${file.mimetype}. Allowed: ${allowedTypes.join(', ')}`,
       );
     }
 
@@ -209,9 +234,23 @@ export class BlankingMediaService {
   private async saveMediaForStation(
     station: { id: string; stationId: string },
     file: Express.Multer.File,
+    category: BlankingMediaCategory,
   ): Promise<BlankingMediaFile> {
+    this.validateFile(file, category);
+
+    // Categories like the results logo only ever hold a single file — a new
+    // upload replaces whatever was there before instead of appending.
+    if (SINGLE_ITEM_CATEGORIES.includes(category)) {
+      const existing = await this.prisma.blankingMedia.findMany({
+        where: { stationId: station.id, category },
+      });
+      for (const old of existing) {
+        await this.deleteMediaFile(station.id, old);
+      }
+    }
+
     const maxOrderRow = await this.prisma.blankingMedia.findFirst({
-      where: { stationId: station.id },
+      where: { stationId: station.id, category },
       orderBy: { order: 'desc' },
     });
     const nextOrder = (maxOrderRow?.order ?? -1) + 1;
@@ -229,6 +268,7 @@ export class BlankingMediaService {
       data: {
         id,
         stationId: station.id,
+        category,
         filename: file.originalname,
         mimeType: file.mimetype,
         sizeBytes: file.size,
@@ -241,6 +281,7 @@ export class BlankingMediaService {
     return {
       id: media.id,
       stationId: media.stationId,
+      category: media.category as BlankingMediaCategory,
       filename: media.filename,
       mimeType: media.mimeType,
       sizeBytes: media.sizeBytes,
@@ -249,6 +290,20 @@ export class BlankingMediaService {
       createdAt: media.createdAt,
       updatedAt: media.updatedAt,
     };
+  }
+
+  private async deleteMediaFile(
+    stationDbId: string,
+    media: { id: string; filename: string; mimeType: string },
+  ): Promise<void> {
+    await this.prisma.blankingMedia.delete({ where: { id: media.id } });
+    const ext = path.extname(media.filename) || this.mimeToExt(media.mimeType);
+    const filePath = path.join(UPLOAD_DIR, stationDbId, `${media.id}${ext}`);
+    try {
+      await fs.unlink(filePath);
+    } catch {
+      // Ignore cleanup errors
+    }
   }
 
   private async findStationByIdOrStationId(id: string) {

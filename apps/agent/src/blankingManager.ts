@@ -85,6 +85,8 @@ export class BlankingManager {
   private scriptPath: string | null = null;
   private playlistPath: string | null = null;
   private mediaPaths: string[] = [];
+  private launchingMediaPaths: string[] = [];
+  private resultsLogoPath: string | null = null;
   private slideIntervalMs = 10000;
   private resultsHtmlPath: string | null = null;
   private launchingHtmlPath: string | null = null;
@@ -326,6 +328,29 @@ export class BlankingManager {
     }
   }
 
+  /**
+   * Background images available for the "session launching" screen. One is
+   * picked at random each time generateLaunchingHtml() runs (a new session
+   * starting), for visual variety across launches — not applied live to a
+   * screen that's already showing (same lazy-apply approach as the results
+   * logo, see setResultsLogoPath()).
+   */
+  setLaunchingMediaPaths(paths: string[]): void {
+    this.launchingMediaPaths = paths;
+    this.logger.info({ count: paths.length }, 'Launching screen media paths updated');
+  }
+
+  /**
+   * Single logo image for the "session results" screen — unlike the
+   * launching screen's rotating photos, this is one static brand mark, so
+   * no randomness/playlist here. Applied the next time generateResultsHtml()
+   * runs rather than forcing a live restart of an already-visible screen.
+   */
+  setResultsLogoPath(path: string | null): void {
+    this.resultsLogoPath = path;
+    this.logger.info({ hasLogo: path !== null }, 'Results screen logo path updated');
+  }
+
   isBlankingActive(): boolean {
     return this.process !== null && !this.process.killed;
   }
@@ -409,7 +434,12 @@ export class BlankingManager {
   // clamp()/conic-gradient. Layout uses flexbox/vw units and a
   // repeating-linear-gradient checkerboard, all supported in IE11 edge mode
   // (see the FEATURE_BROWSER_EMULATION fix in blanking.ps1).
-  private commonStyles(): string {
+  private commonStyles(background?: { imagePath: string; fit: 'cover' | 'logo' }): string {
+    const imageLayer = background
+      ? background.fit === 'cover'
+        ? `linear-gradient(rgba(5,5,8,0.45), rgba(5,5,8,0.45)), url('${this.toFileUrl(background.imagePath)}') center/cover no-repeat,`
+        : `url('${this.toFileUrl(background.imagePath)}') center/auto 30vh no-repeat,`
+      : '';
     return `
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
@@ -417,6 +447,7 @@ export class BlankingManager {
       background:
         radial-gradient(circle at 50% -10%, rgba(255,51,51,0.16) 0%, transparent 55%),
         radial-gradient(circle at 50% 110%, rgba(168,85,247,0.12) 0%, transparent 55%),
+        ${imageLayer}
         #050508;
       color: #fff;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -682,7 +713,7 @@ export class BlankingManager {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Session terminée</title>
-  <style>${this.commonStyles()}
+  <style>${this.commonStyles(this.resultsLogoPath ? { imagePath: this.resultsLogoPath, fit: 'logo' } : undefined)}
   </style>
 </head>
 <body>
@@ -736,6 +767,7 @@ export class BlankingManager {
     const trackDisplay = info.trackLayout
       ? `${trackLabel} (${info.trackLayout})`
       : (trackLabel ?? '-');
+    const backgroundImage = this.pickRandomLaunchingImage();
 
     const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -743,7 +775,7 @@ export class BlankingManager {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lancement de la session</title>
-  <style>${this.commonStyles()}
+  <style>${this.commonStyles(backgroundImage ? { imagePath: backgroundImage, fit: 'cover' } : undefined)}
   </style>
 </head>
 <body>
@@ -817,6 +849,18 @@ export class BlankingManager {
     <tbody>${rows}</tbody>
   </table>
 </div>`;
+  }
+
+  private pickRandomLaunchingImage(): string | null {
+    if (this.launchingMediaPaths.length === 0) return null;
+    const index = Math.floor(Math.random() * this.launchingMediaPaths.length);
+    return this.launchingMediaPaths[index];
+  }
+
+  private toFileUrl(filePath: string): string {
+    const normalized = filePath.replace(/\\/g, '/');
+    const withLeadingSlash = normalized.startsWith('/') ? normalized : `/${normalized}`;
+    return `file://${encodeURI(withLeadingSlash)}`;
   }
 
   private escapeHtml(value: string): string {

@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.95 — Images personnalisées pour les écrans de lancement et de fin
+
+### Ajouté
+
+- **Demandé par l'utilisateur : "avoir plusieurs images pour le blanking screen de start et juste le logo en fin".** `BlankingMedia` gère désormais 3 catégories bien distinctes par station : `idle` (écran d'attente existant, inchangé — diaporama images/vidéos), `launching` (nouveau — plusieurs images de fond, une choisie au hasard à chaque lancement de session) et `results` (nouveau — un seul logo, remplacé si un nouvel upload arrive). Chaque catégorie a son propre stockage/upload/liste côté backend (`?category=` sur les endpoints `blanking-media` existants, défaut `idle` pour rester compatible), sa propre synchronisation locale côté agent (dossiers séparés), et sa propre logique d'affichage — aucun mélange possible entre les trois écrans.
+- Écran de lancement : l'image choisie remplit tout le fond (`cover`) avec un léger voile sombre pour garder le texte (pilote/voiture/circuit) lisible par-dessus.
+- Écran de fin : le logo s'affiche en incrustation centrée (`contain`, ~30% de la hauteur d'écran), pas étiré en plein écran, pour ne pas déformer un logo.
+- Nouveau : deux boutons "Images de lancement" et "Logo écran de fin" dans le panneau "Écran" de chaque station (dashboard), même interface que l'écran d'attente existant (glisser-déposer, suppression), sans réordonnancement pour le logo (un seul fichier).
+- Prochaine étape (hors de cette version) : demander les visuels eux-mêmes à un outil de design, puis les uploader via ces nouveaux boutons.
+
 ## v2.2.94 — Retrait du forçage FULLSCREEN au lancement
 
 ### Corrigé

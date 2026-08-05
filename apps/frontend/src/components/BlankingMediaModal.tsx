@@ -2,42 +2,71 @@ import { useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
-import { stationsApi, type BlankingMediaFile, type Station } from '../services/stations';
+import {
+  stationsApi,
+  type BlankingMediaCategory,
+  type BlankingMediaFile,
+  type Station,
+} from '../services/stations';
 import { Upload, Trash2, ChevronUp, ChevronDown, ImageIcon, Film, X } from 'lucide-react';
 
 interface BlankingMediaModalProps {
   station: Station;
   onClose: () => void;
+  category?: BlankingMediaCategory;
+  title?: string;
+  emptyHint?: string;
+  /** Images only (no video) when set — used for launching/results, which are rendered as static backgrounds. */
+  imagesOnly?: boolean;
+  /** Caps the list to a single file — a new upload replaces it (enforced backend-side too), reorder controls are hidden. */
+  maxItems?: number;
 }
 
-export function BlankingMediaModal({ station, onClose }: BlankingMediaModalProps) {
+const CATEGORY_LABELS: Record<BlankingMediaCategory, string> = {
+  idle: "Écran d'attente",
+  launching: 'Écran de lancement',
+  results: 'Logo écran de fin',
+};
+
+export function BlankingMediaModal({
+  station,
+  onClose,
+  category = 'idle',
+  title,
+  emptyHint,
+  imagesOnly = false,
+  maxItems,
+}: BlankingMediaModalProps) {
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const queryKey = ['blanking-media', station.id, category];
 
   const { data: media, isLoading } = useQuery({
-    queryKey: ['blanking-media', station.id],
-    queryFn: () => stationsApi.getBlankingMedia(station.id),
+    queryKey,
+    queryFn: () => stationsApi.getBlankingMedia(station.id, category),
   });
 
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => stationsApi.uploadBlankingMedia(station.id, file),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blanking-media', station.id] }),
+    mutationFn: (file: File) => stationsApi.uploadBlankingMedia(station.id, file, category),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (mediaId: string) => stationsApi.deleteBlankingMedia(station.id, mediaId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blanking-media', station.id] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 
   const reorderMutation = useMutation({
-    mutationFn: (mediaIds: string[]) => stationsApi.reorderBlankingMedia(station.id, mediaIds),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['blanking-media', station.id] }),
+    mutationFn: (mediaIds: string[]) =>
+      stationsApi.reorderBlankingMedia(station.id, mediaIds, category),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
   });
 
   const handleFiles = (files: FileList | null) => {
     if (!files) return;
-    Array.from(files).forEach((file) => uploadMutation.mutate(file));
+    const toUpload = maxItems === 1 ? Array.from(files).slice(-1) : Array.from(files);
+    toUpload.forEach((file) => uploadMutation.mutate(file));
   };
 
   const moveItem = (index: number, direction: -1 | 1) => {
@@ -50,8 +79,14 @@ export function BlankingMediaModal({ station, onClose }: BlankingMediaModalProps
     reorderMutation.mutate(reordered.map((m) => m.id));
   };
 
+  const atCapacity = maxItems !== undefined && (media?.length ?? 0) >= maxItems;
+
   return (
-    <Modal title={`Écran d'attente — ${station.name}`} onClose={onClose} size="lg">
+    <Modal
+      title={title ?? `${CATEGORY_LABELS[category]} — ${station.name}`}
+      onClose={onClose}
+      size="lg"
+    >
       <div className="space-y-6">
         <div
           onDragOver={(e) => {
@@ -73,14 +108,24 @@ export function BlankingMediaModal({ station, onClose }: BlankingMediaModalProps
         >
           <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
           <p className="text-sm text-gray-300">
-            Glisse-dépose des images ou vidéos ici, ou clique pour sélectionner
+            {atCapacity
+              ? 'Glisse-dépose une image ici pour remplacer celle en place'
+              : imagesOnly
+                ? 'Glisse-dépose des images ici, ou clique pour sélectionner'
+                : 'Glisse-dépose des images ou vidéos ici, ou clique pour sélectionner'}
           </p>
-          <p className="text-xs text-gray-500 mt-1">PNG, JPG, WEBP, MP4, WEBM — max 100 Mo</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {imagesOnly ? 'PNG, JPG, WEBP' : 'PNG, JPG, WEBP, MP4, WEBM'} — max 100 Mo
+          </p>
           <input
             ref={fileInputRef}
             type="file"
-            multiple
-            accept="image/png,image/jpeg,image/jpg,image/webp,video/mp4,video/webm"
+            multiple={maxItems !== 1}
+            accept={
+              imagesOnly
+                ? 'image/png,image/jpeg,image/jpg,image/webp'
+                : 'image/png,image/jpeg,image/jpg,image/webp,video/mp4,video/webm'
+            }
             className="hidden"
             onChange={(e) => handleFiles(e.target.files)}
           />
@@ -90,7 +135,7 @@ export function BlankingMediaModal({ station, onClose }: BlankingMediaModalProps
 
         {media && media.length === 0 && !isLoading && (
           <p className="text-center text-gray-500 text-sm">
-            Aucun média pour l'instant. L'écran d'attente restera noir par défaut.
+            {emptyHint ?? "Aucun média pour l'instant. L'écran d'attente restera noir par défaut."}
           </p>
         )}
 
@@ -102,7 +147,7 @@ export function BlankingMediaModal({ station, onClose }: BlankingMediaModalProps
                 media={m}
                 index={index}
                 total={media.length}
-                onMove={moveItem}
+                onMove={maxItems === 1 ? undefined : moveItem}
                 onDelete={() => deleteMutation.mutate(m.id)}
                 isDeleting={deleteMutation.isPending && deleteMutation.variables === m.id}
               />
@@ -131,7 +176,7 @@ function MediaItem({
   media: BlankingMediaFile;
   index: number;
   total: number;
-  onMove: (index: number, direction: -1 | 1) => void;
+  onMove?: (index: number, direction: -1 | 1) => void;
   onDelete: () => void;
   isDeleting: boolean;
 }) {
@@ -168,20 +213,24 @@ function MediaItem({
         </div>
 
         <div className="flex items-center gap-1">
-          <button
-            onClick={() => onMove(index, -1)}
-            disabled={index === 0}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg disabled:opacity-30"
-          >
-            <ChevronUp className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => onMove(index, 1)}
-            disabled={index === total - 1}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg disabled:opacity-30"
-          >
-            <ChevronDown className="w-4 h-4" />
-          </button>
+          {onMove && (
+            <>
+              <button
+                onClick={() => onMove(index, -1)}
+                disabled={index === 0}
+                className="p-1.5 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg disabled:opacity-30"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => onMove(index, 1)}
+                disabled={index === total - 1}
+                className="p-1.5 text-gray-400 hover:text-white hover:bg-dark-700 rounded-lg disabled:opacity-30"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </>
+          )}
           <button
             onClick={onDelete}
             disabled={isDeleting}
