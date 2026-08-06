@@ -3,7 +3,7 @@ param(
   [string]$Action = 'Enter',
   [string]$GameProcessName = 'acs',
   [string]$SkipTitle = 'SimRacingBlanking',
-  [int]$ForegroundTimeoutMs = 20000
+  [int]$ForegroundTimeoutMs = 6000
 )
 
 Add-Type -TypeDefinition @'

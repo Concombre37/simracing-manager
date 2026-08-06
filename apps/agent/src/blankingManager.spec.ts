@@ -435,7 +435,7 @@ describe('BlankingManager', () => {
     expect(html).toContain('ks_monza');
   });
 
-  it('crossfades between multiple launching background images with a rotation script', () => {
+  it('crossfades between multiple launching background images with a pure-CSS keyframe loop', () => {
     manager.setAuto();
     manager.setAcRunning(false);
     manager.setLaunchingMediaPaths([
@@ -449,14 +449,18 @@ describe('BlankingManager', () => {
     const { resultsHtmlPath } = lastSpawnArgs();
     const html = readFileSync(resultsHtmlPath!, 'utf-8');
     expect(html.match(/scene-bg-layer/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(html).toContain('scene-bg-layer active');
-    expect(html).toContain('setInterval');
+    expect(html).toContain('scene-bg-layer slideshow');
+    expect(html).toContain('@keyframes scene-bg-slideshow');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('animation-delay:0ms');
+    expect(html).toContain('animation-delay:2500ms');
+    expect(html).toContain('animation-delay:5000ms');
     expect(html).toContain('launch1.jpg');
     expect(html).toContain('launch2.jpg');
     expect(html).toContain('launch3.jpg');
   });
 
-  it('does not emit a rotation script for a single launching background image', () => {
+  it('does not emit a rotation keyframe for a single launching background image', () => {
     manager.setAuto();
     manager.setAcRunning(false);
     manager.setLaunchingMediaPaths(['C:\\media\\launch1.jpg']);
@@ -466,7 +470,9 @@ describe('BlankingManager', () => {
     const { resultsHtmlPath } = lastSpawnArgs();
     const html = readFileSync(resultsHtmlPath!, 'utf-8');
     expect(html).toContain('scene-bg-layer active');
-    expect(html).not.toContain('setInterval');
+    expect(html).not.toContain('scene-bg-layer slideshow');
+    expect(html).not.toContain('@keyframes scene-bg-slideshow');
+    expect(html).not.toContain('<script>');
   });
 
   it('updates the launching screen in place without restarting when already showing it', () => {

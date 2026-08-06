@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.101 — Correctifs suite au premier vrai test sur POD (diaporama figé, blanking qui ne se retire pas)
+
+### Corrigé
+
+- **Signalé par l'utilisateur après la mise à jour v2.2.100 sur `desktop-gl3t50t` : les images de lancement ne tournaient pas, et le blanking ne se retirait pas ~5s après la mise en Drive.** La série v2.2.84→v2.2.100 (dont le diaporama et le mécanisme de confirmation `notifyDriveTriggered`/`revealThenStop`) n'avait jamais tourné sur du vrai matériel avant cette mise à jour — seulement testée via les mocks Vitest.
+- **Diaporama** : la rotation reposait sur un `<script>` (`setInterval`) — le tout premier script embarqué dans ces écrans, jamais exécuté en conditions réelles dans le moteur IE11 de la WebBrowser control WPF. Remplacée par une **animation CSS `@keyframes` pure** (`scene-bg-layer.slideshow` + `animation-delay` décalé par image), la même technique déjà utilisée avec succès dans ce fichier pour le spinner et la barre de chargement — aucune dépendance à l'exécution de JS dans ce moteur.
+- **Blanking qui ne se retire pas** : `BlankingManager.revealThenStop()` attendait `onGameRevealed()` (`KioskManager.revealGame()`, un spawn PowerShell) sans aucune limite de temps propre — si ce spawn restait bloqué (process PowerShell coincé), `this.revealing` restait `true` pour toujours et **plus aucun appel ultérieur ne pouvait jamais retirer le blanking**, pour le reste de la session voire des sessions suivantes. Trois filets de sécurité imbriqués ajoutés : le timeout interne de `kiosk.ps1` (`ForegroundTimeoutMs`, réduit de 20s à 6s), un nouveau timeout côté agent dans `KioskManager.runAwaited()` (9s, force-kill le process PowerShell s'il n'est pas sorti), et un nouveau `REVEAL_WATCHDOG_MS` (12s) dans `revealThenStop()` lui-même qui force la suite même si tout le reste est resté bloqué. Fait aussi tomber le pire cas total (3 tentatives) de 60s à 36s.
+
 ## v2.2.100 — Diaporama en fondu pour les images de lancement
 
 ### Changé

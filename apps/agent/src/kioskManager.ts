@@ -99,6 +99,12 @@ export class KioskManager {
       return Promise.resolve(false);
     }
     return new Promise((resolve) => {
+      let settled = false;
+      const settle = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
       try {
         const proc = spawn('powershell.exe', this.buildArgs(extraArgs), {
           windowsHide: true,
@@ -106,12 +112,26 @@ export class KioskManager {
         });
         proc.on('error', (err) => {
           this.logger.error({ err }, 'Kiosk script failed to start');
-          resolve(false);
+          settle(false);
         });
-        proc.on('exit', (code) => resolve(code === 0));
+        proc.on('exit', (code) => settle(code === 0));
+        // Belt-and-suspenders: kiosk.ps1 has its own internal timeout
+        // (ForegroundTimeoutMs) that should always make it exit on its own,
+        // but a wedged PowerShell process (stuck behind a dialog, a hung
+        // Win32 call) would otherwise leave this promise — and everything
+        // waiting on it, i.e. BlankingManager.revealThenStop() — unresolved
+        // indefinitely. If the script hasn't exited by itself well past its
+        // own timeout, force-kill it and treat it as a failed confirmation
+        // rather than hanging forever.
+        setTimeout(() => {
+          if (settled) return;
+          this.logger.warn('Kiosk script did not exit in time, killing it');
+          proc.kill('SIGKILL');
+          settle(false);
+        }, 9000).unref();
       } catch (err) {
         this.logger.error({ err }, 'Failed to spawn kiosk script');
-        resolve(false);
+        settle(false);
       }
     });
   }

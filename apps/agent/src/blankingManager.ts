@@ -22,6 +22,21 @@ const MAX_EARLY_EXIT_RETRIES = 3;
  * against a single transient tasklist.exe/shared-memory glitch yanking
  * blanking back over a live race. See evaluate(). */
 const MISSING_STREAK_THRESHOLD_DURING_SESSION = 3;
+/** Time each launching-screen background photo stays as the visible one
+ * before crossfading to the next (see renderSlideshowStyles()). */
+const SLIDESHOW_INTERVAL_MS = 2500;
+/** Duration of the opacity crossfade between two consecutive photos —
+ * carved out of the tail end of each SLIDESHOW_INTERVAL_MS slot. */
+const SLIDESHOW_CROSSFADE_MS = 1200;
+/** Hard cap on how long a single revealThenStop() attempt waits on
+ * onGameRevealed() before treating it as "not confirmed" and moving on
+ * (retry, or give up and hide anyway on the last attempt) — see
+ * revealThenStop(). This is the outermost of three nested timeouts and
+ * should normally never be the one that fires: kiosk.ps1's own
+ * ForegroundTimeoutMs (6s) times out first, then KioskManager's own
+ * force-kill watchdog (9s) if the PowerShell process itself gets wedged;
+ * this 12s one only matters if something upstream of both of those hangs. */
+const REVEAL_WATCHDOG_MS = 12000;
 
 interface SessionResultsSummary {
   clientName?: string;
@@ -506,6 +521,7 @@ export class BlankingManager {
       left: 0; right: 0; top: 0; bottom: 0;
       background: rgba(5,5,8,0.5);
     }
+    ${this.renderSlideshowStyles(photoPaths.length)}
     .scene-glow-launch {
       position: absolute; left: 0; right: 0; bottom: 0; height: 10.156vw;
       background: linear-gradient(to top, rgba(0,87,255,0.14), rgba(0,0,0,0));
@@ -784,7 +800,6 @@ export class BlankingManager {
       </div>
     </div>
   </div>
-  ${this.renderSlideshowScript(backgroundImages.length)}
 </body>
 </html>`;
 
@@ -840,42 +855,57 @@ export class BlankingManager {
     return shuffled;
   }
 
-  /** Stacked, absolutely-positioned background images crossfaded by
-   * .scene-bg-layer's opacity transition — see renderSlideshowScript() for
-   * the rotation timer. A single path (the results logo, or a launching
-   * screen with only one image configured) renders the same way, just with
-   * nothing to rotate to. */
+  /** Stacked, absolutely-positioned background images. A single path (the
+   * results logo, or a launching screen with only one image configured)
+   * just gets the initial fade-in (.active, see the .scene-bg-layer
+   * transition rule) and stays there. Multiple paths instead get the
+   * `slideshow` class plus a staggered `animation-delay` — see
+   * renderSlideshowStyles() for the actual rotation, driven entirely by a
+   * CSS @keyframes loop rather than a JS timer (see that method for why). */
   private renderSceneBackgroundLayers(photoPaths: string[]): string {
     if (photoPaths.length === 0) return '';
+    const rotating = photoPaths.length > 1;
     const layers = photoPaths
-      .map(
-        (p, i) =>
-          `<div class="scene-bg-layer${i === 0 ? ' active' : ''}" style="background-image:url('${this.toFileUrl(p)}')"></div>`,
-      )
+      .map((p, i) => {
+        const cls = rotating ? 'scene-bg-layer slideshow' : 'scene-bg-layer active';
+        const style = rotating
+          ? `background-image:url('${this.toFileUrl(p)}');animation-delay:${i * SLIDESHOW_INTERVAL_MS}ms`
+          : `background-image:url('${this.toFileUrl(p)}')`;
+        return `<div class="${cls}" style="${style}"></div>`;
+      })
       .join('');
     return `${layers}<div class="scene-bg-overlay"></div>`;
   }
 
   /** Rotates the launching screen's background photos every ~2.5s with a
-   * crossfade (the .scene-bg-layer opacity transition does the actual
-   * fading — this just toggles which layer is .active). Rendered inside a
+   * crossfade, purely via a CSS @keyframes loop (no JS): every
+   * `.scene-bg-layer.slideshow` plays the *same* keyframes/duration, each
+   * with its own `animation-delay` (0, interval, 2*interval, ...) so they
+   * take turns being the one at opacity 1 — the standard delay-staggered
+   * pure-CSS crossfade technique. Deliberately not implemented as a JS
+   * setInterval (an earlier version was): this HTML is rendered inside a
    * WPF WebBrowser control locked to IE11 (see blanking.ps1's
-   * FEATURE_BROWSER_EMULATION), so this must be plain ES5: no let/const, no
-   * arrow functions, no template literals. Omitted entirely when there's
-   * nothing to rotate between (0 or 1 images). */
-  private renderSlideshowScript(count: number): string {
+   * FEATURE_BROWSER_EMULATION) where script execution has never actually
+   * been exercised by anything in this codebase, unlike CSS @keyframes
+   * (already used and confirmed working for the spinner/loading-bar
+   * animations elsewhere in this same stylesheet) — so this avoids
+   * depending on a code path with no track record in this rendering engine.
+   * Omitted entirely when there's nothing to rotate between (0 or 1
+   * images). */
+  private renderSlideshowStyles(count: number): string {
     if (count <= 1) return '';
-    return `<script>
-(function () {
-  var layers = document.getElementsByClassName('scene-bg-layer');
-  var current = 0;
-  setInterval(function () {
-    layers[current].className = 'scene-bg-layer';
-    current = (current + 1) % layers.length;
-    layers[current].className = 'scene-bg-layer active';
-  }, 2500);
-})();
-</script>`;
+    const totalMs = SLIDESHOW_INTERVAL_MS * count;
+    const slotPct = 100 / count;
+    const fadePct = (SLIDESHOW_CROSSFADE_MS / totalMs) * 100;
+    const fadeStartPct = Math.max(0, slotPct - fadePct).toFixed(3);
+    return `
+    @keyframes scene-bg-slideshow {
+      0% { opacity: 1; }
+      ${fadeStartPct}% { opacity: 1; }
+      ${slotPct.toFixed(3)}% { opacity: 0; }
+      100% { opacity: 0; }
+    }
+    .scene-bg-layer.slideshow { animation: scene-bg-slideshow ${totalMs}ms ease-in-out infinite; }`;
   }
 
   private toFileUrl(filePath: string): string {
@@ -1191,7 +1221,21 @@ export class BlankingManager {
     }
     this.revealing = true;
     const maxAttempts = 3;
-    void (result as Promise<boolean>).then((confirmed) => {
+    // onGameRevealed() (KioskManager.revealGame(), a PowerShell spawn) is
+    // expected to always settle on its own — but if it ever doesn't (a
+    // wedged child process that never fires 'exit'/'error', e.g. stuck
+    // behind a dialog), `this.revealing` would stay true forever and this
+    // whole guard-checked method — the ONLY path that ever removes blanking
+    // — would permanently no-op from then on, even for future sessions.
+    // REVEAL_WATCHDOG_MS caps that: whichever settles first wins, so a wedged
+    // confirmation still counts as "not confirmed" instead of hanging the
+    // agent's blanking logic forever.
+    void Promise.race([
+      result as Promise<boolean>,
+      new Promise<boolean>((resolve) =>
+        setTimeout(() => resolve(false), REVEAL_WATCHDOG_MS).unref(),
+      ),
+    ]).then((confirmed) => {
       this.revealing = false;
       if (confirmed || attempt >= maxAttempts) {
         if (confirmed) {
