@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.100 — Diaporama en fondu pour les images de lancement
+
+### Changé
+
+- **Demandé par l'utilisateur : "j'aimerais que chaque Images de lancement ce change avec une jolie transition toute les 2-3 secondes".** L'écran "Lancement en cours" affichait une seule image de fond, choisie au hasard parmi la playlist `launching` au début de chaque session, fixe pour toute sa durée. Il affiche maintenant **toutes** les images de la playlist, empilées et fondues en fondu enchaîné les unes sur les autres toutes les 2,5s (transition CSS `opacity` de 1,2s). L'ordre de rotation est mélangé à chaque nouveau lancement (même intention de variété qu'avant, plus poussée). Une playlist à une seule image reste statique (aucune rotation inutile) ; playlist vide inchangée (dégradé/texture par défaut).
+- `BlankingManager.commonStyles()` généralisé pour prendre un tableau d'images au lieu d'une seule (`photoPaths: string[]`) — réutilisé tel quel par l'écran de résultats (toujours un logo unique, donc jamais de rotation là) pour éviter deux mécanismes de fond d'écran qui divergent avec le temps.
+- Rotation implémentée en JS ES5 pur (`var`, pas de flèches/template literals) car rendue dans le moteur IE11 de la WebBrowser control WPF (`blanking.ps1`) — aucun script embarqué n'existait avant dans ces écrans.
+
 ## v2.2.99 — Le logo devient le vrai fond de l'écran de résultats
 
 ### Changé

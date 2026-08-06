@@ -435,6 +435,40 @@ describe('BlankingManager', () => {
     expect(html).toContain('ks_monza');
   });
 
+  it('crossfades between multiple launching background images with a rotation script', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.setLaunchingMediaPaths([
+      'C:\\media\\launch1.jpg',
+      'C:\\media\\launch2.jpg',
+      'C:\\media\\launch3.jpg',
+    ]);
+
+    manager.showLaunching({ clientName: 'Alice', carAcId: 'ks_porsche_911', track: 'ks_monza' });
+
+    const { resultsHtmlPath } = lastSpawnArgs();
+    const html = readFileSync(resultsHtmlPath!, 'utf-8');
+    expect(html.match(/scene-bg-layer/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(html).toContain('scene-bg-layer active');
+    expect(html).toContain('setInterval');
+    expect(html).toContain('launch1.jpg');
+    expect(html).toContain('launch2.jpg');
+    expect(html).toContain('launch3.jpg');
+  });
+
+  it('does not emit a rotation script for a single launching background image', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.setLaunchingMediaPaths(['C:\\media\\launch1.jpg']);
+
+    manager.showLaunching({ clientName: 'Alice', carAcId: 'ks_porsche_911', track: 'ks_monza' });
+
+    const { resultsHtmlPath } = lastSpawnArgs();
+    const html = readFileSync(resultsHtmlPath!, 'utf-8');
+    expect(html).toContain('scene-bg-layer active');
+    expect(html).not.toContain('setInterval');
+  });
+
   it('updates the launching screen in place without restarting when already showing it', () => {
     manager.setAuto();
     manager.setAcRunning(false);

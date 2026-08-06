@@ -452,12 +452,13 @@ export class BlankingManager {
   // background opacity alone, panel corners are square, and every row/column
   // layout below uses flexbox (with `gap`, already proven to work in this
   // exact engine by the pre-existing header/summary rules) instead of grid.
-  private commonStyles(screen: 'launch' | 'results', photoPath?: string): string {
-    const sceneBackground = photoPath
-      ? `linear-gradient(rgba(5,5,8,0.5), rgba(5,5,8,0.5)), url('${this.toFileUrl(photoPath)}') center/cover no-repeat, #08080c`
-      : screen === 'launch'
-        ? 'radial-gradient(120% 100% at 18% 40%, #1b2740 0%, #12141f 45%, #08080c 100%)'
-        : 'radial-gradient(90% 120% at 50% 45%, #172033 0%, #0f1119 50%, #07070b 100%)';
+  private commonStyles(screen: 'launch' | 'results', photoPaths: string[] = []): string {
+    const sceneBackground =
+      photoPaths.length > 0
+        ? '#08080c'
+        : screen === 'launch'
+          ? 'radial-gradient(120% 100% at 18% 40%, #1b2740 0%, #12141f 45%, #08080c 100%)'
+          : 'radial-gradient(90% 120% at 50% 45%, #172033 0%, #0f1119 50%, #07070b 100%)';
 
     return `
     * { box-sizing: border-box; }
@@ -489,6 +490,21 @@ export class BlankingManager {
       position: absolute;
       inset: 0;
       background: repeating-linear-gradient(108deg, rgba(255,255,255,0.035) 0 2px, rgba(255,255,255,0) 2px 160px);
+    }
+    .scene-bg-layer {
+      position: absolute;
+      left: 0; right: 0; top: 0; bottom: 0;
+      background-position: center;
+      background-size: cover;
+      background-repeat: no-repeat;
+      opacity: 0;
+      transition: opacity 1.2s ease-in-out;
+    }
+    .scene-bg-layer.active { opacity: 1; }
+    .scene-bg-overlay {
+      position: absolute;
+      left: 0; right: 0; top: 0; bottom: 0;
+      background: rgba(5,5,8,0.5);
     }
     .scene-glow-launch {
       position: absolute; left: 0; right: 0; bottom: 0; height: 10.156vw;
@@ -644,13 +660,13 @@ export class BlankingManager {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Session terminée</title>
-  <style>${this.commonStyles('results', this.resultsLogoPath ?? undefined)}</style>
+  <style>${this.commonStyles('results', this.resultsLogoPath ? [this.resultsLogoPath] : [])}</style>
 </head>
 <body>
   <div class="scene">
     ${
       this.resultsLogoPath
-        ? ''
+        ? this.renderSceneBackgroundLayers([this.resultsLogoPath])
         : `<div class="scene-texture"></div><div class="scene-ring"></div><div class="scene-watermark-text">AC</div>`
     }
     <div class="panel results-panel">
@@ -723,7 +739,7 @@ export class BlankingManager {
     const trackLabel = info.trackName ?? info.track;
     const carLabel = info.carName ?? info.carAcId;
     const trackDisplay = trackLabel ?? '-';
-    const backgroundImage = this.pickRandomLaunchingImage();
+    const backgroundImages = this.shuffleLaunchingImages();
 
     const html = `<!DOCTYPE html>
 <html lang="fr">
@@ -731,13 +747,13 @@ export class BlankingManager {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lancement de la session</title>
-  <style>${this.commonStyles('launch', backgroundImage ?? undefined)}</style>
+  <style>${this.commonStyles('launch', backgroundImages)}</style>
 </head>
 <body>
   <div class="scene">
     ${
-      backgroundImage
-        ? ''
+      backgroundImages.length > 0
+        ? this.renderSceneBackgroundLayers(backgroundImages)
         : `<div class="scene-texture"></div><div class="scene-glow-launch"></div><div class="scene-glow-blob"></div>`
     }
     <div class="panel launch-panel">
@@ -768,6 +784,7 @@ export class BlankingManager {
       </div>
     </div>
   </div>
+  ${this.renderSlideshowScript(backgroundImages.length)}
 </body>
 </html>`;
 
@@ -811,10 +828,54 @@ export class BlankingManager {
     return `${header}${rows}`;
   }
 
-  private pickRandomLaunchingImage(): string | null {
-    if (this.launchingMediaPaths.length === 0) return null;
-    const index = Math.floor(Math.random() * this.launchingMediaPaths.length);
-    return this.launchingMediaPaths[index];
+  /** Shuffled once per launch so the starting image and the rotation order
+   * both vary session to session, instead of always cycling the same
+   * playlist in upload order. */
+  private shuffleLaunchingImages(): string[] {
+    const shuffled = [...this.launchingMediaPaths];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }
+
+  /** Stacked, absolutely-positioned background images crossfaded by
+   * .scene-bg-layer's opacity transition — see renderSlideshowScript() for
+   * the rotation timer. A single path (the results logo, or a launching
+   * screen with only one image configured) renders the same way, just with
+   * nothing to rotate to. */
+  private renderSceneBackgroundLayers(photoPaths: string[]): string {
+    if (photoPaths.length === 0) return '';
+    const layers = photoPaths
+      .map(
+        (p, i) =>
+          `<div class="scene-bg-layer${i === 0 ? ' active' : ''}" style="background-image:url('${this.toFileUrl(p)}')"></div>`,
+      )
+      .join('');
+    return `${layers}<div class="scene-bg-overlay"></div>`;
+  }
+
+  /** Rotates the launching screen's background photos every ~2.5s with a
+   * crossfade (the .scene-bg-layer opacity transition does the actual
+   * fading — this just toggles which layer is .active). Rendered inside a
+   * WPF WebBrowser control locked to IE11 (see blanking.ps1's
+   * FEATURE_BROWSER_EMULATION), so this must be plain ES5: no let/const, no
+   * arrow functions, no template literals. Omitted entirely when there's
+   * nothing to rotate between (0 or 1 images). */
+  private renderSlideshowScript(count: number): string {
+    if (count <= 1) return '';
+    return `<script>
+(function () {
+  var layers = document.getElementsByClassName('scene-bg-layer');
+  var current = 0;
+  setInterval(function () {
+    layers[current].className = 'scene-bg-layer';
+    current = (current + 1) % layers.length;
+    layers[current].className = 'scene-bg-layer active';
+  }, 2500);
+})();
+</script>`;
   }
 
   private toFileUrl(filePath: string): string {
