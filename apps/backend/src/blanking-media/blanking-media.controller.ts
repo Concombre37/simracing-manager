@@ -16,8 +16,6 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
-import { createReadStream } from 'fs';
-import { stat } from 'fs/promises';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AdminOrStationAuthGuard } from '../auth/guards/admin-or-station-auth.guard';
@@ -208,18 +206,10 @@ export class BlankingMediaController {
 
   @Get('blanking-media/:id/download')
   async download(@Param('id') id: string, @Res() res: Response) {
-    const fileInfo = await this.blankingMediaService.getFilePath(id);
-    try {
-      const fileStat = await stat(fileInfo.path);
-      res.setHeader('Content-Type', fileInfo.mimeType);
-      res.setHeader('Content-Length', fileStat.size);
-      res.setHeader(
-        'Content-Disposition',
-        `inline; filename="${fileInfo.filename}"`,
-      );
-      createReadStream(fileInfo.path).pipe(res);
-    } catch {
-      throw new NotFoundException('Media file not found on disk');
-    }
+    const file = await this.blankingMediaService.getFileData(id);
+    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Length', file.data.length);
+    res.setHeader('Content-Disposition', `inline; filename="${file.filename}"`);
+    res.send(file.data);
   }
 }
