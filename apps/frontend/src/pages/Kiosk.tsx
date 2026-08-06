@@ -38,7 +38,11 @@ import {
   Users,
   Square,
   Clock4,
-  Home,
+  Flag,
+  X,
+  Eraser,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react';
 
 type Tab = 'servers' | 'stations';
@@ -61,6 +65,11 @@ function formatClock(totalSeconds: number): string {
     return `${hours}h ${minutes.toString().padStart(2, '0')}m`;
   }
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function formatHHMM(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 }
 
 interface PodConfig {
@@ -95,25 +104,40 @@ const DURATION_OPTIONS: { value: number | undefined; label: string }[] = [
   { value: 60, label: '60 min' },
 ];
 
+const DEFAULT_POD_CONFIG: PodConfig = {
+  clientName: '',
+  difficulty: 'PRO',
+  gearbox: 'MANUAL',
+  carAcId: '',
+  durationMinutes: 15,
+};
+
 /**
  * Touch-friendly "operator" kiosk view — no sidebar (see KioskRoute in
  * App.tsx), meant for a terminal at the venue rather than a passive
  * TV/wall display like SessionsKiosk. Covers the loop that actually
- * repeats all day: glance at POD/server status, send a POD onto a running
- * server. Creating/editing/deleting servers stays on the full admin page
- * (/dedicated-servers) — an infrequent setup action, not worth duplicating
- * the whole wizard here.
+ * repeats all day: glance at POD/server status, send one or more PODs
+ * onto a running server. Creating/editing/deleting servers stays on the
+ * full admin page (/dedicated-servers) — an infrequent setup action, not
+ * worth duplicating the whole wizard here.
+ *
+ * Visual language (racing-blue/cyan HUD, corner brackets, condensed
+ * uppercase type) matches the agent's in-game blanking screens
+ * (blankingManager.ts) — from the same Claude Design mockup
+ * ("Kiosque HUD"), so the kiosk and the in-game overlay read as one
+ * system.
  */
 export function Kiosk() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const socket = useSocket('/');
   const [tab, setTab] = useState<Tab>('stations');
+  const [selectedPodIds, setSelectedPodIds] = useState<string[]>([]);
+  const [podPickerOpen, setPodPickerOpen] = useState(false);
   const [sendTarget, setSendTarget] = useState<{
     server: DedicatedServer;
-    preselect?: string;
+    preselectStationIds?: string[];
   } | null>(null);
-  const [pickServerFor, setPickServerFor] = useState<string | null>(null);
 
   const { data: stations } = useQuery({
     queryKey: ['stations'],
@@ -180,38 +204,76 @@ export function Kiosk() {
     [servers],
   );
 
-  function handleSendFromStation(stationId: string) {
-    if (runningServers.length === 0) {
-      navigate('/kiosk/dedicated-servers/create');
-      return;
-    }
-    if (runningServers.length === 1) {
-      setSendTarget({ server: runningServers[0], preselect: stationId });
-    } else {
-      setPickServerFor(stationId);
-    }
+  const occupiedStationIds = useMemo(
+    () => new Set((sessions ?? []).map((s) => s.station.stationId)),
+    [sessions],
+  );
+
+  const freePodCount = useMemo(
+    () =>
+      (stations ?? []).filter(
+        (s) =>
+          s.role === 'simulator' &&
+          (s.status === 'online' || s.status === 'in_game') &&
+          !occupiedStationIds.has(s.stationId),
+      ).length,
+    [stations, occupiedStationIds],
+  );
+
+  function togglePod(stationId: string) {
+    setSelectedPodIds((prev) =>
+      prev.includes(stationId) ? prev.filter((id) => id !== stationId) : [...prev, stationId],
+    );
+  }
+
+  function openServerPicker() {
+    if (selectedPodIds.length === 0) return;
+    setPodPickerOpen(true);
+  }
+
+  function pickServer(server: DedicatedServer) {
+    setPodPickerOpen(false);
+    setSendTarget({ server, preselectStationIds: selectedPodIds });
+    setSelectedPodIds([]);
   }
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-dark-950 p-4 md:p-6">
-      <header className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-black uppercase tracking-wide text-white">
-          SimRacing Manager <span className="text-accent-orange">Kiosque</span>
-        </h1>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/"
-            className="flex items-center gap-2 rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400 transition-colors hover:border-accent-orange/50 hover:text-white"
-          >
-            <Home className="h-4 w-4" />
-            Accueil
-          </Link>
-          <Link
-            to="/en-cours/kiosk"
-            className="rounded-full border border-dark-600 bg-dark-800/70 px-4 py-1.5 text-sm font-semibold text-gray-400 transition-colors hover:border-accent-orange/50 hover:text-white"
-          >
-            Voir les sessions
-          </Link>
+    <div className="relative flex h-screen w-screen flex-col overflow-hidden bg-dark-950">
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            'radial-gradient(1400px 700px at 50% -18%, rgba(0,87,255,.16), transparent 70%)',
+        }}
+      />
+
+      <header className="relative z-10 flex flex-wrap items-center gap-4 border-b border-white/10 px-6 py-4 md:px-8">
+        <div className="flex flex-none items-center gap-3">
+          <div className="grid h-11 w-11 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-racing-blue to-racing-cyan text-dark-950 shadow-[0_0_24px_rgba(0,120,255,0.45)]">
+            <Flag className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="whitespace-nowrap font-hud text-xl font-bold leading-none tracking-wide text-white">
+              Mode kiosque
+            </h1>
+            <p className="mt-1 whitespace-nowrap font-hud-mono text-xs text-sky-200/70">
+              Touchez un POD pour l'envoyer en course
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="flex flex-none flex-wrap items-center gap-4 md:gap-6">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 animate-pulse-glow rounded-full bg-accent-green shadow-[0_0_10px_#22c55e]" />
+            <span className="whitespace-nowrap font-hud text-sm font-bold text-emerald-300">
+              {freePodCount} POD{freePodCount !== 1 ? 's' : ''} libre{freePodCount !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <span className="whitespace-nowrap border-l border-white/10 pl-4 font-hud-mono text-2xl font-bold text-white">
+            {formatHHMM(now)}
+          </span>
           <div className="flex items-center gap-1 rounded-full border border-dark-600 bg-dark-800/70 p-1">
             <TabButton
               active={tab === 'servers'}
@@ -226,10 +288,23 @@ export function Kiosk() {
               label="Postes"
             />
           </div>
+          <Link
+            to="/en-cours/kiosk"
+            className="whitespace-nowrap rounded-lg border border-white/10 px-3 py-2 font-hud text-sm font-bold text-gray-400 transition-colors hover:border-racing-cyan/40 hover:text-sky-200"
+          >
+            Sessions
+          </Link>
+          <Link
+            to="/"
+            className="flex items-center gap-2 whitespace-nowrap rounded-lg border border-white/10 px-3 py-2 font-hud text-sm font-bold text-gray-400 transition-colors hover:border-red-500/40 hover:text-red-300"
+          >
+            <X className="h-4 w-4" />
+            Quitter
+          </Link>
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto pr-1">
+      <div className="relative z-10 flex-1 overflow-y-auto px-6 py-6 md:px-8">
         {tab === 'servers' ? (
           <ServersTab
             servers={servers ?? []}
@@ -244,8 +319,8 @@ export function Kiosk() {
             content={contentByStationId}
             liveData={liveData}
             now={now}
-            canSend={runningServers.length > 0}
-            onSend={handleSendFromStation}
+            selectedPodIds={selectedPodIds}
+            onTogglePod={togglePod}
             onCommand={(stationId, command) =>
               socket?.emit('station:command', { stationId, command })
             }
@@ -253,32 +328,73 @@ export function Kiosk() {
         )}
       </div>
 
-      {pickServerFor && (
-        <Modal title="Choisir un serveur" onClose={() => setPickServerFor(null)} size="sm">
-          <div className="space-y-2">
-            {runningServers.map((server) => (
-              <button
-                key={server.id}
-                type="button"
-                onClick={() => {
-                  setSendTarget({ server, preselect: pickServerFor });
-                  setPickServerFor(null);
-                }}
-                className="flex w-full items-center justify-between rounded-lg border border-dark-600 bg-dark-900 p-3 text-left transition-colors hover:border-accent-orange/50"
-              >
-                <span className="font-semibold text-white">{server.name}</span>
-                <ArrowRight className="h-4 w-4 text-gray-500" />
-              </button>
-            ))}
+      {tab === 'stations' && (
+        <div className="relative z-10 flex flex-none flex-wrap items-center gap-4 border-t border-racing-cyan/20 bg-dark-900/90 px-6 py-4 backdrop-blur md:px-8">
+          <div className="flex flex-none items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-md border border-racing-cyan/40 bg-racing-cyan/10 font-hud text-lg font-bold text-sky-200">
+              {selectedPodIds.length}
+            </div>
+            <div>
+              <p className="font-hud text-[11px] font-semibold uppercase tracking-widest text-gray-500">
+                Sélection
+              </p>
+              <p className="whitespace-nowrap font-hud text-base font-bold text-white">
+                {selectedPodIds.length === 0
+                  ? 'aucun POD'
+                  : selectedPodIds.length === 1
+                    ? '1 POD'
+                    : `${selectedPodIds.length} PODs`}
+              </p>
+            </div>
           </div>
-        </Modal>
+          <div
+            className="h-px min-w-[20px] flex-1"
+            style={{ background: 'linear-gradient(90deg, rgba(0,194,255,.3), transparent)' }}
+          />
+          <div className="flex flex-none flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setSelectedPodIds([])}
+              disabled={selectedPodIds.length === 0}
+            >
+              <Eraser className="h-4 w-4" />
+              Tout désélectionner
+            </Button>
+            <button
+              type="button"
+              onClick={openServerPicker}
+              disabled={selectedPodIds.length === 0}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-6 py-2.5 font-hud text-base font-bold tracking-wide transition-all ${
+                selectedPodIds.length > 0
+                  ? 'bg-gradient-to-r from-racing-blue to-racing-cyan text-dark-950 shadow-[0_0_28px_rgba(0,120,255,0.35)] hover:shadow-[0_0_38px_rgba(0,150,255,0.5)]'
+                  : 'cursor-not-allowed bg-white/5 text-gray-600'
+              }`}
+            >
+              <Send className="h-4 w-4" />
+              Envoyer en course
+            </button>
+          </div>
+        </div>
+      )}
+
+      {podPickerOpen && (
+        <ServerPickerOverlay
+          servers={runningServers}
+          selectedCount={selectedPodIds.length}
+          onClose={() => setPodPickerOpen(false)}
+          onPick={pickServer}
+          onCreateServer={() => {
+            setPodPickerOpen(false);
+            navigate('/kiosk/dedicated-servers/create');
+          }}
+        />
       )}
 
       {sendTarget && (
         <SendPodsModal
           server={sendTarget.server}
           stations={stations ?? []}
-          preselectStationId={sendTarget.preselect}
+          preselectStationIds={sendTarget.preselectStationIds}
           onClose={() => setSendTarget(null)}
         />
       )}
@@ -301,9 +417,9 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-bold transition-all ${
+      className={`flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-1.5 font-hud text-sm font-bold transition-all ${
         active
-          ? 'bg-accent-orange text-dark-900 shadow-lg shadow-accent-orange/30'
+          ? 'bg-gradient-to-r from-racing-blue to-racing-cyan text-dark-950 shadow-[0_0_16px_rgba(0,140,255,0.4)]'
           : 'text-gray-400 hover:text-white'
       }`}
     >
@@ -450,27 +566,14 @@ function ServersTab({
   );
 }
 
-function StationStatusBadge({ status }: { status: Station['status'] }) {
-  switch (status) {
-    case 'in_game':
-      return <Badge variant="blue">En jeu</Badge>;
-    case 'online':
-      return <Badge variant="green">En ligne</Badge>;
-    case 'updating':
-      return <Badge variant="yellow">Mise à jour</Badge>;
-    default:
-      return <Badge variant="gray">Hors ligne</Badge>;
-  }
-}
-
 function StationsTab({
   stations,
   sessions,
   content,
   liveData,
   now,
-  canSend,
-  onSend,
+  selectedPodIds,
+  onTogglePod,
   onCommand,
 }: {
   stations: Station[];
@@ -478,8 +581,8 @@ function StationsTab({
   content: Map<string, StationContent | null | undefined>;
   liveData: Record<string, TelemetrySnapshot>;
   now: number;
-  canSend: boolean;
-  onSend: (stationId: string) => void;
+  selectedPodIds: string[];
+  onTogglePod: (stationId: string) => void;
   onCommand: (stationId: string, command: string) => void;
 }) {
   const sessionByStationId = useMemo(() => {
@@ -519,9 +622,9 @@ function StationsTab({
             return (
               <div
                 key={`empty-${i}`}
-                className="flex min-h-[160px] items-center justify-center rounded-xl border border-dashed border-dark-700 bg-dark-900/30"
+                className="flex min-h-[160px] items-center justify-center rounded-xl border border-dashed border-white/10 bg-dark-900/30"
               >
-                <Monitor className="h-6 w-6 text-dark-700" />
+                <Monitor className="h-6 w-6 text-white/10" />
               </div>
             );
           }
@@ -540,8 +643,8 @@ function StationsTab({
             <PodAvailableCell
               key={station.id}
               station={station}
-              canSend={canSend}
-              onSend={() => onSend(station.stationId)}
+              selected={selectedPodIds.includes(station.stationId)}
+              onToggle={() => onTogglePod(station.stationId)}
             />
           );
         })}
@@ -568,50 +671,75 @@ function StationsTab({
 
 function PodAvailableCell({
   station,
-  canSend,
-  onSend,
+  selected,
+  onToggle,
 }: {
   station: Station;
-  canSend: boolean;
-  onSend: () => void;
+  selected: boolean;
+  onToggle: () => void;
 }) {
   const sendable = station.status === 'online' || station.status === 'in_game';
+  const variant = sendable
+    ? {
+        border: 'border-emerald-500/25',
+        bg: 'bg-gradient-to-br from-emerald-500/10 to-dark-900/60',
+        bar: 'bg-emerald-400',
+        dot: 'bg-emerald-400 shadow-[0_0_10px_#24d17e]',
+        num: 'text-emerald-400',
+        state: 'text-emerald-300',
+        stateLabel: 'Libre',
+        Icon: CheckCircle2,
+        iconColor: 'text-emerald-300',
+        meta: 'prêt à partir',
+        metaColor: 'text-gray-500',
+      }
+    : {
+        border: 'border-orange-500/25',
+        bg: 'bg-gradient-to-br from-orange-500/10 to-dark-900/60',
+        bar: 'bg-orange-400',
+        dot: 'bg-orange-400 shadow-[0_0_10px_#ff7a1a]',
+        num: 'text-orange-400',
+        state: 'text-orange-300',
+        stateLabel: 'Indisponible',
+        Icon: AlertTriangle,
+        iconColor: 'text-orange-300',
+        meta: 'agent hors ligne',
+        metaColor: 'text-orange-300/60',
+      };
+  const Icon = variant.Icon;
+
   return (
     <div
-      onClick={() => sendable && onSend()}
-      className={`flex min-h-[160px] flex-col justify-between rounded-xl border border-dark-600 bg-dark-800/70 p-4 transition-colors ${
-        sendable ? 'cursor-pointer hover:border-accent-orange/50' : 'cursor-not-allowed opacity-60'
-      }`}
+      onClick={() => sendable && onToggle()}
+      className={`relative min-h-[160px] overflow-hidden rounded-xl border p-4 transition-all ${variant.border} ${variant.bg} ${
+        sendable ? 'cursor-pointer hover:border-racing-cyan/50' : 'cursor-not-allowed opacity-70'
+      } ${selected ? 'ring-2 ring-racing-cyan shadow-[0_0_34px_rgba(0,140,255,0.35)]' : ''}`}
     >
-      <div className="mb-3 min-w-0">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <Monitor className="h-5 w-5 shrink-0 text-gray-500" />
-          <StationStatusBadge status={station.status} />
-        </div>
-        <p className="truncate font-bold text-white">{station.name}</p>
-        <p className="truncate font-mono text-[10px] text-gray-500">{station.stationId}</p>
+      <span className={`absolute inset-y-0 left-0 w-[3px] ${variant.bar}`} />
+      <span
+        className={`absolute right-2 top-2 h-3.5 w-3.5 border-r border-t ${
+          selected ? 'border-racing-cyan' : 'border-white/10'
+        }`}
+      />
+
+      <div className="flex items-center justify-between gap-2">
+        <span className={`truncate font-hud-mono text-[11px] ${variant.num}`}>
+          {station.stationId}
+        </span>
+        <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${variant.dot}`} />
       </div>
-      <Button
-        variant="success"
-        size="sm"
-        disabled={!sendable}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSend();
-        }}
-      >
-        {canSend ? (
-          <>
-            <Send className="h-4 w-4" />
-            Envoyer
-          </>
-        ) : (
-          <>
-            <Plus className="h-4 w-4" />
-            Créer un serveur
-          </>
-        )}
-      </Button>
+
+      <p className="mt-3 truncate font-hud text-2xl font-bold leading-tight text-white">
+        {station.name}
+      </p>
+      <p className={`mt-1 font-hud text-sm font-bold ${variant.state}`}>{variant.stateLabel}</p>
+
+      <div className="mt-3 flex min-h-[24px] items-center gap-2 border-t border-white/10 pt-3">
+        <Icon className={`h-4 w-4 shrink-0 ${variant.iconColor}`} />
+        <span className={`truncate font-hud-mono text-xs ${variant.metaColor}`}>
+          {variant.meta}
+        </span>
+      </div>
     </div>
   );
 }
@@ -655,49 +783,53 @@ function PodSessionCell({
   return (
     <div
       onClick={onClick}
-      className={`relative flex min-h-[160px] cursor-pointer flex-col justify-between overflow-hidden rounded-xl border bg-dark-800/70 transition-colors hover:border-accent-orange/50 ${
-        critical ? 'border-red-500/50' : 'border-dark-600'
+      className={`group relative flex min-h-[160px] cursor-pointer flex-col justify-between overflow-hidden rounded-xl border transition-colors hover:border-racing-cyan/50 ${
+        critical ? 'border-red-500/50' : 'border-racing-cyan/25'
       }`}
       style={critical ? { boxShadow: '0 0 24px -10px rgba(255,51,51,0.6)' } : undefined}
     >
-      {trackPreview ? (
+      <div className="absolute inset-0 bg-gradient-to-br from-racing-blue/15 via-dark-900/70 to-dark-950" />
+      {trackPreview && (
         <img
           src={trackPreview}
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-20"
         />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-br from-accent-orange/10 via-dark-900 to-dark-950" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-dark-900/95 via-dark-900/50 to-transparent" />
+      <span className="absolute inset-y-0 left-0 z-10 w-[3px] bg-gradient-to-b from-racing-blue to-racing-cyan" />
+      <span className="absolute right-2 top-2 z-10 h-3.5 w-3.5 border-r border-t border-racing-cyan/70" />
 
       <div className="relative z-10 flex h-full flex-col justify-between p-3">
         <div className="min-w-0">
-          <p className="truncate text-[9px] font-bold uppercase tracking-widest text-accent-orange">
-            {station.name}
-          </p>
-          <h3 className="truncate text-base font-black uppercase leading-tight text-white">
+          <div className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-racing-cyan shadow-[0_0_8px_#00c2ff]" />
+            <p className="truncate font-hud-mono text-[10px] font-bold uppercase tracking-widest text-sky-300">
+              {station.name}
+            </p>
+          </div>
+          <h3 className="mt-1 truncate font-hud text-lg font-bold uppercase leading-tight text-white">
             {session.clientName || station.name}
           </h3>
-          <p className="truncate text-[11px] text-gray-400">{carName ?? '—'}</p>
+          <p className="truncate font-hud-mono text-[11px] text-sky-200/60">{carName ?? '—'}</p>
         </div>
 
-        <div className="mt-2 flex items-end justify-between">
+        <div className="mt-2 flex items-end justify-between border-t border-white/10 pt-2">
           <div>
-            <p className="text-[9px] uppercase tracking-wide text-gray-500">Vitesse</p>
+            <p className="font-hud text-[9px] uppercase tracking-wide text-gray-500">Vitesse</p>
             <p
-              className={`font-mono text-xl font-bold tabular-nums ${stale ? 'text-gray-500' : 'text-accent-blue'}`}
+              className={`font-hud-mono text-xl font-bold tabular-nums ${stale ? 'text-gray-500' : 'text-racing-cyan'}`}
             >
               {stale ? '—' : Math.round(telemetry!.speedKmh)}
               <span className="ml-1 text-[10px] text-gray-500">km/h</span>
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[9px] uppercase tracking-wide text-gray-500">
+            <p className="font-hud text-[9px] uppercase tracking-wide text-gray-500">
               {remainingSeconds !== undefined ? 'Restant' : 'Écoulé'}
             </p>
             <p
-              className={`font-mono text-xl font-bold tabular-nums ${
+              className={`font-hud-mono text-xl font-bold tabular-nums ${
                 expired ? 'text-red-500' : critical ? 'animate-blink text-red-400' : 'text-white'
               }`}
             >
@@ -710,15 +842,148 @@ function PodSessionCell({
   );
 }
 
+/** Redesigned "choose a server" step — replaces the old plain Modal. Always
+ * shown when the operator confirms a POD selection (even with a single
+ * server running), so the destination is always explicit; shows a
+ * "no server" empty state with a direct create-server shortcut instead of
+ * silently redirecting, matching the Claude Design "Kiosque HUD" mockup. */
+function ServerPickerOverlay({
+  servers,
+  selectedCount,
+  onClose,
+  onPick,
+  onCreateServer,
+}: {
+  servers: DedicatedServer[];
+  selectedCount: number;
+  onClose: () => void;
+  onPick: (server: DedicatedServer) => void;
+  onCreateServer: () => void;
+}) {
+  const labelMap = useContentLabelMap();
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-3xl overflow-hidden rounded-xl border border-racing-cyan/30 bg-gradient-to-br from-[#0b1428]/95 to-dark-900/95 p-7 shadow-[0_0_60px_rgba(0,80,255,0.25)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="absolute left-2 top-2 h-4 w-4 border-l border-t border-racing-cyan/70" />
+        <span className="absolute right-2 top-2 h-4 w-4 border-r border-t border-racing-cyan/70" />
+        <span className="absolute bottom-2 left-2 h-4 w-4 border-b border-l border-racing-cyan/70" />
+        <span className="absolute bottom-2 right-2 h-4 w-4 border-b border-r border-racing-cyan/70" />
+
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-hud text-xs font-semibold uppercase tracking-widest text-racing-cyan">
+              Envoyer {selectedCount} POD{selectedCount > 1 ? 's' : ''}
+            </p>
+            <h2 className="mt-1 font-hud text-3xl font-bold text-white">Choisis le serveur</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-white/10 text-gray-400 transition-colors hover:border-red-500/40 hover:text-red-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div
+          className="my-5 h-px"
+          style={{
+            background:
+              'linear-gradient(90deg, transparent, rgba(0,194,255,.3) 6%, rgba(0,194,255,.3) 94%, transparent)',
+          }}
+        />
+
+        {servers.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-white/10 px-6 py-9 text-center">
+            <Server className="h-8 w-8 text-gray-600" />
+            <p className="font-hud text-lg font-bold text-gray-200">Aucun serveur disponible</p>
+            <p className="max-w-sm text-sm text-gray-500">
+              Crée un serveur pour envoyer {selectedCount} POD{selectedCount > 1 ? 's' : ''} en
+              course.
+            </p>
+          </div>
+        ) : (
+          <div className="flex max-h-[50vh] flex-col gap-3 overflow-y-auto pr-1">
+            {servers.map((server) => {
+              const trackName = findTrackName(
+                server.track,
+                server.station.content as { tracks?: { acId: string; name: string }[] } | undefined,
+                labelMap,
+              );
+              return (
+                <button
+                  key={server.id}
+                  type="button"
+                  onClick={() => onPick(server)}
+                  className="relative flex items-center gap-4 overflow-hidden rounded-lg border border-racing-cyan/25 bg-gradient-to-r from-racing-blue/10 to-dark-900/40 p-4 text-left transition-colors hover:border-racing-cyan/60"
+                >
+                  <span className="absolute inset-y-0 left-0 w-[3px] bg-gradient-to-b from-racing-blue to-racing-cyan" />
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-md border border-racing-cyan/25 bg-racing-cyan/10 text-sky-300">
+                    <Server className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="truncate font-hud text-xl font-bold text-white">
+                        {server.name}
+                      </span>
+                      <ServerStatusBadge status={server.status} />
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-4 font-hud text-sm font-semibold text-gray-400">
+                      <span className="flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 text-racing-cyan" />
+                        {trackName}
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5 text-racing-cyan" />
+                        {server.cars.length} voiture{server.cars.length > 1 ? 's' : ''} ·{' '}
+                        {server.maxClients} slots
+                      </span>
+                      <span className="font-hud-mono text-xs text-gray-500">
+                        {server.station.localIp ?? '—'}
+                        {server.udpPort ? `:${server.udpPort}` : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-5 w-5 shrink-0 text-sky-300" />
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-white/10 pt-5">
+          <button
+            type="button"
+            onClick={onCreateServer}
+            className="flex h-12 flex-1 items-center justify-center gap-2.5 rounded-lg bg-gradient-to-r from-racing-blue to-racing-cyan px-5 font-hud text-base font-bold tracking-wide text-dark-950 shadow-[0_0_30px_rgba(0,120,255,0.32)] transition-shadow hover:shadow-[0_0_42px_rgba(0,150,255,0.5)]"
+          >
+            <Plus className="h-4 w-4" />
+            Créer un serveur
+          </button>
+          <span className="whitespace-nowrap font-hud-mono text-xs text-gray-500">
+            circuit et voitures en 3 étapes
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SendPodsModal({
   server,
   stations,
-  preselectStationId,
+  preselectStationIds,
   onClose,
 }: {
   server: DedicatedServer;
   stations: Station[];
-  preselectStationId?: string;
+  preselectStationIds?: string[];
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -739,21 +1004,14 @@ function SendPodsModal({
     [stations, server],
   );
 
-  const [selectedIds, setSelectedIds] = useState<string[]>(
-    preselectStationId ? [preselectStationId] : [],
-  );
+  const [selectedIds, setSelectedIds] = useState<string[]>(preselectStationIds ?? []);
   const [configs, setConfigs] = useState<Record<string, PodConfig>>(() =>
-    preselectStationId
-      ? {
-          [preselectStationId]: {
-            clientName: '',
-            difficulty: 'PRO',
-            gearbox: 'MANUAL',
-            carAcId: availableCars[0] ?? '',
-            durationMinutes: 15,
-          },
-        }
-      : {},
+    Object.fromEntries(
+      (preselectStationIds ?? []).map((id) => [
+        id,
+        { ...DEFAULT_POD_CONFIG, carAcId: availableCars[0] ?? '' },
+      ]),
+    ),
   );
   const [error, setError] = useState<string | null>(null);
 
@@ -762,13 +1020,7 @@ function SendPodsModal({
       if (prev.includes(stationId)) return prev.filter((x) => x !== stationId);
       setConfigs((c) => ({
         ...c,
-        [stationId]: c[stationId] ?? {
-          clientName: '',
-          difficulty: 'PRO',
-          gearbox: 'MANUAL',
-          carAcId: availableCars[0] ?? '',
-          durationMinutes: 15,
-        },
+        [stationId]: c[stationId] ?? { ...DEFAULT_POD_CONFIG, carAcId: availableCars[0] ?? '' },
       }));
       return [...prev, stationId];
     });

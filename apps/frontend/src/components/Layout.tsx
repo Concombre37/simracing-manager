@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
+import { useSiteLogo } from '../services/stations';
 import { PageBackground } from './PageBackground';
 import {
   LayoutDashboard,
@@ -59,6 +60,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
+  const logo = useSiteLogo(!!user);
+
+  useEffect(() => {
+    if (!logo) return;
+    const link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (link) link.href = logo.downloadUrl;
+  }, [logo]);
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -80,8 +89,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
           to="/"
           className="flex h-14 shrink-0 items-center gap-3 border-b border-dark-700 px-[18px]"
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent-orange to-accent-red shadow-glow-orange">
-            <Flag className="h-[18px] w-[18px] text-white" />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-accent-orange to-accent-red shadow-glow-orange">
+            {logo ? (
+              <img src={logo.downloadUrl} alt="Logo" className="h-full w-full object-cover" />
+            ) : (
+              <Flag className="h-[18px] w-[18px] text-white" />
+            )}
           </div>
           <div className="whitespace-nowrap leading-tight opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100">
             <p className="text-base font-black tracking-tight">

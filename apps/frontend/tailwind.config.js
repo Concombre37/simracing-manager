@@ -20,9 +20,21 @@ export default {
           blue: '#00d4ff',
           purple: '#a855f7',
         },
+        // Racing-blue HUD palette — matches the agent's in-game blanking
+        // screens (blankingManager.ts's commonStyles), used for the kiosk
+        // redesign so both look like the same visual system.
+        racing: {
+          blue: '#0057ff',
+          cyan: '#00c2ff',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        // HUD display/mono faces for the kiosk redesign only — not used as
+        // the app-wide `sans`/`mono` defaults, so untouched pages keep their
+        // existing look.
+        hud: ['Rajdhani', 'sans-serif'],
+        'hud-mono': ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       backgroundImage: {
         'carbon-fiber':

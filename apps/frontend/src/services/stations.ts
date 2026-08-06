@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 
 export type StationRole = 'simulator' | 'admin';
@@ -149,3 +150,16 @@ export const stationsApi = {
   shutdown: (id: string) =>
     api.post<{ success: boolean }>(`/stations/${id}/shutdown`).then((res) => res.data),
 };
+
+/** The "results" global blanking media is a single logo shared by every pod
+ * (see BlankingMedia.category) — reused as the site's own logo/favicon so
+ * there's only one place to configure branding, not two. */
+export function useSiteLogo(enabled: boolean): BlankingMediaFile | null {
+  const { data } = useQuery({
+    queryKey: ['blanking-media', 'global', 'results'],
+    queryFn: () => stationsApi.getGlobalBlankingMedia('results'),
+    staleTime: 60_000,
+    enabled,
+  });
+  return data?.[0] ?? null;
+}

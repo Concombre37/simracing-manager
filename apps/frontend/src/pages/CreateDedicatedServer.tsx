@@ -7,10 +7,7 @@ import { stationsApi, type Station } from '../services/stations';
 import { formatTrackName, formatCarName } from '../utils/track';
 import { useContentLabelMap, type ContentLabelMap } from '../services/contentLabels';
 import { setWizardBackgroundStep } from '../components/PageBackground';
-import { PageShell } from '../components/ui/PageShell';
-import { Card } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
+import { PageTransition } from '../components/PageTransition';
 import { Input, Label } from '../components/ui/Input';
 import {
   ArrowLeft,
@@ -27,7 +24,6 @@ import {
   ImageOff,
   AlertCircle,
   RefreshCw,
-  Wifi,
   Flag,
   X,
   Minus,
@@ -35,6 +31,9 @@ import {
   ChevronDown,
   Settings2,
   Eraser,
+  ShieldCheck,
+  CheckCircle2,
+  CircleDashed,
 } from 'lucide-react';
 
 const DEFAULT_MAX_CLIENTS = 11;
@@ -269,163 +268,215 @@ export function CreateDedicatedServer() {
   };
 
   return (
-    <PageShell
-      title="Nouveau"
-      accent="serveur"
-      subtitle="Configure un serveur dédié Assetto Corsa en 3 étapes"
-      actions={
-        <Button variant="ghost" onClick={() => navigate(backPath)}>
-          <X className="h-4 w-4" />
-          Annuler
-        </Button>
-      }
-    >
-      <Stepper current={step} />
-
-      <Card padding="lg" className="flex min-h-[480px] flex-col">
-        <div className="relative flex-1 overflow-hidden">
-          <AnimatePresence mode="wait" custom={direction} initial={false}>
-            <motion.div
-              key={step}
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as const }}
-            >
-              {step === 1 && (
-                <StepStation
-                  stations={onlineStations}
-                  loading={stationsLoading}
-                  selectedId={stationId}
-                  onSelect={selectStation}
-                />
-              )}
-
-              {step === 2 && (
-                <StepTrack
-                  stationId={stationId}
-                  station={selectedStation}
-                  tracks={filteredTracks}
-                  totalTracks={content.tracks.length}
-                  search={trackSearch}
-                  onSearch={setTrackSearch}
-                  selectedTrack={selectedTrack}
-                  trackLayout={trackLayout}
-                  onSelectTrack={selectTrack}
-                  onSelectLayout={setTrackLayout}
-                  onSync={() => selectedStation && syncMutation.mutate(selectedStation.id)}
-                  isSyncing={syncMutation.isPending}
-                />
-              )}
-
-              {step === 3 && (
-                <StepConfig
-                  name={name}
-                  onName={setName}
-                  maxClients={maxClients}
-                  onMaxClients={setMaxClients}
-                  password={password}
-                  onPassword={setPassword}
-                  rconPassword={rconPassword}
-                  onRconPassword={setRconPassword}
-                  showAdvanced={showAdvanced}
-                  onToggleAdvanced={() => setShowAdvanced((v) => !v)}
-                  cars={filteredCars}
-                  totalCars={content.cars.length}
-                  carCounts={carCounts}
-                  totalSelectedCars={totalSelectedCars}
-                  onAddCar={addCar}
-                  onRemoveCar={removeCar}
-                  onFillAllWith={fillAllSlotsWith}
-                  onClearCars={clearCarSelection}
-                  carSearch={carSearch}
-                  onCarSearch={setCarSearch}
-                  station={selectedStation}
-                  track={selectedTrack}
-                  trackLayout={trackLayout}
-                />
-              )}
-            </motion.div>
-          </AnimatePresence>
+    <PageTransition>
+      <div className="space-y-6">
+        {/* HERO */}
+        <div className="flex flex-wrap items-end gap-6">
+          <div className="min-w-[260px] flex-1">
+            <div className="mb-2.5 flex items-center gap-2.5">
+              <span className="h-[5px] w-[5px] flex-none rotate-45 bg-racing-cyan shadow-[0_0_8px_#00c2ff]" />
+              <span className="whitespace-nowrap font-hud text-xs font-semibold uppercase tracking-[0.16em] text-racing-cyan">
+                Configuration en 3 étapes
+              </span>
+            </div>
+            <h1 className="font-hud text-[clamp(34px,4.4vw,48px)] font-bold leading-none tracking-tight text-white">
+              Nouveau{' '}
+              <span className="bg-gradient-to-r from-racing-blue to-racing-cyan bg-clip-text text-transparent">
+                serveur
+              </span>
+            </h1>
+            <p className="mt-2.5 font-hud-mono text-xs text-gray-500">
+              Configure un serveur dédié Assetto Corsa en 3 étapes
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(backPath)}
+            className="flex items-center gap-2 whitespace-nowrap rounded-md border border-white/10 px-4 py-2.5 font-hud text-sm font-bold tracking-wide text-gray-300 transition-colors hover:border-red-500/40 hover:text-red-300"
+          >
+            <X className="h-4 w-4" />
+            Annuler
+          </button>
         </div>
 
-        {/* Navigation du wizard */}
-        <div className="mt-6 flex items-center justify-between border-t border-dark-600 pt-6">
-          <Button variant="secondary" onClick={goPrev} disabled={step === 1}>
-            <ArrowLeft className="h-4 w-4" />
-            Précédent
-          </Button>
+        <Stepper current={step} onGo={(s) => (s <= step || canProceed()) && setStep(s)} />
 
-          <span className="font-mono text-xs tabular-nums text-gray-500">Étape {step} / 3</span>
+        <div>
+          <StepBadge
+            icon={STEPS[step - 1].icon}
+            label={`Étape ${step} · ${STEPS[step - 1].label}`}
+          />
+
+          <div className="relative mt-5 min-h-[420px] overflow-hidden">
+            <AnimatePresence mode="wait" custom={direction} initial={false}>
+              <motion.div
+                key={step}
+                custom={direction}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as const }}
+              >
+                {step === 1 && (
+                  <StepStation
+                    stations={onlineStations}
+                    loading={stationsLoading}
+                    selectedId={stationId}
+                    onSelect={selectStation}
+                  />
+                )}
+
+                {step === 2 && (
+                  <StepTrack
+                    stationId={stationId}
+                    station={selectedStation}
+                    tracks={filteredTracks}
+                    totalTracks={content.tracks.length}
+                    search={trackSearch}
+                    onSearch={setTrackSearch}
+                    selectedTrack={selectedTrack}
+                    trackLayout={trackLayout}
+                    onSelectTrack={selectTrack}
+                    onSelectLayout={setTrackLayout}
+                    onSync={() => selectedStation && syncMutation.mutate(selectedStation.id)}
+                    isSyncing={syncMutation.isPending}
+                  />
+                )}
+
+                {step === 3 && (
+                  <StepConfig
+                    name={name}
+                    onName={setName}
+                    maxClients={maxClients}
+                    onMaxClients={setMaxClients}
+                    password={password}
+                    onPassword={setPassword}
+                    rconPassword={rconPassword}
+                    onRconPassword={setRconPassword}
+                    showAdvanced={showAdvanced}
+                    onToggleAdvanced={() => setShowAdvanced((v) => !v)}
+                    cars={filteredCars}
+                    totalCars={content.cars.length}
+                    carCounts={carCounts}
+                    totalSelectedCars={totalSelectedCars}
+                    onAddCar={addCar}
+                    onRemoveCar={removeCar}
+                    onFillAllWith={fillAllSlotsWith}
+                    onClearCars={clearCarSelection}
+                    carSearch={carSearch}
+                    onCarSearch={setCarSearch}
+                    station={selectedStation}
+                    track={selectedTrack}
+                    trackLayout={trackLayout}
+                  />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* PIED */}
+        <div className="flex flex-wrap items-center gap-4 border-t border-white/10 pt-5">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={step === 1}
+            className="flex h-10 items-center gap-2 whitespace-nowrap rounded-md border border-white/10 px-4 font-hud text-sm font-bold text-gray-300 transition-colors hover:border-racing-cyan/40 hover:text-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Précédent
+          </button>
+
+          <span className="min-w-[8px] flex-1 text-center font-hud-mono text-xs text-gray-500">
+            Étape {step} / 3
+          </span>
 
           {step < 3 ? (
-            <Button variant="primary" onClick={goNext} disabled={!canProceed()}>
-              Suivant
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              onClick={handleSubmit}
-              disabled={!canSubmit}
-              isLoading={createMutation.isPending}
+            <button
+              type="button"
+              onClick={goNext}
+              disabled={!canProceed()}
+              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-md bg-gradient-to-r from-racing-blue to-racing-cyan px-5 font-hud text-sm font-bold tracking-wide text-dark-950 shadow-[0_0_24px_rgba(0,120,255,0.3)] transition-shadow hover:shadow-[0_0_34px_rgba(0,150,255,0.5)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
-              <Flag className="h-4 w-4" />
+              Suivant
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit || createMutation.isPending}
+              className="flex h-10 items-center gap-2 whitespace-nowrap rounded-md bg-gradient-to-r from-racing-blue to-racing-cyan px-5 font-hud text-sm font-bold tracking-wide text-dark-950 shadow-[0_0_24px_rgba(0,120,255,0.3)] transition-shadow hover:shadow-[0_0_34px_rgba(0,150,255,0.5)] disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+            >
+              {createMutation.isPending ? (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-dark-950/40 border-t-dark-950" />
+              ) : (
+                <Flag className="h-3.5 w-3.5" />
+              )}
               Créer le serveur
-            </Button>
+            </button>
           )}
         </div>
-      </Card>
-    </PageShell>
+      </div>
+    </PageTransition>
   );
 }
 
-function Stepper({ current }: { current: number }) {
+function StepBadge({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
-    <div className="flex items-center">
+    <div className="flex items-center gap-3">
+      <div className="flex h-[30px] flex-none items-center gap-2 whitespace-nowrap rounded-md border border-racing-cyan/40 bg-gradient-to-r from-racing-blue/20 to-racing-cyan/10 px-3.5">
+        <Icon className="h-3.5 w-3.5 text-sky-300" />
+        <span className="font-hud text-[13.5px] font-bold tracking-wide text-white">{label}</span>
+      </div>
+      <div className="h-px min-w-[8px] flex-1 bg-gradient-to-r from-racing-cyan/30 to-transparent" />
+    </div>
+  );
+}
+
+function Stepper({ current, onGo }: { current: number; onGo: (step: number) => void }) {
+  return (
+    <div className="flex items-center gap-3 border-y border-white/10 py-4">
       {STEPS.map((s, i) => {
         const done = current > s.id;
         const active = current === s.id;
         const Icon = s.icon;
         return (
           <div key={s.id} className="flex flex-1 items-center last:flex-none">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                {active && (
-                  <span className="absolute inset-0 animate-ring-pulse rounded-xl bg-accent-orange" />
-                )}
-                <div
-                  className={`relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 transition-all ${
-                    done
-                      ? 'border-accent-orange bg-accent-orange text-white'
-                      : active
-                        ? 'border-accent-orange bg-accent-orange/10 text-accent-orange shadow-glow-orange'
-                        : 'border-dark-600 bg-dark-800 text-gray-500'
-                  }`}
-                >
-                  {done ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
-                </div>
+            <button
+              type="button"
+              onClick={() => onGo(s.id)}
+              className="flex items-center gap-3 text-left"
+            >
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-lg transition-all ${
+                  done
+                    ? 'bg-gradient-to-br from-racing-blue to-racing-cyan text-dark-950'
+                    : active
+                      ? 'border border-racing-cyan/60 bg-gradient-to-br from-racing-blue/30 to-racing-cyan/10 text-sky-300 shadow-[0_0_20px_rgba(0,120,255,0.3)]'
+                      : 'border border-white/10 bg-dark-900/50 text-gray-500'
+                }`}
+              >
+                {done ? <Check className="h-4.5 w-4.5" /> : <Icon className="h-4.5 w-4.5" />}
               </div>
               <div className="hidden sm:block">
-                <p className="text-[10px] uppercase tracking-widest text-gray-500">Étape {s.id}</p>
-                <p
-                  className={`text-sm font-semibold ${active || done ? 'text-white' : 'text-gray-500'}`}
-                >
+                <p className="whitespace-nowrap font-hud text-[11.5px] font-semibold tracking-wide text-gray-400">
+                  Étape {s.id}
+                </p>
+                <p className="whitespace-nowrap font-hud text-base font-bold text-white">
                   {s.label}
                 </p>
               </div>
-            </div>
+            </button>
             {i < STEPS.length - 1 && (
-              <div className="mx-4 h-0.5 flex-1 overflow-hidden rounded-full bg-dark-700">
-                <motion.div
-                  className="h-full bg-accent-orange"
-                  initial={false}
-                  animate={{ width: done ? '100%' : '0%' }}
-                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] as const }}
-                />
-              </div>
+              <div
+                className="mx-3.5 h-px flex-1"
+                style={{
+                  background:
+                    'linear-gradient(90deg, transparent, rgba(0,194,255,.35), transparent)',
+                }}
+              />
             )}
           </div>
         );
@@ -451,7 +502,7 @@ function StepStation({
 
   if (stations.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-dark-600 bg-dark-900/50 py-16 text-center">
+      <div className="rounded-xl border border-dashed border-white/10 bg-dark-900/50 py-16 text-center">
         <AlertCircle className="mx-auto mb-3 h-10 w-10 text-gray-600" />
         <p className="text-gray-400">Aucun poste admin en ligne pour le moment.</p>
         <p className="mt-1 text-sm text-gray-600">
@@ -464,11 +515,11 @@ function StepStation({
 
   return (
     <div>
-      <h3 className="mb-4 flex items-center gap-2 text-lg font-semibold text-white">
-        <Monitor className="h-5 w-5 text-accent-orange" />
+      <h3 className="mb-4 flex items-center gap-2.5 font-hud text-xl font-bold tracking-wide text-white">
+        <Monitor className="h-5 w-5 text-racing-cyan" />
         Choisis le poste hôte
       </h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {stations.map((station) => {
           const selected = selectedId === station.id;
           const content = station.content as { cars?: unknown[]; tracks?: unknown[] } | null;
@@ -478,37 +529,51 @@ function StepStation({
               key={station.id}
               type="button"
               onClick={() => onSelect(station.id)}
-              className={`relative rounded-xl border p-4 text-left transition-all duration-200 hover:scale-[1.02] ${
+              className={`relative overflow-hidden rounded-lg border p-4 text-left transition-all ${
                 selected
-                  ? 'border-accent-orange bg-accent-orange/5 shadow-lg shadow-accent-orange/10 ring-2 ring-accent-orange'
-                  : 'border-dark-600 bg-dark-900 hover:border-accent-orange/50'
+                  ? 'border-racing-cyan/50 bg-gradient-to-br from-racing-blue/15 to-dark-900/50 shadow-[0_0_22px_rgba(0,120,255,0.2)]'
+                  : 'border-white/[0.06] bg-dark-900/45 hover:border-racing-cyan/35'
               }`}
             >
+              <span
+                className={`absolute inset-y-0 left-0 w-[3px] ${
+                  selected ? 'bg-gradient-to-b from-racing-blue to-racing-cyan' : 'bg-gray-700'
+                }`}
+              />
               {selected && (
-                <div className="absolute right-3 top-3 rounded-full bg-accent-orange p-1 text-dark-900">
-                  <Check className="h-3.5 w-3.5" />
-                </div>
+                <span className="absolute right-2 top-2 h-3.5 w-3.5 border-r border-t border-racing-cyan/70" />
               )}
-              <div className="mb-3 flex items-center gap-3">
-                <div
-                  className={`rounded-lg p-2 ${station.status === 'in_game' ? 'bg-blue-400/10' : 'bg-green-400/10'}`}
-                >
-                  <Monitor
-                    className={`h-5 w-5 ${station.status === 'in_game' ? 'text-blue-400' : 'text-green-400'}`}
-                  />
+              <div className="flex items-center gap-3">
+                <div className="grid h-9 w-9 flex-none place-items-center rounded-md border border-purple-400/30 bg-purple-400/10 text-purple-200">
+                  <ShieldCheck className="h-4.5 w-4.5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-white">{station.name}</p>
-                  <p className="truncate font-mono text-xs text-gray-500">{station.stationId}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-hud text-xl font-bold text-white">{station.name}</p>
+                  <p className="truncate font-hud-mono text-xs text-sky-200/60">
+                    {station.localIp ?? '—'} · poste admin
+                  </p>
                 </div>
+                {selected && <CheckCircle2 className="h-5 w-5 flex-none text-racing-cyan" />}
               </div>
-              <div className="flex items-center justify-between">
-                <Badge variant={station.status === 'in_game' ? 'blue' : 'green'}>
-                  {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
-                </Badge>
-                <span className="flex items-center gap-1 font-mono text-xs text-gray-500">
-                  <Wifi className="h-3 w-3" />
-                  {station.localIp ?? '—'}
+              <div className="mt-3 flex items-center gap-3.5 border-t border-white/10 pt-3">
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      station.status === 'in_game'
+                        ? 'bg-racing-cyan shadow-[0_0_8px_#00c2ff]'
+                        : 'bg-emerald-400 shadow-[0_0_8px_#24d17e]'
+                    }`}
+                  />
+                  <span
+                    className={`font-hud text-[13px] font-bold ${
+                      station.status === 'in_game' ? 'text-racing-cyan' : 'text-emerald-400'
+                    }`}
+                  >
+                    {station.status === 'in_game' ? 'En jeu' : 'En ligne'}
+                  </span>
+                </span>
+                <span className="whitespace-nowrap font-hud-mono text-xs text-gray-500">
+                  agent v{station.version ?? '—'}
                 </span>
               </div>
               {hasNoContent && (
@@ -555,39 +620,45 @@ function StepTrack({
   const labelMap = useContentLabelMap();
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-          <MapPin className="h-5 w-5 text-accent-orange" />
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <h3 className="flex flex-none items-center gap-2.5 font-hud text-xl font-bold tracking-wide text-white">
+          <MapPin className="h-5 w-5 text-racing-cyan" />
           Choisis le circuit
         </h3>
+        <div className="h-px min-w-[8px] flex-1 bg-gradient-to-r from-white/10 to-transparent" />
         {totalTracks > 0 && (
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full flex-none sm:w-64">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
             <input
               type="text"
               value={search}
               onChange={(e) => onSearch(e.target.value)}
               placeholder="Rechercher un circuit..."
-              className="w-full rounded-lg border border-dark-600 bg-dark-900 py-2 pl-9 pr-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-accent-orange"
+              className="w-full rounded-md border border-white/10 bg-black/30 py-2 pl-9 pr-3 font-hud-mono text-sm text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-racing-cyan/50"
             />
           </div>
         )}
       </div>
 
       {!stationId ? null : totalTracks === 0 ? (
-        <div className="space-y-3 rounded-xl border border-dashed border-dark-600 bg-dark-900/50 py-16 text-center">
+        <div className="space-y-3 rounded-xl border border-dashed border-white/10 bg-dark-900/50 py-16 text-center">
           <AlertCircle className="mx-auto h-10 w-10 text-gray-600" />
           <p className="text-gray-400">Aucun circuit détecté sur ce poste.</p>
           {station && (
-            <Button size="sm" variant="secondary" isLoading={isSyncing} onClick={onSync}>
-              <RefreshCw className="h-4 w-4" />
+            <button
+              type="button"
+              onClick={onSync}
+              disabled={isSyncing}
+              className="mx-auto flex items-center gap-2 rounded-md border border-white/10 px-4 py-2 font-hud text-sm font-bold text-gray-300 transition-colors hover:border-racing-cyan/40 hover:text-sky-200 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
               Synchroniser le contenu
-            </Button>
+            </button>
           )}
         </div>
       ) : (
         <>
-          <div className="grid max-h-[65vh] grid-cols-1 gap-4 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid max-h-[65vh] grid-cols-1 gap-3 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">
             {tracks.map((track) => {
               const selected = selectedTrack?.acId === track.acId;
               return (
@@ -595,10 +666,10 @@ function StepTrack({
                   key={track.acId}
                   type="button"
                   onClick={() => onSelectTrack(track)}
-                  className={`group relative overflow-hidden rounded-xl border text-left transition-all duration-200 hover:scale-[1.02] ${
+                  className={`group relative overflow-hidden rounded-lg border text-left transition-all ${
                     selected
-                      ? 'border-accent-orange shadow-lg shadow-accent-orange/20 ring-2 ring-accent-orange'
-                      : 'border-dark-600 bg-dark-800 hover:border-accent-orange/50'
+                      ? 'border-racing-cyan/60 shadow-[0_0_22px_rgba(0,120,255,0.2)]'
+                      : 'border-white/[0.06] hover:border-racing-cyan/35'
                   }`}
                 >
                   <div className="flex aspect-video items-center justify-center bg-dark-900">
@@ -616,16 +687,24 @@ function StepTrack({
                       </div>
                     )}
                     {selected && (
-                      <div className="absolute right-2 top-2 rounded-full bg-accent-orange p-1 text-dark-900">
-                        <Check className="h-4 w-4" />
-                      </div>
+                      <CheckCircle2 className="absolute right-2.5 top-2.5 h-5 w-5 text-racing-cyan drop-shadow-[0_0_6px_rgba(0,194,255,0.8)]" />
                     )}
                   </div>
-                  <div className="p-3">
-                    <p className="truncate font-semibold text-white">
+                  <div
+                    className={`p-3 ${
+                      selected
+                        ? 'bg-gradient-to-r from-racing-blue/15 to-dark-900/60'
+                        : 'bg-dark-900/60'
+                    }`}
+                  >
+                    <p
+                      className={`truncate font-hud text-lg font-bold ${selected ? 'text-white' : 'text-gray-200'}`}
+                    >
                       {formatTrackName(track.name, track.acId, labelMap)}
                     </p>
-                    <p className="truncate text-xs text-gray-500">{track.acId}</p>
+                    <p className="mt-0.5 truncate font-hud-mono text-[11.5px] text-gray-500">
+                      {track.acId}
+                    </p>
                   </div>
                 </button>
               );
@@ -648,10 +727,10 @@ function StepTrack({
                       key={layout.name}
                       type="button"
                       onClick={() => onSelectLayout(layout.name)}
-                      className={`group relative overflow-hidden rounded-lg border text-left transition-all duration-200 hover:scale-[1.03] ${
+                      className={`group relative overflow-hidden rounded-md border text-left transition-all ${
                         active
-                          ? 'border-accent-orange shadow-lg shadow-accent-orange/20 ring-2 ring-accent-orange'
-                          : 'border-dark-600 bg-dark-800 hover:border-accent-orange/50'
+                          ? 'border-racing-cyan/60 shadow-[0_0_16px_rgba(0,120,255,0.2)]'
+                          : 'border-white/[0.06] hover:border-racing-cyan/35'
                       }`}
                     >
                       <div className="flex aspect-video items-center justify-center bg-dark-900">
@@ -666,13 +745,13 @@ function StepTrack({
                           <MapPin className="h-6 w-6 text-gray-600" />
                         )}
                         {active && (
-                          <div className="absolute right-1.5 top-1.5 rounded-full bg-accent-orange p-0.5 text-dark-900">
-                            <Check className="h-3 w-3" />
-                          </div>
+                          <CheckCircle2 className="absolute right-1.5 top-1.5 h-4 w-4 text-racing-cyan" />
                         )}
                       </div>
-                      <div className="p-1.5">
-                        <p className="truncate text-xs font-medium text-white">{layout.name}</p>
+                      <div className="bg-dark-900/60 p-1.5">
+                        <p className="truncate font-hud text-xs font-bold text-white">
+                          {layout.name}
+                        </p>
                       </div>
                     </button>
                   );
@@ -744,17 +823,18 @@ function StepConfig({
     <div className="grid items-start gap-6 lg:grid-cols-[1fr,280px]">
       {/* Colonne principale : voitures d'abord, options avancées repliées */}
       <div className="space-y-6">
-        <section className="overflow-hidden rounded-xl border border-dark-600 bg-dark-900/50">
+        <section className="overflow-hidden rounded-lg border border-white/10 bg-dark-900/50">
           <button
             type="button"
             onClick={onToggleAdvanced}
-            className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left"
+            className="flex w-full flex-wrap items-center gap-2.5 px-4 py-3.5 text-left"
           >
-            <span className="flex items-center gap-2 text-sm font-semibold text-white">
-              <Settings2 className="h-4 w-4 text-gray-400" />
-              Options avancées
-              <span className="font-normal text-gray-500">(nom, slots, mot de passe...)</span>
+            <Settings2 className="h-4.5 w-4.5 flex-none text-racing-cyan" />
+            <span className="font-hud text-base font-bold text-white">Options avancées</span>
+            <span className="font-hud-mono text-[11.5px] text-gray-500">
+              nom, slots, mot de passe...
             </span>
+            <div className="min-w-[8px] flex-1" />
             <ChevronDown
               className={`h-4 w-4 shrink-0 text-gray-500 transition-transform duration-200 ${
                 showAdvanced ? 'rotate-180' : ''
@@ -763,7 +843,7 @@ function StepConfig({
           </button>
 
           {showAdvanced && (
-            <div className="space-y-4 border-t border-dark-700 p-4">
+            <div className="space-y-4 border-t border-white/10 p-4">
               <div>
                 <Label htmlFor="server-name">Nom du serveur</Label>
                 <Input
@@ -786,10 +866,10 @@ function StepConfig({
                       key={n}
                       type="button"
                       onClick={() => onMaxClients(n)}
-                      className={`h-9 w-9 rounded-lg text-sm font-bold transition-all ${
+                      className={`h-9 w-9 rounded-md font-hud text-sm font-bold transition-all ${
                         maxClients === n
-                          ? 'scale-110 bg-accent-orange text-dark-900 shadow-lg shadow-accent-orange/30'
-                          : 'bg-dark-700 text-gray-300 hover:bg-dark-600'
+                          ? 'scale-110 bg-gradient-to-br from-racing-blue to-racing-cyan text-dark-950 shadow-[0_0_16px_rgba(0,120,255,0.4)]'
+                          : 'bg-white/[0.04] text-gray-300 hover:bg-white/[0.08]'
                       }`}
                     >
                       {n}
@@ -831,58 +911,56 @@ function StepConfig({
         </section>
 
         <section>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-4">
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-white">
-              <Car className="h-5 w-5 text-accent-orange" />
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <h3 className="flex flex-none items-center gap-2.5 font-hud text-xl font-bold tracking-wide text-white">
+              <Car className="h-5 w-5 text-racing-cyan" />
               Choix des voitures
             </h3>
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`whitespace-nowrap font-mono text-sm ${atCapacity ? 'text-accent-orange' : 'text-gray-400'}`}
-              >
-                {totalSelectedCars} / {maxClients} slots
-              </span>
-              {totalCars > 0 && (
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
-                  <input
-                    type="text"
-                    value={carSearch}
-                    onChange={(e) => onCarSearch(e.target.value)}
-                    placeholder="Rechercher..."
-                    className="w-36 rounded-lg border border-dark-600 bg-dark-900 py-1.5 pl-8 pr-3 text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-accent-orange"
-                  />
-                </div>
-              )}
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={onClearCars}
-                disabled={totalSelectedCars === 0}
-              >
-                <Eraser className="h-3.5 w-3.5" />
-                Vider
-              </Button>
-            </div>
+            <span
+              className={`flex-none whitespace-nowrap font-hud-mono text-xs ${atCapacity ? 'text-orange-400' : 'text-gray-500'}`}
+            >
+              {totalSelectedCars} / {maxClients} slots
+            </span>
+            <div className="h-px min-w-[8px] flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+            {totalCars > 0 && (
+              <div className="relative flex-none">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+                <input
+                  type="text"
+                  value={carSearch}
+                  onChange={(e) => onCarSearch(e.target.value)}
+                  placeholder="Rechercher..."
+                  className="w-36 rounded-md border border-white/10 bg-black/30 py-1.5 pl-8 pr-3 font-hud-mono text-xs text-white placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-racing-cyan/50"
+                />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={onClearCars}
+              disabled={totalSelectedCars === 0}
+              className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-md border border-white/10 px-3 py-1.5 font-hud text-[13.5px] font-bold text-gray-300 transition-colors hover:border-racing-cyan/40 hover:text-sky-200 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Eraser className="h-3.5 w-3.5" />
+              Vider
+            </button>
           </div>
 
           {totalCars === 0 ? (
-            <div className="rounded-xl border border-dashed border-dark-600 bg-dark-900/50 py-10 text-center">
+            <div className="rounded-xl border border-dashed border-white/10 bg-dark-900/50 py-10 text-center">
               <AlertCircle className="mx-auto mb-2 h-10 w-10 text-gray-600" />
               <p className="text-gray-400">Aucune voiture détectée sur ce poste.</p>
             </div>
           ) : (
-            <div className="grid max-h-[65vh] grid-cols-2 gap-3 overflow-y-auto p-1 sm:grid-cols-3 lg:grid-cols-4">
+            <div className="grid max-h-[65vh] grid-cols-2 gap-2.5 overflow-y-auto p-1 sm:grid-cols-3 lg:grid-cols-4">
               {cars.map((car) => {
                 const count = carCounts[car.acId] ?? 0;
                 return (
                   <div
                     key={car.acId}
-                    className={`group relative overflow-hidden rounded-xl border transition-all duration-200 ${
+                    className={`group relative overflow-hidden rounded-lg border transition-all ${
                       count > 0
-                        ? 'border-accent-orange shadow-lg shadow-accent-orange/20 ring-2 ring-accent-orange'
-                        : 'border-dark-600 bg-dark-800 hover:border-accent-orange/50'
+                        ? 'border-racing-cyan/55 shadow-[0_0_18px_rgba(0,120,255,0.2)]'
+                        : 'border-white/[0.06] hover:border-racing-cyan/35'
                     }`}
                   >
                     <button
@@ -907,11 +985,17 @@ function StepConfig({
                           <Car className="h-8 w-8 text-gray-600" />
                         )}
                       </div>
-                      <div className="p-2">
-                        <p className="truncate text-sm font-medium text-white">
+                      <div
+                        className={`p-2 ${count > 0 ? 'bg-gradient-to-r from-racing-blue/15 to-dark-900/60' : 'bg-dark-900/60'}`}
+                      >
+                        <p
+                          className={`truncate font-hud text-sm font-bold ${count > 0 ? 'text-white' : 'text-gray-200'}`}
+                        >
                           {formatCarName(car.name, car.acId, labelMap)}
                         </p>
-                        <p className="truncate text-[10px] text-gray-500">{car.acId}</p>
+                        <p className="mt-0.5 truncate font-hud-mono text-[10.5px] text-gray-500">
+                          {car.acId}
+                        </p>
                       </div>
                     </button>
 
@@ -920,7 +1004,7 @@ function StepConfig({
                       type="button"
                       onClick={() => onFillAllWith(car.acId)}
                       title={`Remplir les ${maxClients} slots avec cette voiture`}
-                      className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-dark-900/80 text-gray-300 opacity-0 backdrop-blur transition-opacity duration-150 hover:bg-accent-orange hover:text-dark-900 group-hover:opacity-100"
+                      className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-dark-900/80 text-gray-300 opacity-0 backdrop-blur transition-opacity duration-150 hover:bg-racing-cyan hover:text-dark-950 group-hover:opacity-100"
                     >
                       <Layers className="h-3 w-3" />
                     </button>
@@ -931,10 +1015,10 @@ function StepConfig({
                         type="button"
                         onClick={() => onRemoveCar(car.acId)}
                         title="Retirer un exemplaire"
-                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-accent-orange text-xs font-bold text-dark-900 shadow"
+                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-racing-cyan text-xs font-bold text-dark-950 shadow"
                       >
                         {count > 1 ? (
-                          <span className="font-mono">×{count}</span>
+                          <span className="font-hud-mono">×{count}</span>
                         ) : (
                           <Minus className="h-3 w-3" />
                         )}
@@ -954,13 +1038,12 @@ function StepConfig({
       </div>
 
       {/* Récapitulatif sticky : toujours visible pendant la configuration */}
-      <aside className="overflow-hidden rounded-xl border border-dark-600 bg-dark-800/70 lg:sticky lg:top-20">
-        <div className="border-b border-dark-700 bg-accent-orange/10 px-4 py-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-accent-orange">
-            Récapitulatif
-          </p>
-        </div>
-        <div className="space-y-3 p-4">
+      <aside className="relative overflow-hidden rounded-lg border border-racing-cyan/30 bg-gradient-to-br from-racing-blue/[0.14] to-dark-900/50 p-4.5 lg:sticky lg:top-20">
+        <span className="absolute left-2 top-2 h-3 w-3 border-l border-t border-racing-cyan/70" />
+        <span className="absolute bottom-2 right-2 h-3 w-3 border-b border-r border-racing-cyan/70" />
+
+        <p className="font-hud text-lg font-bold tracking-wide text-white">Récapitulatif</p>
+        <div className="mt-3.5 flex flex-col gap-3">
           <RecapItem icon={Monitor} label="Poste" value={station?.name ?? '—'} />
           <RecapItem
             icon={MapPin}
@@ -974,25 +1057,32 @@ function StepConfig({
           <RecapItem icon={Users} label="Slots" value={String(maxClients)} />
           <RecapItem icon={Lock} label="Accès" value={password ? 'Protégé' : 'Public'} />
         </div>
-        <div className="border-t border-dark-700 p-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-              <Car className="h-3.5 w-3.5" />
+
+        <div className="mt-4 border-t border-white/[0.09] pt-3.5">
+          <div className="flex items-center gap-2.5">
+            <Car className="h-3.5 w-3.5 flex-none text-racing-cyan" />
+            <span className="whitespace-nowrap font-hud text-[13.5px] font-bold text-gray-300">
               Grille de voitures
-            </p>
-            <p className="text-[10px] font-semibold text-gray-400">
+            </span>
+            <div className="flex-1" />
+            <span
+              className={`whitespace-nowrap font-hud-mono text-xs ${atCapacity ? 'text-orange-400' : 'text-gray-500'}`}
+            >
               {totalSelectedCars}/{maxClients}
-            </p>
+            </span>
           </div>
-          <CarSlotsGrid
-            carCounts={carCounts}
-            cars={cars}
-            maxClients={maxClients}
-            labelMap={labelMap}
-            onRemoveCar={onRemoveCar}
-          />
+          <div className="mt-2.5">
+            <CarSlotsGrid
+              carCounts={carCounts}
+              cars={cars}
+              maxClients={maxClients}
+              labelMap={labelMap}
+              onRemoveCar={onRemoveCar}
+            />
+          </div>
         </div>
-        <div className="space-y-1.5 border-t border-dark-700 px-4 py-3">
+
+        <div className="mt-4 flex flex-col gap-2 border-t border-white/[0.09] pt-3.5">
           <CheckRow ok={!!name.trim()}>Nom défini</CheckRow>
           <CheckRow ok={totalSelectedCars > 0}>Au moins une voiture</CheckRow>
         </div>
@@ -1037,7 +1127,7 @@ function CarSlotsGrid({
           return (
             <div
               key={`empty-${i}`}
-              className="aspect-square rounded-md border border-dashed border-dark-600 bg-dark-900/40"
+              className="aspect-square rounded-md border border-dashed border-white/[0.12]"
             />
           );
         }
@@ -1049,7 +1139,7 @@ function CarSlotsGrid({
             type="button"
             onClick={() => onRemoveCar(acId)}
             title={`${displayName} — cliquer pour retirer`}
-            className="group relative aspect-square overflow-hidden rounded-md border border-dark-600 bg-dark-900 transition-colors hover:border-accent-red/60"
+            className="group relative aspect-square overflow-hidden rounded-md border border-white/10 bg-dark-900 transition-colors hover:border-red-500/60"
           >
             {car?.preview ? (
               <img
@@ -1083,10 +1173,10 @@ function RecapItem({
 }) {
   return (
     <div className="flex min-w-0 items-center gap-2.5">
-      <Icon className="h-4 w-4 shrink-0 text-accent-orange" />
+      <Icon className="h-4 w-4 shrink-0 text-racing-cyan" />
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wider text-gray-500">{label}</p>
-        <p className="truncate text-sm font-medium text-white" title={value}>
+        <p className="font-hud text-[11px] font-semibold tracking-wide text-sky-200/70">{label}</p>
+        <p className="mt-0.5 truncate font-hud text-base font-bold text-white" title={value}>
           {value}
         </p>
       </div>
@@ -1096,12 +1186,10 @@ function RecapItem({
 
 function CheckRow({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
-    <p className={`flex items-center gap-1.5 text-xs ${ok ? 'text-green-400' : 'text-gray-500'}`}>
-      {ok ? (
-        <Check className="h-3.5 w-3.5" />
-      ) : (
-        <span className="mx-1 h-1.5 w-1.5 rounded-full bg-gray-600" />
-      )}
+    <p
+      className={`flex items-center gap-2 font-hud text-sm font-semibold ${ok ? 'text-emerald-400' : 'text-gray-500'}`}
+    >
+      {ok ? <CheckCircle2 className="h-4 w-4" /> : <CircleDashed className="h-4 w-4" />}
       {children}
     </p>
   );
