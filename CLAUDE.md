@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.100`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.102`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -8,7 +8,7 @@ Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au
 - **GitHub**: `Concombre37/simracing-manager`
 - **Production**: `https://simracing.hytlabs.com` (derrière Cloudflare Tunnel — voir mémoire `hytlabs-cloudflare-tunnel`)
 - **Architecture**: NestJS 10 (backend) + React 18/Vite (frontend) + agent Windows Node.js (`pkg`), le tout en npm workspaces.
-- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.67`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
+- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.102`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
 - **Deux stations réelles connues** (hytlabs) : `concombre` (rôle `admin`, hôte de serveurs dédiés, IP `192.168.1.63`) et `desktop-gl3t50t` (rôle `simulator`, POD joueur, IP `192.168.1.64`).
 
 ### Agents
@@ -369,6 +369,7 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 - `serverLauncher.ts` utilise des ports dynamiques `9600-9700`/`8081-8181`. Vérifie la disponibilité TCP+UDP avant d'assigner. Ports alloués stockés dans `DedicatedServer.udpPort/tcpPort/httpPort`.
 - **Firewall + vérification de port réellement lié (v2.2.58, fix du "Failed to handshake" #1)** : `ensureFirewallRule()` ajoute une règle Windows Firewall unique, programme-wide, pour `acServer.exe` (best-effort, ne bloque jamais le lancement). `waitForPortBound()` vérifie via `netstat -ano -p UDP` que le PID du process possède bien le port avant de considérer le lancement réussi — un process vivant n'est pas la preuve que le port UDP est réellement ouvert (pare-feu, port déjà pris au niveau OS malgré la vérif préalable).
 - **`race.ini` du join direct incomplet (v2.2.64, fix du "Failed to handshake" #2, le vrai fix pour le join)** : `writeJoinRaceIni()` n'écrivait que `[RACE]`/`[CAR_0]`/`[REMOTE]`, contrairement à `agent-legacy` (référence connue pour fonctionner) et à `writeRaceIni()` (lancement direct/solo, juste à côté dans le même fichier, qui fonctionne bien) qui écrivent en plus `[AUTOSPAWN]`, `[SESSION_0]`, `[TEMPERATURE]`, `[WEATHER]`, `[WIND]`, `[LIGHTING]` (v2.2.66) et plusieurs champs `[CAR_0]`/`[REMOTE]` (`DRIVERNAME`, `TEAM`, `GUID`, `RESTRICTOR`, `SPECTATOR_MODE`, `SPAWN_POINT`, `NAME`, `__CM_EXTENDED`). Symptôme diagnostiqué via les logs distants (5.11) : `acs.exe` se lance, la mémoire partagée se mappe, mais reste "gelée" en boucle (`packetId` n'avance jamais) — le client n'entre jamais réellement en course. **Confirmé réparé en conditions réelles** (créé un serveur + envoyé un POD réel) : la mémoire partagée passe de "gelée" à "state changed" en ~15s, centaines de paquets de télémétrie reçus en quelques minutes.
+- **`DRIVERNAME`/`NAME` du `race.ini` de join laissés vides jusqu'en v2.2.102** — ces champs existaient déjà dans `writeJoinRaceIni()` (depuis le fix v2.2.64 ci-dessus) mais étaient toujours écrits à `''`, alors que `clientName` est bien reçu dans le payload `server:join`. Le pilote n'apparaissait donc jamais nommé en jeu (ni pour lui, ni pour Content Manager s'il est utilisé comme overlay). Fix : `writeJoinRaceIni()` prend désormais `clientName` et le reporte dans les deux champs (CR/LF filtrés). **`SKIN=` passé à `SKIN=random`** en même temps (`[RACE]`+`[CAR_0]`, join **et** lancement direct/solo `writeRaceIni()`) — vide, tout le monde héritait du même skin par défaut.
 - `server:join` envoie `host`, `port`, `httpPort`, `password`, `carAcId`, `track`, `trackLayout`, `serverName`, `durationMinutes?`, `clientName?`, `difficulty?`, `gearbox?`, `sessionId?`.
 - `acLauncher.ts` gère le join soit via Content Manager (`acmanager://race/online/join`), soit en direct (`acs.exe` + `race.ini`).
 - L'agent ne scanne **pas** activement les process `acServer.exe` en cours — le statut du serveur dédié dépend uniquement de `server:started`/`server:stopped`, ce dernier étant émis soit sur arrêt volontaire, soit sur crash tardif détecté par le listener `exit` du child process (v2.2.68, voir 5.12).

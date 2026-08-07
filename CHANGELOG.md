@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.102 — Le pilote et un skin aléatoire sont désormais envoyés à AC/Content Manager en rejoignant un serveur
+
+### Changé
+
+- **Demandé par l'utilisateur : "j'aimerais que ça envoie a content manager le nom du pilote pour qu'il le voie en jeu" + "et skin random".** `AcLauncher.writeJoinRaceIni()` (le `race.ini` écrit avant de lancer `acs.exe` pour rejoindre un serveur dédié) écrivait `DRIVERNAME=`/`NAME=` (`[CAR_0]`/`[REMOTE]`) systématiquement vides, alors que le nom du pilote (`clientName`, saisi côté kiosque/dashboard à l'envoi du POD) est déjà transmis à l'agent dans le payload `server:join` — il n'était simplement jamais reporté dans le fichier. Les deux champs sont désormais remplis avec ce nom (CR/LF filtrés pour ne pas casser la structure ligne-par-ligne de l'INI), donc AC — et Content Manager si utilisé comme overlay — l'affichent réellement en jeu.
+- `SKIN=` (vide, ce qui figeait tout le monde sur le même skin par défaut) passé à `SKIN=random` dans `[RACE]`/`[CAR_0]`, aussi bien pour le join (`writeJoinRaceIni`) que pour le lancement direct/solo (`writeRaceIni`), pour varier l'apparence des voitures.
+
 ## v2.2.101 — Correctifs suite au premier vrai test sur POD (diaporama figé, blanking qui ne se retire pas)
 
 ### Corrigé

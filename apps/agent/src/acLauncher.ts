@@ -95,6 +95,7 @@ export class AcLauncher {
       serverHttpPort: joinConfig.httpPort,
       password: joinConfig.password,
       serverName: joinConfig.serverName,
+      clientName: joinConfig.clientName,
     });
 
     await this.configureVideoIni(documentsPath);
@@ -219,7 +220,7 @@ export class AcLauncher {
       'AI_LEVEL=100',
       `MODEL=${cfg.car}`,
       'MODEL_CONFIG=',
-      'SKIN=',
+      'SKIN=random',
       `TRACK=${cfg.track}`,
       `CONFIG_TRACK=${cfg.trackLayout ?? ''}`,
       'PENALTIES=0',
@@ -231,7 +232,7 @@ export class AcLauncher {
       '[CAR_0]',
       `MODEL=${cfg.car}`,
       'MODEL_CONFIG=',
-      'SKIN=',
+      'SKIN=random',
       'DRIVERNAME=',
       'TEAM=',
       'GUID=',
@@ -418,9 +419,14 @@ export class AcLauncher {
       serverHttpPort?: number;
       password?: string;
       serverName?: string;
+      clientName?: string;
     },
   ): Promise<void> {
     const raceIniPath = path.join(cfgDir, 'race.ini');
+    // CR/LF casserait la structure ligne-par-ligne de l'INI ; le reste du
+    // nom (accents, espaces...) est laissé tel quel, AC/CM l'affiche sans
+    // problème.
+    const driverName = (cfg.clientName ?? '').replace(/[\r\n]/g, ' ').trim();
     // Mirrors the previous (agent-legacy) implementation's race.ini exactly —
     // a prior version of this file trimmed it down to [RACE]/[CAR_0]/[REMOTE]
     // only, which is missing [AUTOSPAWN]/[SESSION_0]/[TEMPERATURE]/[WEATHER]/
@@ -440,7 +446,7 @@ export class AcLauncher {
       'AI_LEVEL=100',
       `MODEL=${cfg.car}`,
       'MODEL_CONFIG=',
-      'SKIN=',
+      'SKIN=random',
       `TRACK=${cfg.track}`,
       `CONFIG_TRACK=${cfg.trackLayout ?? ''}`,
       'PENALTIES=0',
@@ -452,8 +458,8 @@ export class AcLauncher {
       '[CAR_0]',
       `MODEL=${cfg.car}`,
       'MODEL_CONFIG=',
-      'SKIN=',
-      'DRIVERNAME=',
+      'SKIN=random',
+      `DRIVERNAME=${driverName}`,
       'TEAM=',
       'GUID=',
       'SETUP=',
@@ -470,7 +476,7 @@ export class AcLauncher {
       `SERVER_NAME=${cfg.serverName ?? 'Serveur SimCenter'}`,
       `PASSWORD=${cfg.password ?? ''}`,
       `REQUESTED_CAR=${cfg.car}`,
-      'NAME=',
+      `NAME=${driverName}`,
       'TEAM=',
       'GUID=',
       '__CM_EXTENDED=0',
