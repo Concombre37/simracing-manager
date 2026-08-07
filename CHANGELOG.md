@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.105 — Les serveurs dédiés restent en Practice 12h au lieu de basculer en Qualifying/Race au bout de 30 min
+
+### Changé
+
+- **Demandé par l'utilisateur : "quand tu crée les serveur tu les place en 12H de durée pour éviter qu'il change ... et si possible le bloquer sur l'heur actuelle qu'on avait mis niveau soleil".** `[PRACTICE] TIME=` dans `server_cfg.ini` (`serverLauncher.ts#writeServerConfig()`) passe de `30` à `720` (minutes, soit 12h) : avec `LOOP_MODE=1`, une durée courte faisait basculer automatiquement le serveur en Qualifying puis Race au bout de 30-45 min, coupant les pilotes en pleine conduite libre (grille imposée, écran de session). 12h couvre toute une journée d'exploitation sans jamais quitter Practice.
+- **L'heure/soleil (`SUN_ANGLE=80`, ~17:00) était déjà fixe et identique pour chaque serveur créé** (constante codée en dur, aucun champ ne permet de le faire varier à la création) — déjà "bloqué" comme demandé, aucun changement nécessaire sur ce point.
+
 ## v2.2.104 — Le blanking de lancement se retirait trop tôt, avant que le pilote soit vraiment en piste
 
 ### Corrigé

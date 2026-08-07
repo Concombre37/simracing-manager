@@ -484,7 +484,13 @@ export class ServerLauncher {
       '',
       '[PRACTICE]',
       'NAME=Practice',
-      'TIME=30',
+      // Demandé par l'utilisateur : 12h (720 min) au lieu de 30 — avec
+      // LOOP_MODE=1 ci-dessus, une durée courte fait automatiquement
+      // basculer le serveur en Qualifying puis Race au bout de 30/45 min,
+      // ce qui coupe les pilotes en pleine conduite libre (grille imposée,
+      // écran de session). 12h couvre toute une journée d'exploitation du
+      // lieu sans jamais quitter Practice.
+      'TIME=720',
       'IS_OPEN=1',
       '',
       '[QUALIFY]',
