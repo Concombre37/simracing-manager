@@ -58,6 +58,7 @@ export class AcLauncher {
     });
 
     await this.configureVideoIni(documentsPath);
+    await this.configureGameplayIni(documentsPath);
 
     if (config.LAUNCH_MODE === 'cm') {
       await this.ensureLuaAppInstalled();
@@ -99,6 +100,7 @@ export class AcLauncher {
     });
 
     await this.configureVideoIni(documentsPath);
+    await this.configureGameplayIni(documentsPath);
     await this.configureAssistsIni(documentsPath, joinConfig.difficulty, joinConfig.gearbox);
     if (joinConfig.clientName) {
       await this.luaBridge.setClientName(joinConfig.clientName);
@@ -534,6 +536,31 @@ export class AcLauncher {
       this.logger.info({ path: videoIniPath, mode: targetMode }, 'video.ini updated');
     } catch (err) {
       this.logger.warn({ err }, 'Failed to update video.ini');
+    }
+  }
+
+  /**
+   * Active le rétroviseur virtuel AC (`[VIRTUAL_MIRROR] ACTIVE=1` dans
+   * `cfg/gameplay.ini`) à chaque lancement — la touche par défaut du jeu
+   * pour l'afficher/masquer en jeu reste F11, mais sans cette valeur activée
+   * ici l'app HUD n'existe pas du tout et F11 ne fait rien. Même prudence
+   * que `configureVideoIni` : si `gameplay.ini` n'existe pas encore (AC
+   * jamais lancé sur ce poste), on ne le crée pas nous-même.
+   */
+  private async configureGameplayIni(documentsPath: string): Promise<void> {
+    const gameplayIniPath = path.join(documentsPath, 'cfg', 'gameplay.ini');
+    if (!(await this.pathExists(gameplayIniPath))) return;
+
+    try {
+      const content = await fs.readFile(gameplayIniPath, 'utf-8');
+      const updated = this.setIniValue(content, 'VIRTUAL_MIRROR', 'ACTIVE', '1');
+      await fs.writeFile(gameplayIniPath, updated, 'utf-8');
+      this.logger.info(
+        { path: gameplayIniPath },
+        'gameplay.ini updated (virtual mirror F11 activé)',
+      );
+    } catch (err) {
+      this.logger.warn({ err }, 'Failed to update gameplay.ini');
     }
   }
 

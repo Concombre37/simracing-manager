@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.103 — Le rétroviseur virtuel (F11) est désormais activé par défaut à chaque lancement
+
+### Changé
+
+- **Demandé par l'utilisateur : "il faudrais ajouter l'option au lancement du rétro intérieur f11 par default".** `AcLauncher` ne touchait jamais à `cfg/gameplay.ini` : sans `[VIRTUAL_MIRROR] ACTIVE=1` dans ce fichier, l'app HUD du rétroviseur virtuel n'existe pas du tout et la touche F11 (raccourci par défaut d'AC pour l'afficher/masquer) ne fait rien. Nouvelle méthode `configureGameplayIni()`, appelée à chaque lancement (`launch()` et `joinServer()`) juste après `configureVideoIni()`, qui force cette valeur à `1` (même prudence que pour `video.ini` : si `gameplay.ini` n'existe pas encore sur le poste, on ne le crée pas nous-même).
+
 ## v2.2.102 — Le pilote et un skin aléatoire sont désormais envoyés à AC/Content Manager en rejoignant un serveur
 
 ### Changé
