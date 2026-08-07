@@ -793,10 +793,6 @@ export class SimRacingAgent {
       // really started (mirrors the in_game status just reported). Resets
       // any stale manual override internally.
       this.blankingManager.setPodInGame(true);
-      // Drive was just triggered automatically — start the configured
-      // hide-delay countdown from here rather than waiting for the next
-      // acRunning/acLoaded poll to notice the game (a few seconds later).
-      this.blankingManager.notifyDriveTriggered();
       // Only the game should be visible during a session: hide the
       // taskbar, minimize whatever else was open, and bring the game
       // window to the foreground once it appears.
@@ -1218,11 +1214,6 @@ export class SimRacingAgent {
       // really started (mirrors the in_game status just reported). Resets
       // any stale manual override internally.
       this.blankingManager.setPodInGame(true);
-      // acLauncher.joinServer() already called luaBridge.autoStart() as its
-      // last step (Drive) — start the hide-delay countdown from here rather
-      // than waiting for the next acRunning/acLoaded poll to notice the
-      // game a few seconds later.
-      this.blankingManager.notifyDriveTriggered();
       // Only the game should be visible during a session: hide the
       // taskbar, minimize whatever else was open, and bring the game
       // window to the foreground once it appears.

@@ -108,26 +108,28 @@ describe('BlankingManager', () => {
     vi.useRealTimers();
   });
 
-  it('hides blanking after the default 10s grace period once AC is running', () => {
-    // Matches the proven approach from the previous production launcher
-    // (plain process presence, no telemetry-based "car ready" confirmation)
-    // plus a configurable grace period so it doesn't vanish the instant
-    // acs.exe appears while AC is still loading.
+  it('does NOT start the hide-delay countdown from acRunning alone (process detected, AC still loading)', () => {
+    // acRunning fires the instant acs.exe appears in the process list, well
+    // before the driver is actually in Drive — must not by itself start the
+    // countdown that removes blanking (found in production, v2.2.104: the
+    // launching screen was disappearing while AC was still loading the
+    // track/menu underneath). Only acLoaded (shared memory mapped AND
+    // fresh) reflects a genuinely live, spawned session.
     vi.useFakeTimers();
     manager.setAuto();
     manager.setAcRunning(true);
     expect(manager.isBlankingActive()).toBe(true);
-    vi.advanceTimersByTime(10000);
-    expect(manager.isBlankingActive()).toBe(false);
+    vi.advanceTimersByTime(30000);
+    expect(manager.isBlankingActive()).toBe(true);
     vi.useRealTimers();
   });
 
-  it('cancels the pending hide if AC stops running before the delay elapses', () => {
+  it('cancels the pending hide if AC shared memory unloads before the delay elapses', () => {
     vi.useFakeTimers();
     manager.setAuto();
-    manager.setAcRunning(true);
+    manager.setAcLoaded(true);
     vi.advanceTimersByTime(5000);
-    manager.setAcRunning(false);
+    manager.setAcLoaded(false);
     vi.advanceTimersByTime(10000);
     expect(manager.isBlankingActive()).toBe(true);
     vi.useRealTimers();
@@ -137,7 +139,7 @@ describe('BlankingManager', () => {
     vi.useFakeTimers();
     manager.setHideDelaySeconds(3);
     manager.setAuto();
-    manager.setAcRunning(true);
+    manager.setAcLoaded(true);
     vi.advanceTimersByTime(2999);
     expect(manager.isBlankingActive()).toBe(true);
     vi.advanceTimersByTime(1);
@@ -145,50 +147,32 @@ describe('BlankingManager', () => {
     vi.useRealTimers();
   });
 
-  it('starts the hide-delay countdown on notifyDriveTriggered() before AC is even detected running', () => {
-    // Requested by the user: once Drive has been triggered automatically,
-    // the session is effectively already launched — the countdown should
-    // start there rather than waiting for the next acRunning/acLoaded poll
-    // (which lags a few seconds behind the actual Drive press).
-    vi.useFakeTimers();
-    manager.setAuto();
-    expect(manager.isBlankingActive()).toBe(true);
-    manager.notifyDriveTriggered();
-    vi.advanceTimersByTime(9999);
-    expect(manager.isBlankingActive()).toBe(true);
-    vi.advanceTimersByTime(1);
-    expect(manager.isBlankingActive()).toBe(false);
-    vi.useRealTimers();
-  });
-
-  it('does not schedule a second countdown if notifyDriveTriggered() is called again while one is already pending', () => {
-    vi.useFakeTimers();
-    manager.setHideDelaySeconds(10);
-    manager.setAuto();
-    manager.notifyDriveTriggered();
-    vi.advanceTimersByTime(6000);
-    manager.notifyDriveTriggered();
-    // If this second call had reset the timer, blanking would still be
-    // active here (10s from the second call); it must not have.
-    vi.advanceTimersByTime(4000);
-    expect(manager.isBlankingActive()).toBe(false);
-    vi.useRealTimers();
-  });
-
-  it('does nothing when notifyDriveTriggered() is called while blanking is already hidden', () => {
-    manager.hide();
-    expect(manager.isBlankingActive()).toBe(false);
-    manager.notifyDriveTriggered();
-    expect(manager.isBlankingActive()).toBe(false);
-  });
-
-  it('shows blanking again once AC stops running and shared memory unmaps', () => {
+  it('falls back to hiding once acRunning has been true for AC_LOADED_SAFETY_FALLBACK_MS without acLoaded ever confirming', () => {
+    // Safety net only — protects against blanking getting stuck forever if
+    // shared memory genuinely never comes up (crash, unexpected AC version).
     vi.useFakeTimers();
     manager.setAuto();
     manager.setAcRunning(true);
+    expect(manager.isBlankingActive()).toBe(true);
+    vi.advanceTimersByTime(91000);
+    // Safety fallback triggers evaluate() to schedule the hide-delay
+    // countdown once the 90s ceiling is crossed; the default 10s delay
+    // then still applies on top of it. evaluate() only re-runs reactively,
+    // so re-poke setAcRunning(true) here the same way the real ~2s
+    // heartbeat loop does every tick regardless of whether the value changed.
+    manager.setAcRunning(true);
     vi.advanceTimersByTime(10000);
     expect(manager.isBlankingActive()).toBe(false);
-    manager.setAcRunning(false);
+    vi.useRealTimers();
+  });
+
+  it('shows blanking again once AC shared memory unmaps', () => {
+    vi.useFakeTimers();
+    manager.setAuto();
+    manager.setAcLoaded(true);
+    vi.advanceTimersByTime(10000);
+    expect(manager.isBlankingActive()).toBe(false);
+    manager.setAcLoaded(false);
     expect(manager.isBlankingActive()).toBe(true);
     vi.useRealTimers();
   });
@@ -306,9 +290,9 @@ describe('BlankingManager', () => {
     vi.useFakeTimers();
     manager.setAuto();
     manager.setPodInGame(true);
-    manager.setAcRunning(false);
+    manager.setAcLoaded(false);
     expect(manager.isBlankingActive()).toBe(true);
-    manager.setAcRunning(true);
+    manager.setAcLoaded(true);
     vi.advanceTimersByTime(10000);
     expect(manager.isBlankingActive()).toBe(false);
     vi.useRealTimers();
@@ -557,7 +541,7 @@ describe('BlankingManager', () => {
       'blanking-playlist.json',
     );
     m.setAuto();
-    m.setAcRunning(true);
+    m.setAcLoaded(true);
     expect(onGameRevealed).not.toHaveBeenCalled();
     vi.advanceTimersByTime(9999);
     expect(onGameRevealed).not.toHaveBeenCalled();
@@ -655,7 +639,7 @@ describe('BlankingManager', () => {
     );
     m.setAuto();
     m.setPodInGame(true);
-    m.setAcRunning(true);
+    m.setAcLoaded(true);
     vi.advanceTimersByTime(10000);
     expect(m.isBlankingActive()).toBe(false);
     expect(onGameRevealed).toHaveBeenCalledTimes(1);
@@ -666,7 +650,7 @@ describe('BlankingManager', () => {
     expect(m.isBlankingActive()).toBe(false);
 
     // The game is detected again on the very next poll — never actually gone.
-    m.setAcRunning(true);
+    m.setAcLoaded(true);
     expect(m.isBlankingActive()).toBe(false);
     expect(onGameRevealed).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
@@ -686,12 +670,11 @@ describe('BlankingManager', () => {
     );
     m.setAuto();
     m.setPodInGame(true);
-    m.setAcRunning(true);
+    m.setAcLoaded(true);
     vi.advanceTimersByTime(10000);
     expect(m.isBlankingActive()).toBe(false);
 
     m.setAcLoaded(false);
-    m.setAcRunning(false);
     expect(m.isBlankingActive()).toBe(false);
     m.setAcRunning(false);
     expect(m.isBlankingActive()).toBe(false);

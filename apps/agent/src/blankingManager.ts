@@ -37,6 +37,15 @@ const SLIDESHOW_CROSSFADE_MS = 1200;
  * force-kill watchdog (9s) if the PowerShell process itself gets wedged;
  * this 12s one only matters if something upstream of both of those hangs. */
 const REVEAL_WATCHDOG_MS = 12000;
+/** Safety-net ceiling on how long blanking will keep waiting on `acLoaded`
+ * (AC shared memory mapped and fresh — the real "car has spawned, player is
+ * in Drive" signal) once the process is confirmed running, before falling
+ * back to hiding anyway. Deliberately generous (a slow track/PC can take
+ * well over a minute to load) — this only exists so a genuine failure to
+ * ever see shared memory (crash, unexpected AC version, ...) doesn't leave
+ * blanking stuck forever; it is not meant to be the common case. See
+ * evaluate(). */
+const AC_LOADED_SAFETY_FALLBACK_MS = 90000;
 
 interface SessionResultsSummary {
   clientName?: string;
@@ -85,6 +94,10 @@ export class BlankingManager {
   private process: ChildProcess | null = null;
   private override: BlankingOverride = 'auto';
   private acRunning = false;
+  /** Timestamp `acRunning` last flipped false→true, `null` while not running.
+   * Backs the safety-net fallback in evaluate() — see
+   * AC_LOADED_SAFETY_FALLBACK_MS. */
+  private acRunningSince: number | null = null;
   private acLoaded = false;
   private podInGame = false;
   private missingDuringSessionStreak = 0;
@@ -149,28 +162,6 @@ export class BlankingManager {
     if (!Number.isFinite(seconds) || seconds < 0) return;
     this.hideDelaySeconds = seconds;
     this.logger.info({ hideDelaySeconds: seconds }, 'Blanking hide delay updated');
-  }
-
-  /** Starts the hide-delay countdown from the moment "Drive" was triggered
-   * automatically (luaBridge.autoStart()), instead of waiting for
-   * acRunning/acLoaded to be polled true — requested by the user: once
-   * Drive has been pressed the session is effectively already launched,
-   * well before the exe/menu detection in evaluate() would otherwise start
-   * the same countdown a few seconds later. evaluate()'s acRunning-based
-   * scheduling is left in place as a fallback for any launch path that
-   * never calls this (its own `!this.pendingHideTimeout` check means it
-   * simply no-ops once this has already scheduled the timer). */
-  notifyDriveTriggered(): void {
-    if (!this.isBlankingActive() || this.pendingHideTimeout) return;
-    this.missingDuringSessionStreak = 0;
-    this.logger.info(
-      { hideDelaySeconds: this.hideDelaySeconds },
-      'Drive triggered — starting blanking hide-delay countdown',
-    );
-    this.pendingHideTimeout = setTimeout(() => {
-      this.pendingHideTimeout = null;
-      this.revealThenStop();
-    }, this.hideDelaySeconds * 1000);
   }
 
   async init(): Promise<void> {
@@ -254,6 +245,11 @@ export class BlankingManager {
   }
 
   setAcRunning(running: boolean): void {
+    if (running && !this.acRunning) {
+      this.acRunningSince = Date.now();
+    } else if (!running) {
+      this.acRunningSince = null;
+    }
     this.acRunning = running;
     this.evaluate();
   }
@@ -935,16 +931,23 @@ export class BlankingManager {
       return;
     }
 
-    // Matches the proven approach from the previous production launcher
-    // ("RS Launcher"): hide blanking whenever Assetto Corsa is actually
-    // running (process detected, polled every 2s) or its shared memory is
-    // mapped — no telemetry-based "car ready" confirmation. That approach
-    // (waiting for isSessionStarted via shared memory, held for 5s) chased
-    // a moving target across many releases and was never fully reliable:
-    // two independent telemetry sources could disagree on readiness and
-    // the confirmation would never land. Plain process presence is simpler
-    // and is what actually works in production.
-    const shouldHide = this.acRunning || this.acLoaded;
+    // `acRunning` (process detected) fires the instant acs.exe appears in
+    // the OS process list — well before AC has actually loaded the track,
+    // shown its menu, or spawned the car, which left the hide-delay
+    // countdown starting (and therefore blanking dropping) long before the
+    // driver was actually in Drive, exposing AC's own loading screens
+    // underneath (found in production, v2.2.104). `acLoaded` (shared memory
+    // mapped **and** fresh — packetId actually moving) only becomes true
+    // once a session is genuinely live with the car spawned, which is the
+    // real "mise en drive" moment — that's the primary signal now. `acRunning`
+    // is kept only as a safety-net fallback (AC_LOADED_SAFETY_FALLBACK_MS)
+    // so a genuine failure to ever see shared memory doesn't leave blanking
+    // stuck on screen forever.
+    const acLoadedSafetyFallback =
+      this.acRunning &&
+      this.acRunningSince !== null &&
+      Date.now() - this.acRunningSince > AC_LOADED_SAFETY_FALLBACK_MS;
+    const shouldHide = this.acLoaded || acLoadedSafetyFallback;
 
     if (shouldHide) {
       this.missingDuringSessionStreak = 0;

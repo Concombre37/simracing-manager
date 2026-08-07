@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.104 — Le blanking de lancement se retirait trop tôt, avant que le pilote soit vraiment en piste
+
+### Corrigé
+
+- **Signalé par l'utilisateur : "il faut bien que le blanking screen de start ... ce retire avec le temps mis dans les paramétre du site mais aprés la mise en drive"** (déjà signalé une première fois plus tôt dans le projet, réapparu). Deux mécanismes déclenchaient le compte à rebours de retrait du blanking bien avant que le pilote soit réellement en piste : `notifyDriveTriggered()` (appelé juste après l'envoi de la commande `autoStart` à l'app Lua — un simple fichier écrit sur disque, sans confirmation, potentiellement des dizaines de secondes avant qu'AC n'ait fini de charger) et, dans `evaluate()`, `acRunning` seul (le process `acs.exe` détecté vivant, ce qui arrive dès l'apparition du process dans la liste Windows — bien avant que le menu ou la voiture n'aient chargé). Résultat : le blanking se retirait pendant qu'AC affichait encore son propre écran de chargement/menu en dessous.
+- `notifyDriveTriggered()` supprimé (plus appelé nulle part). Le déclencheur du décompte devient `acLoaded` (mémoire partagée AC mappée **et** fraîche, `packetId` qui avance) — le seul signal qui reflète réellement une session live avec la voiture spawnée, donc la vraie "mise en drive". `acRunning` seul ne suffit plus à démarrer le décompte, mais reste un filet de sécurité (`AC_LOADED_SAFETY_FALLBACK_MS`, 90s) pour ne jamais bloquer le blanking indéfiniment si la mémoire partagée ne se charge jamais.
+
 ## v2.2.103 — Le rétroviseur virtuel (F11) est désormais activé par défaut à chaque lancement
 
 ### Changé
