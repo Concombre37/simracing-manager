@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.108 — Le diaporama de l'écran de lancement fait un vrai fondu enchaîné
+
+### Corrigé
+
+- **Signalé par l'utilisateur : la transition entre les images de l'écran de lancement n'était pas fluide/propre.** `renderSlideshowStyles()` ne définissait qu'un fondu de _sortie_ (`opacity: 1 → 1 → 0 → 0`) — chaque photo s'effaçait donc vers le noir toute seule, puis la suivante apparaissait d'un coup à pleine opacité une fois le fondu terminé : un fondu au noir suivi d'un cut, pas un vrai fondu enchaîné.
+- Les keyframes CSS sont désormais symétriques : chaque image fond en entrée pendant la toute fin du cycle précédent (`100% - fadePct` → `100%`, les deux bornes à opacité 1 pour que la boucle reparte sans saut) exactement pendant la même fenêtre où l'image précédente fond en sortie — les deux se fondent donc réellement l'une dans l'autre au lieu de passer chacune par le noir. Courbe de transition passée de `ease-in-out` à `cubic-bezier(0.45, 0, 0.55, 1)` pour un rendu plus doux. Toujours 100% CSS `@keyframes` (pas de JS, moteur IE11 de la WebBrowser control — voir `renderSlideshowStyles()`).
+
 ## v2.2.107 — Refonte HUD de la page Sessions en cours + protection anti-missclick
 
 ### Changé

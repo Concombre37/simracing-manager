@@ -442,6 +442,12 @@ describe('BlankingManager', () => {
     expect(html).toContain('launch1.jpg');
     expect(html).toContain('launch2.jpg');
     expect(html).toContain('launch3.jpg');
+    // The keyframe loop must fade back IN at 100% (opacity: 1), not just
+    // fade out to opacity: 0 — otherwise the outgoing photo dissolves to
+    // black and the next one pops in with no overlap (a hard cut, not a
+    // crossfade). See renderSlideshowStyles()'s doc comment.
+    expect(html).toContain('100% { opacity: 1; }');
+    expect(html).not.toContain('100% { opacity: 0; }');
   });
 
   it('does not emit a rotation keyframe for a single launching background image', () => {

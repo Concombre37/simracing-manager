@@ -874,7 +874,7 @@ export class BlankingManager {
   }
 
   /** Rotates the launching screen's background photos every ~2.5s with a
-   * crossfade, purely via a CSS @keyframes loop (no JS): every
+   * true crossfade, purely via a CSS @keyframes loop (no JS): every
    * `.scene-bg-layer.slideshow` plays the *same* keyframes/duration, each
    * with its own `animation-delay` (0, interval, 2*interval, ...) so they
    * take turns being the one at opacity 1 — the standard delay-staggered
@@ -887,21 +887,34 @@ export class BlankingManager {
    * animations elsewhere in this same stylesheet) — so this avoids
    * depending on a code path with no track record in this rendering engine.
    * Omitted entirely when there's nothing to rotate between (0 or 1
-   * images). */
+   * images).
+   *
+   * The keyframes are symmetric (fade in AND fade out, not just fade out —
+   * an earlier version only defined `1 → 1 → 0 → 0`, so an outgoing photo
+   * dissolved to black on its own and the next one then popped straight to
+   * full opacity with no overlap, i.e. a hard cut dressed up as a fade).
+   * Each layer now fades in during the tail of the *previous* cycle
+   * (`100% - fadePct` → `100%`, both ends pinned to opacity 1 so the loop
+   * wraps with no jump) and fades out during the tail of its *own* slot
+   * (`fadeStartPct` → `slotPct`) — exactly the same absolute window the
+   * next layer in line uses for its fade-in, so the two genuinely
+   * cross-dissolve into each other instead of both going through black. */
   private renderSlideshowStyles(count: number): string {
     if (count <= 1) return '';
     const totalMs = SLIDESHOW_INTERVAL_MS * count;
     const slotPct = 100 / count;
     const fadePct = (SLIDESHOW_CROSSFADE_MS / totalMs) * 100;
-    const fadeStartPct = Math.max(0, slotPct - fadePct).toFixed(3);
+    const fadeOutStartPct = Math.max(0, slotPct - fadePct).toFixed(3);
+    const fadeInStartPct = Math.max(slotPct, 100 - fadePct).toFixed(3);
     return `
     @keyframes scene-bg-slideshow {
       0% { opacity: 1; }
-      ${fadeStartPct}% { opacity: 1; }
+      ${fadeOutStartPct}% { opacity: 1; }
       ${slotPct.toFixed(3)}% { opacity: 0; }
-      100% { opacity: 0; }
+      ${fadeInStartPct}% { opacity: 0; }
+      100% { opacity: 1; }
     }
-    .scene-bg-layer.slideshow { animation: scene-bg-slideshow ${totalMs}ms ease-in-out infinite; }`;
+    .scene-bg-layer.slideshow { animation: scene-bg-slideshow ${totalMs}ms cubic-bezier(0.45, 0, 0.55, 1) infinite; }`;
   }
 
   private toFileUrl(filePath: string): string {
