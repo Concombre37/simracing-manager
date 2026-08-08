@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.107 — Refonte HUD de la page Sessions en cours + protection anti-missclick
+
+### Changé
+
+- **Demandé par l'utilisateur : refaire le design de `/en-cours` dans le même style HUD racing-blue/cyan que le reste du site** (Dashboard, Postes, Serveurs dédiés, Kiosque, Assistant serveur), resté à l'ancien design system (orange, cartes génériques) depuis la refonte v2.2.96. Design produit avec Claude Design (projet "Assetto Corsa HUD Design", fichier `Sessions en cours HUD.dc.html`) puis adapté directement en React/Tailwind : état vide avec anneaux concentriques + motif diagonal, cartes de session avec vignette circuit, jauges arc SVG RPM/vitesse, barres accélérateur/frein/progression circuit, tuiles meilleur/dernier tour, badges de connexion et de difficulté. Icônes Phosphor du mockup converties en Lucide (seule bibliothèque du projet).
+
+### Ajouté
+
+- **Demandé par l'utilisateur : protéger les boutons à risque (Stop, réduction de temps) contre les erreurs de missclick, avec une confirmation simple.** Nouveau composant `ConfirmButton` : premier clic arme le bouton (libellé "Confirmer ?" + barre témoin qui se vide sur ~2,2s), second clic dans la fenêtre déclenche l'action, sinon retour automatique à l'état normal. Appliqué au bouton **Stop** et aux boutons **−1 min / −5 min** de chaque carte de session — les boutons d'ajout de temps (+1/+5/+15 min), sans risque, restent en accès direct.
+
 ## v2.2.106 — Date de création visible sur les serveurs dédiés
 
 ### Ajouté
