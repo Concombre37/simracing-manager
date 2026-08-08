@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.113 — Diaporama de lancement repensé de zéro : bascule de classe par timer au lieu de keyframes CSS
+
+### Changé
+
+- **Demandé par l'utilisateur : repartir de zéro sur la transition, quitte à abandonner le fondu s'il le faut, pour un rendu propre et sans lag possible.** L'ancien mécanisme (N couches empilées, chacune avec son propre `animation-delay`, toutes animées en permanence via un `@keyframes` calculé en pourcentages) a connu plusieurs bugs réels en quatre versions (fondu asymétrique, hack GPU probablement responsable d'un blocage total de l'animation) avant que la vraie cause de "rien ne change" soit trouvée ailleurs (cache IE11 sur un nom de fichier fixe, v2.2.112). Une fois cette cause réglée, le mécanisme CSS lui-même restait plus complexe que nécessaire.
+- **Nouveau mécanisme, radicalement plus simple** : chaque image de fond est une couche `.scene-bg-layer` normale ; seule la première démarre avec la classe `active`. Un minuscule script inline (`renderSlideshowScript()`) déplace cette classe d'une couche à la suivante toutes les 4 secondes via `setInterval` — la transition `opacity` déjà existante et déjà éprouvée pour le cas image unique fait tout le travail de fondu des deux côtés en même temps, puisque les deux couches réagissent à la même mutation DOM. Plus aucun calcul de pourcentages de keyframes, plus qu'un seul fondu actif à la fois (au lieu de N animations perpétuelles en arrière-plan) — la lecture la plus directe possible de "propre et sans lag".
+- **Le script est protégé (`try/catch`) et le côté sûr par défaut** : si l'exécution JS échouait pour une raison quelconque dans ce moteur, la première image reste simplement affichée sans rotation — jamais d'écran cassé, juste pas de diaporama. L'ancienne réserve envers le JS dans ce moteur ("aucun antécédent vérifié") est levée : `FEATURE_BROWSER_EMULATION` force déjà un vrai mode document IE11, où `setInterval`/`className` sont des fonctionnalités de base, pas une zone grise — et l'approche 100% CSS a fini par accumuler plus de bugs réels que n'en aurait jamais causé un script aussi minimal.
+- Nouveau test verrouillant le mécanisme : la classe `active` n'existe qu'une fois dans le HTML initial, le script de rotation est bien présent pour plusieurs images et absent pour une seule.
+
 ## v2.2.112 — Vraie root-cause : le fichier HTML de lancement gardait toujours le même nom, IE11 servait une version en cache
 
 ### Corrigé

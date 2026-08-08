@@ -419,7 +419,7 @@ describe('BlankingManager', () => {
     expect(html).toContain('ks_monza');
   });
 
-  it('crossfades between multiple launching background images with a pure-CSS keyframe loop', () => {
+  it('crossfades between multiple launching background images with a class-toggling timer', () => {
     manager.setAuto();
     manager.setAcRunning(false);
     manager.setLaunchingMediaPaths([
@@ -433,34 +433,25 @@ describe('BlankingManager', () => {
     const { resultsHtmlPath } = lastSpawnArgs();
     const html = readFileSync(resultsHtmlPath!, 'utf-8');
     expect(html.match(/scene-bg-layer/g)?.length).toBeGreaterThanOrEqual(3);
-    expect(html).toContain('scene-bg-layer slideshow');
-    expect(html).toContain('@keyframes scene-bg-slideshow');
-    expect(html).not.toContain('<script>');
-    expect(html).toContain('animation-delay:0ms');
-    expect(html).toContain('animation-delay:4000ms');
-    expect(html).toContain('animation-delay:8000ms');
+    // Exactly one layer starts active (the first) — no bespoke keyframe
+    // class, no per-layer animation-delay: the rotation script alone moves
+    // `active` around at runtime. Matched as a class attribute specifically
+    // since the same string also legitimately appears once more inside the
+    // rotation script's own source (the className it assigns at runtime).
+    expect(html.match(/class="scene-bg-layer active"/g)?.length).toBe(1);
+    expect(html).not.toContain('@keyframes scene-bg-slideshow');
+    expect(html).not.toContain('animation-delay');
     expect(html).toContain('launch1.jpg');
     expect(html).toContain('launch2.jpg');
     expect(html).toContain('launch3.jpg');
-    // The keyframe loop must fade back IN at 100% (opacity: 1), not just
-    // fade out to opacity: 0 — otherwise the outgoing photo dissolves to
-    // black and the next one pops in with no overlap (a hard cut, not a
-    // crossfade). See renderSlideshowStyles()'s doc comment.
-    expect(html).toContain('100% { opacity: 1; }');
-    expect(html).not.toContain('100% { opacity: 0; }');
-    // No 3D-transform GPU-promotion hack — tried and reverted, see
-    // renderSlideshowStyles()'s doc comment (no track record in this exact
-    // WPF WebBrowser/IE11 combination, and old Trident builds are known to
-    // sometimes stop animating other properties entirely on 3D-transformed
-    // elements instead of just being faster).
-    expect(html).not.toContain('translateZ');
-    // The animation must fully own opacity on rotating layers — a leftover
-    // `transition: opacity` from the single-image (.active) rule fights the
-    // keyframe animation for the same property in IE11.
-    expect(html).toMatch(/\.scene-bg-layer\.slideshow\s*\{[^}]*transition:\s*none;/);
+    // The rotation timer itself, and its interval.
+    expect(html).toContain('<script>');
+    expect(html).toContain('getElementsByClassName');
+    expect(html).toContain('setInterval');
+    expect(html).toContain('}, 4000);');
   });
 
-  it('does not emit a rotation keyframe for a single launching background image', () => {
+  it('does not emit a rotation script for a single launching background image', () => {
     manager.setAuto();
     manager.setAcRunning(false);
     manager.setLaunchingMediaPaths(['C:\\media\\launch1.jpg']);
@@ -470,7 +461,6 @@ describe('BlankingManager', () => {
     const { resultsHtmlPath } = lastSpawnArgs();
     const html = readFileSync(resultsHtmlPath!, 'utf-8');
     expect(html).toContain('scene-bg-layer active');
-    expect(html).not.toContain('scene-bg-layer slideshow');
     expect(html).not.toContain('@keyframes scene-bg-slideshow');
     expect(html).not.toContain('<script>');
   });

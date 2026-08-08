@@ -22,16 +22,14 @@ const MAX_EARLY_EXIT_RETRIES = 3;
  * against a single transient tasklist.exe/shared-memory glitch yanking
  * blanking back over a live race. See evaluate(). */
 const MISSING_STREAK_THRESHOLD_DURING_SESSION = 3;
-/** Time each launching-screen background photo stays as the visible one
- * before crossfading to the next (see renderSlideshowStyles()). Kept well
- * above SLIDESHOW_CROSSFADE_MS so most of the slot is a calm, fully-settled
- * hold rather than a near-constant fade — the previous 2500ms/1200ms pair
- * left barely 1.3s of hold, which read as restless/busy rather than smooth. */
+/** Time each launching-screen background photo stays fully visible before
+ * the slideshow timer (see renderSlideshowScript()) swaps to the next one.
+ * Kept well above SLIDESHOW_CROSSFADE_MS so most of the cycle is a calm,
+ * fully-settled hold rather than a near-constant fade. */
 const SLIDESHOW_INTERVAL_MS = 4000;
-/** Duration of the opacity crossfade between two consecutive photos —
- * carved out of the tail end of each SLIDESHOW_INTERVAL_MS slot. Long
- * enough to read as a deliberate, cinematic dissolve rather than a quick
- * blend. */
+/** Duration of the opacity crossfade between two consecutive photos — the
+ * `.scene-bg-layer` transition duration, shared by both the slideshow
+ * rotation and the single-image fade-in. */
 const SLIDESHOW_CROSSFADE_MS = 1800;
 /** Hard cap on how long a single revealThenStop() attempt waits on
  * onGameRevealed() before treating it as "not confirmed" and moving on
@@ -514,7 +512,14 @@ export class BlankingManager {
       background-size: cover;
       background-repeat: no-repeat;
       opacity: 0;
-      transition: opacity 1.2s ease-in-out;
+      /* This single transition rule is the ONLY thing that ever animates a
+       * crossfade on this screen — both the one-time single-image fade-in
+       * (.active added once) and every slideshow rotation step
+       * (.active added/removed by renderSlideshowScript()'s timer) go
+       * through it. One proven mechanism instead of two independent ones
+       * (a previous version drove rotation with a separate hand-rolled
+       * @keyframes timeline) means there's a single place to get right. */
+      transition: opacity ${SLIDESHOW_CROSSFADE_MS}ms ease-in-out;
     }
     .scene-bg-layer.active { opacity: 1; }
     .scene-bg-overlay {
@@ -522,7 +527,6 @@ export class BlankingManager {
       left: 0; right: 0; top: 0; bottom: 0;
       background: rgba(5,5,8,0.5);
     }
-    ${this.renderSlideshowStyles(photoPaths.length)}
     .scene-glow-launch {
       position: absolute; left: 0; right: 0; bottom: 0; height: 10.156vw;
       background: linear-gradient(to top, rgba(0,87,255,0.14), rgba(0,0,0,0));
@@ -882,91 +886,77 @@ export class BlankingManager {
     return shuffled;
   }
 
-  /** Stacked, absolutely-positioned background images. A single path (the
-   * results logo, or a launching screen with only one image configured)
-   * just gets the initial fade-in (.active, see the .scene-bg-layer
-   * transition rule) and stays there. Multiple paths instead get the
-   * `slideshow` class plus a staggered `animation-delay` — see
-   * renderSlideshowStyles() for the actual rotation, driven entirely by a
-   * CSS @keyframes loop rather than a JS timer (see that method for why). */
+  /** Stacked, absolutely-positioned background images. Every path renders
+   * as a plain `.scene-bg-layer` div; only the first one starts with the
+   * `active` class, so a single image (the results logo, or a launching
+   * screen with only one photo configured) just gets the existing fade-in
+   * transition and sits there forever — a safe, always-correct baseline
+   * with no timer involved at all. Multiple photos additionally get a tiny
+   * inline rotation script (see renderSlideshowScript()) appended after the
+   * layers; if that script somehow never runs, the page is left exactly in
+   * this same safe single-static-image state instead of anything broken. */
   private renderSceneBackgroundLayers(photoPaths: string[]): string {
     if (photoPaths.length === 0) return '';
-    const rotating = photoPaths.length > 1;
     const layers = photoPaths
       .map((p, i) => {
-        const cls = rotating ? 'scene-bg-layer slideshow' : 'scene-bg-layer active';
-        const style = rotating
-          ? `background-image:url('${this.toFileUrl(p)}');animation-delay:${i * SLIDESHOW_INTERVAL_MS}ms`
-          : `background-image:url('${this.toFileUrl(p)}')`;
-        return `<div class="${cls}" style="${style}"></div>`;
+        const cls = i === 0 ? 'scene-bg-layer active' : 'scene-bg-layer';
+        return `<div class="${cls}" style="background-image:url('${this.toFileUrl(p)}')"></div>`;
       })
       .join('');
-    return `${layers}<div class="scene-bg-overlay"></div>`;
+    const script = photoPaths.length > 1 ? this.renderSlideshowScript() : '';
+    return `${layers}<div class="scene-bg-overlay"></div>${script}`;
   }
 
-  /** Rotates the launching screen's background photos every SLIDESHOW_INTERVAL_MS with a
-   * true crossfade, purely via a CSS @keyframes loop (no JS): every
-   * `.scene-bg-layer.slideshow` plays the *same* keyframes/duration, each
-   * with its own `animation-delay` (0, interval, 2*interval, ...) so they
-   * take turns being the one at opacity 1 — the standard delay-staggered
-   * pure-CSS crossfade technique. Deliberately not implemented as a JS
-   * setInterval (an earlier version was): this HTML is rendered inside a
-   * WPF WebBrowser control locked to IE11 (see blanking.ps1's
-   * FEATURE_BROWSER_EMULATION) where script execution has never actually
-   * been exercised by anything in this codebase, unlike CSS @keyframes
-   * (already used and confirmed working for the spinner/loading-bar
-   * animations elsewhere in this same stylesheet) — so this avoids
-   * depending on a code path with no track record in this rendering engine.
-   * Omitted entirely when there's nothing to rotate between (0 or 1
-   * images).
+  /** Rotates the launching screen's background photos: every
+   * SLIDESHOW_INTERVAL_MS, moves the `active` class from the current
+   * `.scene-bg-layer` to the next one in DOM order (wrapping around) — the
+   * existing `.scene-bg-layer` transition rule (already proven for the
+   * single-image fade-in) then animates both sides of that class swap on
+   * its own, opacity 1→0 on the outgoing layer and 0→1 on the incoming one,
+   * genuinely simultaneously since they're driven by the exact same
+   * transition rule reacting to the exact same DOM mutation. No bespoke
+   * keyframe timeline, no percentage math to get subtly wrong, and only
+   * ever one crossfade in flight at a time instead of every layer
+   * perpetually animating in the background.
    *
-   * The keyframes are symmetric (fade in AND fade out, not just fade out —
-   * an earlier version only defined `1 → 1 → 0 → 0`, so an outgoing photo
-   * dissolved to black on its own and the next one then popped straight to
-   * full opacity with no overlap, i.e. a hard cut dressed up as a fade).
-   * Each layer now fades in during the tail of the *previous* cycle
-   * (`100% - fadePct` → `100%`, both ends pinned to opacity 1 so the loop
-   * wraps with no jump) and fades out during the tail of its *own* slot
-   * (`fadeStartPct` → `slotPct`) — exactly the same absolute window the
-   * next layer in line uses for its fade-in, so the two genuinely
-   * cross-dissolve into each other instead of both going through black.
+   * This replaces an earlier pure-CSS @keyframes version (delay-staggered
+   * `animation-delay` per layer, all N layers animating forever in a
+   * shared loop) that went through several rounds of real bugs — an
+   * asymmetric fade-out-only keyframe, then a GPU-promotion `transform`
+   * hack that likely broke animation interpolation entirely on some
+   * builds — each fixed in turn without ever actually solving the
+   * complaint, because the deeper issue was unrelated (the launching HTML
+   * being cached under a fixed filename, see generateLaunchingHtml()).
+   * With that fixed, a simpler mechanism is worth it on its own merits:
+   * fewer moving parts to get wrong, not a reaction to any one bug.
    *
-   * A GPU-layer-promotion hack (`transform: translateZ(0)`) was tried here
-   * and reverted: it has no track record in this specific WPF WebBrowser/
-   * IE11 combination (unlike plain opacity keyframes and `ease-in-out`,
-   * both already proven elsewhere in this exact stylesheet — see
-   * `.scene-bg-layer`'s own pre-existing transition and the
-   * spinner/loading-bar animations), and old Trident builds have a known
-   * history of 3D-transformed elements silently stopping other properties
-   * from animating at all instead of just being faster — which reads
-   * exactly like the reported regression (hard pop instead of any fade).
-   * Same reasoning as the JS-vs-CSS choice above: prefer the technique with
-   * a real track record over a plausible-sounding one with none. */
-  private renderSlideshowStyles(count: number): string {
-    if (count <= 1) return '';
-    const totalMs = SLIDESHOW_INTERVAL_MS * count;
-    const slotPct = 100 / count;
-    const fadePct = (SLIDESHOW_CROSSFADE_MS / totalMs) * 100;
-    const fadeOutStartPct = Math.max(0, slotPct - fadePct).toFixed(3);
-    const fadeInStartPct = Math.max(slotPct, 100 - fadePct).toFixed(3);
-    return `
-    @keyframes scene-bg-slideshow {
-      0% { opacity: 1; }
-      ${fadeOutStartPct}% { opacity: 1; }
-      ${slotPct.toFixed(3)}% { opacity: 0; }
-      ${fadeInStartPct}% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-    .scene-bg-layer.slideshow {
-      /* The base .scene-bg-layer rule above sets a "transition: opacity"
-       * for the single-image (.active) case — left running here too, it
-       * fights the keyframe animation for the same property in IE11
-       * (the two engines disagree on which one "wins" a given frame,
-       * producing exactly the kind of micro-stutter this rewrite is
-       * fixing), so the slideshow variant explicitly turns it off. */
-      transition: none;
-      animation: scene-bg-slideshow ${totalMs}ms ease-in-out infinite;
-    }`;
+   * Reintroduces a small `<script>` where CSS @keyframes had deliberately
+   * been preferred before due to "script execution has no track record in
+   * this WPF WebBrowser/IE11 combination". That reasoning is dropped: the
+   * FEATURE_BROWSER_EMULATION registry key blanking.ps1 already sets
+   * forces genuine IE11 document mode specifically so this control behaves
+   * like a real modern-enough browser (flexbox, gradients) rather than its
+   * IE7 default — full ES5 script execution (setInterval, className) is
+   * core IE11 functionality, not an edge case, and CSS-only turned out to
+   * have its own real bugs across several rounds. Wrapped in try/catch so
+   * a genuinely broken environment degrades to the static first image
+   * (see renderSceneBackgroundLayers()) instead of throwing. */
+  private renderSlideshowScript(): string {
+    return `<script>
+(function () {
+  try {
+    var layers = document.getElementsByClassName('scene-bg-layer');
+    if (layers.length < 2) return;
+    var current = 0;
+    setInterval(function () {
+      var next = (current + 1) % layers.length;
+      layers[current].className = 'scene-bg-layer';
+      layers[next].className = 'scene-bg-layer active';
+      current = next;
+    }, ${SLIDESHOW_INTERVAL_MS});
+  } catch (e) {}
+})();
+</script>`;
   }
 
   private toFileUrl(filePath: string): string {
