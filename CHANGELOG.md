@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.111 — Retrait du hack GPU probablement responsable du "pop" au lieu du fondu
+
+### Corrigé
+
+- **Signalé par l'utilisateur après la mise à jour v2.2.109/110 : transition toujours pas fluide, désormais décrite comme "écran noir et paf prochaine image"** — un symptôme de cut brutal, pas d'un fondu qui manque juste de finesse. Suspect principal : le hack de promotion GPU ajouté en v2.2.109 (`transform: translateZ(0)` sur `.scene-bg-layer`), une technique choisie sans aucun antécédent vérifié dans cette combinaison précise (WPF WebBrowser control verrouillé sur le moteur IE11) — or les anciens builds Trident ont un historique documenté de blocage complet de l'animation d'autres propriétés sur un élément promu en 3D, plutôt qu'une simple accélération. Ce comportement collerait exactement avec un cut brutal à la place d'un fondu.
+- **Retiré** : plus de `transform`/`backface-visibility` sur les couches de fond. Retour à une animation `opacity` pure, sans aucun hack — la même approche minimale déjà éprouvée ailleurs dans cette feuille de style (transition `.scene-bg-layer` d'origine, animations spinner/barre de chargement) plutôt qu'une technique inventée sans preuve qu'elle fonctionne dans ce moteur précis. Le fondu croisé symétrique (v2.2.109) et la neutralisation du conflit `transition`/`animation` restent en place, tous deux de simples animations `opacity` sans transform.
+- Courbe de transition repassée de `cubic-bezier(0.45, 0, 0.55, 1)` à `ease-in-out`, déjà utilisée avec succès pour l'opacité dans cette même feuille de style.
+
 ## v2.2.110 — Root-cause du jank du diaporama : images redimensionnées côté serveur + bug de cache agent corrigé
 
 ### Ajouté

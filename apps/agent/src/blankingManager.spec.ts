@@ -448,9 +448,12 @@ describe('BlankingManager', () => {
     // crossfade). See renderSlideshowStyles()'s doc comment.
     expect(html).toContain('100% { opacity: 1; }');
     expect(html).not.toContain('100% { opacity: 0; }');
-    // GPU layer promotion (see .scene-bg-layer's doc comment) — without it
-    // the IE11 engine software-rasterizes the crossfade and it stutters.
-    expect(html).toContain('transform: translateZ(0);');
+    // No 3D-transform GPU-promotion hack — tried and reverted, see
+    // renderSlideshowStyles()'s doc comment (no track record in this exact
+    // WPF WebBrowser/IE11 combination, and old Trident builds are known to
+    // sometimes stop animating other properties entirely on 3D-transformed
+    // elements instead of just being faster).
+    expect(html).not.toContain('translateZ');
     // The animation must fully own opacity on rotating layers — a leftover
     // `transition: opacity` from the single-image (.active) rule fights the
     // keyframe animation for the same property in IE11.

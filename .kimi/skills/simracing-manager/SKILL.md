@@ -1,6 +1,6 @@
 # SimRacing Manager — Skill
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.110`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.111`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -8,7 +8,7 @@ Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au
 - **GitHub**: `Concombre37/simracing-manager`
 - **Production**: `https://simracing.hytlabs.com` (derrière Cloudflare Tunnel — voir mémoire `hytlabs-cloudflare-tunnel`)
 - **Architecture**: NestJS 10 (backend) + React 18/Vite (frontend) + agent Windows Node.js (`pkg`), le tout en npm workspaces.
-- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.110`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
+- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.111`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
 - **Deux stations réelles connues** (hytlabs) : `concombre` (rôle `admin`, hôte de serveurs dédiés, IP `192.168.1.63`) et `desktop-gl3t50t` (rôle `simulator`, POD joueur, IP `192.168.1.64`).
 
 ### Agents

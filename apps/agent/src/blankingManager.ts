@@ -515,15 +515,6 @@ export class BlankingManager {
       background-repeat: no-repeat;
       opacity: 0;
       transition: opacity 1.2s ease-in-out;
-      /* Forces this layer onto its own DirectComposition-backed surface in
-       * the IE11 engine (WPF WebBrowser control) instead of the software
-       * rasterizer repainting the whole viewport on every opacity tick —
-       * the classic "null 3D transform" GPU-promotion hack, supported since
-       * IE10. Without it, crossfading two full-screen 5120x1440 photos is
-       * CPU-bound and visibly stutters on modest POD hardware. */
-      transform: translateZ(0);
-      -ms-transform: translateZ(0);
-      backface-visibility: hidden;
     }
     .scene-bg-layer.active { opacity: 1; }
     .scene-bg-overlay {
@@ -887,7 +878,7 @@ export class BlankingManager {
     return `${layers}<div class="scene-bg-overlay"></div>`;
   }
 
-  /** Rotates the launching screen's background photos every ~2.5s with a
+  /** Rotates the launching screen's background photos every SLIDESHOW_INTERVAL_MS with a
    * true crossfade, purely via a CSS @keyframes loop (no JS): every
    * `.scene-bg-layer.slideshow` plays the *same* keyframes/duration, each
    * with its own `animation-delay` (0, interval, 2*interval, ...) so they
@@ -912,7 +903,19 @@ export class BlankingManager {
    * wraps with no jump) and fades out during the tail of its *own* slot
    * (`fadeStartPct` → `slotPct`) — exactly the same absolute window the
    * next layer in line uses for its fade-in, so the two genuinely
-   * cross-dissolve into each other instead of both going through black. */
+   * cross-dissolve into each other instead of both going through black.
+   *
+   * A GPU-layer-promotion hack (`transform: translateZ(0)`) was tried here
+   * and reverted: it has no track record in this specific WPF WebBrowser/
+   * IE11 combination (unlike plain opacity keyframes and `ease-in-out`,
+   * both already proven elsewhere in this exact stylesheet — see
+   * `.scene-bg-layer`'s own pre-existing transition and the
+   * spinner/loading-bar animations), and old Trident builds have a known
+   * history of 3D-transformed elements silently stopping other properties
+   * from animating at all instead of just being faster — which reads
+   * exactly like the reported regression (hard pop instead of any fade).
+   * Same reasoning as the JS-vs-CSS choice above: prefer the technique with
+   * a real track record over a plausible-sounding one with none. */
   private renderSlideshowStyles(count: number): string {
     if (count <= 1) return '';
     const totalMs = SLIDESHOW_INTERVAL_MS * count;
@@ -936,7 +939,7 @@ export class BlankingManager {
        * producing exactly the kind of micro-stutter this rewrite is
        * fixing), so the slideshow variant explicitly turns it off. */
       transition: none;
-      animation: scene-bg-slideshow ${totalMs}ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+      animation: scene-bg-slideshow ${totalMs}ms ease-in-out infinite;
     }`;
   }
 
