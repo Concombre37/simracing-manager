@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.2.110 — Root-cause du jank du diaporama : images redimensionnées côté serveur + bug de cache agent corrigé
+
+### Ajouté
+
+- **Suite du fix v2.2.109 : redimensionnement automatique des images de blanking (`launching`/`results`) à l'upload.** Confirmé en creusant que les 11 photos de lancement actuellement en ligne pesaient jusqu'à 2,2 Mo en **5120×1440 natif** (résolution des fonds d'écran sources), sans aucune limite ni redimensionnement nulle part dans le pipeline d'upload (max 100 Mo autorisé). Décoder et blender plusieurs images de cette taille en continu dans le moteur IE11 (software, pas de vraie composition GPU pour du contenu non promu) était probablement le facteur dominant du jank, indépendamment du fondu CSS lui-même. Nouvelle dépendance `sharp` côté backend : toute image envoyée sur ces catégories est désormais limitée à 2560px sur son plus grand côté (`fit: inside`, format d'origine conservé, aucun forçage en JPEG) — largement au-dessus de la résolution physique de n'importe quel POD connu (1920×1080), très en dessous du coût de décodage d'un fond d'écran natif.
+- **Migration ponctuelle des 12 fichiers déjà en base** (11 photos de lancement + logo résultats) : toutes redimensionnées en place (même id, `updatedAt` mis à jour automatiquement par Prisma). Exemple : `2024-Formula1-Alpine-A524-001-1440sw.jpg` passe de 2 178 025 à 394 325 octets (5120×1440 → 2560×720).
+
+### Corrigé
+
+- **Bug de cache trouvé en creusant le pipeline de sync agent, indépendant du jank lui-même mais qui aurait empêché ce correctif de jamais atteindre les PODs déjà provisionnés** : `BlankingMediaSync.syncCategory()` ne re-téléchargeait un média que s'il n'existait pas _du tout_ localement (`localFiles.has(id+ext)`) — un fichier déjà présent sous son id était considéré à jour pour toujours, même si son contenu changeait côté serveur (comme ici, un remplacement en place lors du redimensionnement). Nouveau manifeste local (`.manifest.json` par catégorie, `id → updatedAt`) : un média n'est plus considéré à jour que si son `updatedAt` serveur correspond à celui enregistré lors du dernier téléchargement — sinon il est retéléchargé même si le fichier existe déjà localement.
+
 ## v2.2.109 — Diaporama de lancement : transition repensée pour être vraiment fluide
 
 ### Changé

@@ -55,18 +55,29 @@ export class BlankingMediaSync {
     await fs.mkdir(dir, { recursive: true });
 
     const localFiles = await this.listLocalFiles(dir);
+    // Tracks each cached file's server `updatedAt` so a same-id re-upload
+    // (e.g. an image replaced in place, or resized server-side) is detected
+    // and re-downloaded — without this, a file existing on disk under its
+    // id was treated as "already synced" forever, no matter how stale its
+    // content actually was.
+    const manifest = await this.readManifest(dir);
+    const nextManifest: Record<string, string> = {};
     const remoteIds = new Set<string>();
     const keptPaths: string[] = [];
 
     for (const media of mediaList) {
       remoteIds.add(media.id);
       const ext = path.extname(media.filename) || this.mimeToExt(media.mimeType);
-      const localPath = path.join(dir, `${media.id}${ext}`);
+      const filename = `${media.id}${ext}`;
+      const localPath = path.join(dir, filename);
       keptPaths.push(localPath);
 
-      if (!localFiles.has(`${media.id}${ext}`)) {
+      const updatedAt = String(media.updatedAt);
+      const stale = !localFiles.has(filename) || manifest[media.id] !== updatedAt;
+      if (stale) {
         await this.downloadMedia(media, localPath, token);
       }
+      nextManifest[media.id] = updatedAt;
     }
 
     // Remove local files no longer in the remote list
@@ -83,8 +94,31 @@ export class BlankingMediaSync {
       }
     }
 
+    await this.writeManifest(dir, nextManifest);
+
     this.logger.info({ category, count: keptPaths.length }, 'Blanking media sync complete');
     return keptPaths;
+  }
+
+  private manifestPath(dir: string): string {
+    return path.join(dir, '.manifest.json');
+  }
+
+  private async readManifest(dir: string): Promise<Record<string, string>> {
+    try {
+      const raw = await fs.readFile(this.manifestPath(dir), 'utf-8');
+      return JSON.parse(raw) as Record<string, string>;
+    } catch {
+      return {};
+    }
+  }
+
+  private async writeManifest(dir: string, manifest: Record<string, string>): Promise<void> {
+    try {
+      await fs.writeFile(this.manifestPath(dir), JSON.stringify(manifest));
+    } catch (err) {
+      this.logger.debug({ err, dir }, 'Failed to write blanking media manifest');
+    }
   }
 
   private applyPaths(category: BlankingMediaCategory, paths: string[]): void {
@@ -104,7 +138,13 @@ export class BlankingMediaSync {
   private async listLocalFiles(dir: string): Promise<Set<string>> {
     try {
       const entries = await fs.readdir(dir, { withFileTypes: true });
-      return new Set(entries.filter((e) => e.isFile()).map((e) => e.name));
+      // Excludes the manifest itself — it isn't a media file keyed by a
+      // remote id, so leaving it in would make the stale-file cleanup below
+      // delete it again on every single sync right after writeManifest()
+      // wrote it.
+      return new Set(
+        entries.filter((e) => e.isFile() && e.name !== '.manifest.json').map((e) => e.name),
+      );
     } catch {
       return new Set();
     }

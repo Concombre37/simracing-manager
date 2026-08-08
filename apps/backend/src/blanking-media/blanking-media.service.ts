@@ -1,9 +1,11 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BlankingMediaCategory } from '@simracing/shared';
@@ -17,6 +19,16 @@ const ALLOWED_IMAGE_TYPES = [
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/webm'];
 const ALLOWED_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
 const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+/** Launching/results images are rendered full-bleed ("cover") inside a
+ * WPF WebBrowser control locked to the IE11 engine — a legacy
+ * software-ish rasterizer that has to decode and alpha-blend every stacked
+ * background layer on each crossfade frame (see blankingManager.ts's
+ * renderSlideshowStyles()). Raw uploads (camera/wallpaper-site photos,
+ * sometimes several MB at native 5120x1440+) turned that into a real
+ * stutter independent of the CSS transition itself. Capping the longest
+ * edge here keeps every upload well above any known POD's physical
+ * resolution (1920x1080) while staying far cheaper to decode/blend. */
+const MAX_IMAGE_DIMENSION = 2560;
 
 // Only the idle waiting screen supports video slideshows and differs
 // per-station; the launching screen (rotating background images) and the
@@ -41,6 +53,8 @@ export interface BlankingMediaFile {
 
 @Injectable()
 export class BlankingMediaService {
+  private readonly logger = new Logger(BlankingMediaService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
@@ -267,6 +281,43 @@ export class BlankingMediaService {
     }
   }
 
+  /** Downscales an oversized image so neither dimension exceeds
+   * MAX_IMAGE_DIMENSION, preserving aspect ratio and the original format
+   * (no forced re-encode to JPEG — keeps PNG/WebP transparency intact for
+   * whatever future use might need it). A no-op for videos, already
+   * small-enough images, or anything sharp fails to decode — a bad/unusual
+   * file should never block the upload itself, it just skips the
+   * optimization and stores the original bytes as before. */
+  private async resizeImageIfNeeded(
+    buffer: Buffer,
+    mimeType: string,
+  ): Promise<Buffer> {
+    if (!ALLOWED_IMAGE_TYPES.includes(mimeType)) {
+      return buffer;
+    }
+    try {
+      const image = sharp(buffer);
+      const { width, height } = await image.metadata();
+      if (!width || !height) {
+        return buffer;
+      }
+      if (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION) {
+        return buffer;
+      }
+      return await image
+        .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .toBuffer();
+    } catch (err) {
+      this.logger.warn(
+        `Failed to resize blanking media image, storing original: ${err}`,
+      );
+      return buffer;
+    }
+  }
+
   private async saveMedia(
     stationDbId: string | null,
     businessStationId: string | null,
@@ -290,6 +341,7 @@ export class BlankingMediaService {
     const nextOrder = (maxOrderRow?.order ?? -1) + 1;
 
     const id = randomUUID();
+    const data = await this.resizeImageIfNeeded(file.buffer, file.mimetype);
 
     const media = await this.prisma.blankingMedia.create({
       data: {
@@ -298,8 +350,8 @@ export class BlankingMediaService {
         category,
         filename: file.originalname,
         mimeType: file.mimetype,
-        sizeBytes: file.size,
-        data: file.buffer,
+        sizeBytes: data.length,
+        data,
         order: nextOrder,
       },
     });
