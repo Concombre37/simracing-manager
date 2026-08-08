@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.112 — Vraie root-cause : le fichier HTML de lancement gardait toujours le même nom, IE11 servait une version en cache
+
+### Corrigé
+
+- **Signalé par l'utilisateur après v2.2.108→111 : "rendu exactement comme si rien n'avait changé"** — un signal fort qu'aucune des quatre corrections précédentes (fondu symétrique, promotion GPU puis son retrait, réglages de rythme) n'avait de chance d'être visible, quel que soit leur bien-fondé individuel.
+- **Vraie cause trouvée** : `generateLaunchingHtml()` écrivait toujours sur le même chemin fixe (`session-launching.html`), et le contrôle WebBrowser (moteur IE11) garde un cache disque persistant indexé par URL qui survit au redémarrage du processus — chaque écran de lancement est une toute nouvelle fenêtre PowerShell/WPF, pas un rechargement d'une fenêtre déjà ouverte, donc `Navigate()` vers un chemin déjà visité par une session précédente peut renvoyer le document mis en cache au lieu de reparser le fichier fraîchement réécrit. Résultat : n'importe quel changement de CSS/HTML sur cet écran pouvait rester invisible indéfiniment, peu importe sa correction.
+- **Fix** : chaque génération de l'écran de lancement obtient désormais un nom de fichier unique (`session-launching-<timestamp>-<random>.html`), donc jamais vu par le cache. Le fichier précédent est supprimé juste après la bascule vers le nouveau pour ne pas accumuler de fichiers dans le dossier temporaire sur une longue session. L'écran de résultats n'est pas concerné : son mécanisme de rafraîchissement en place (poll + `Navigate()` vers le même chemin, déjà en prod) dépend justement d'un chemin stable pour fonctionner.
+- Nouveau test verrouillant ce comportement : deux lancements séparés (avec un vrai redémarrage entre les deux, pas la mise à jour en place déjà couverte) doivent obtenir deux chemins différents.
+
 ## v2.2.111 — Retrait du hack GPU probablement responsable du "pop" au lieu du fondu
 
 ### Corrigé

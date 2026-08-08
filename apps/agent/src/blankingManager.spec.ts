@@ -486,6 +486,30 @@ describe('BlankingManager', () => {
     expect(vi.mocked(spawn).mock.calls.length).toBe(spawnCountAfterFirstShow);
   });
 
+  it('gives each new launching screen a fresh, never-before-seen file path', () => {
+    // The WebBrowser control's IE11 engine keeps a persistent disk cache
+    // keyed by URL that survives across the process restarts this window
+    // goes through between sessions — Navigate()-ing to a filename it has
+    // already visited before could silently serve the old cached document
+    // instead of the freshly written one, making any HTML/CSS change here
+    // invisible in practice regardless of how correct it is. Two separate
+    // launches (a real restart in between, not the in-place update covered
+    // by the previous test) must never reuse the same path.
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showLaunching({ clientName: 'Alice', carAcId: 'ks_porsche_911', track: 'ks_monza' });
+    const firstPath = lastSpawnArgs().resultsHtmlPath;
+    expect(firstPath).toBeDefined();
+
+    manager.hide();
+    manager.setAuto();
+    manager.showLaunching({ clientName: 'Bob', carAcId: 'ks_ferrari_488', track: 'ks_spa' });
+    const secondPath = lastSpawnArgs().resultsHtmlPath;
+
+    expect(secondPath).toBeDefined();
+    expect(secondPath).not.toBe(firstPath);
+  });
+
   it('does not tear down the launching screen when setPodInGame(true) fires once launch succeeds', () => {
     // This is the exact transition that used to cause a visible flicker:
     // setPodInGame(true) fires right after the game process is spawned,

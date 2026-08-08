@@ -752,7 +752,25 @@ export class BlankingManager {
 
   private generateLaunchingHtml(info: SessionLaunchInfo): void {
     const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
-    const htmlPath = path.join(tmpDir, 'session-launching.html');
+    // Was a fixed filename ('session-launching.html') reused across every
+    // single launch — since the WebBrowser control's underlying IE11 engine
+    // keeps a persistent disk cache keyed by URL that survives across
+    // process restarts (this window is a brand new PowerShell/WPF process
+    // each time, not a reload of a still-open one), Navigate()-ing to the
+    // exact same file:// path it has already visited before could just
+    // serve the previously cached document instead of re-parsing the
+    // freshly rewritten one — which would make *any* HTML/CSS change here
+    // invisible in practice no matter how correct it is, exactly what was
+    // reported after several rounds of crossfade fixes that visibly did
+    // nothing. Each generation now gets its own never-before-seen filename,
+    // so there is nothing for the cache to (mis)match against; the previous
+    // file is deleted right after switching to the new one so this doesn't
+    // leak files into the temp dir over a long-running session.
+    const previousHtmlPath = this.launchingHtmlPath;
+    const htmlPath = path.join(
+      tmpDir,
+      `session-launching-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.html`,
+    );
     const trackLabel = info.trackName ?? info.track;
     const carLabel = info.carName ?? info.carAcId;
     const trackDisplay = trackLabel ?? '-';
@@ -806,6 +824,14 @@ export class BlankingManager {
 
     writeFileSync(htmlPath, html, 'utf-8');
     this.launchingHtmlPath = htmlPath;
+
+    if (previousHtmlPath && previousHtmlPath !== htmlPath && existsSync(previousHtmlPath)) {
+      try {
+        unlinkSync(previousHtmlPath);
+      } catch {
+        // Best-effort — a leftover temp file here is harmless.
+      }
+    }
   }
 
   private renderLeaderboard(
