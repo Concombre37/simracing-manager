@@ -23,11 +23,16 @@ const MAX_EARLY_EXIT_RETRIES = 3;
  * blanking back over a live race. See evaluate(). */
 const MISSING_STREAK_THRESHOLD_DURING_SESSION = 3;
 /** Time each launching-screen background photo stays as the visible one
- * before crossfading to the next (see renderSlideshowStyles()). */
-const SLIDESHOW_INTERVAL_MS = 2500;
+ * before crossfading to the next (see renderSlideshowStyles()). Kept well
+ * above SLIDESHOW_CROSSFADE_MS so most of the slot is a calm, fully-settled
+ * hold rather than a near-constant fade — the previous 2500ms/1200ms pair
+ * left barely 1.3s of hold, which read as restless/busy rather than smooth. */
+const SLIDESHOW_INTERVAL_MS = 4000;
 /** Duration of the opacity crossfade between two consecutive photos —
- * carved out of the tail end of each SLIDESHOW_INTERVAL_MS slot. */
-const SLIDESHOW_CROSSFADE_MS = 1200;
+ * carved out of the tail end of each SLIDESHOW_INTERVAL_MS slot. Long
+ * enough to read as a deliberate, cinematic dissolve rather than a quick
+ * blend. */
+const SLIDESHOW_CROSSFADE_MS = 1800;
 /** Hard cap on how long a single revealThenStop() attempt waits on
  * onGameRevealed() before treating it as "not confirmed" and moving on
  * (retry, or give up and hide anyway on the last attempt) — see
@@ -510,6 +515,15 @@ export class BlankingManager {
       background-repeat: no-repeat;
       opacity: 0;
       transition: opacity 1.2s ease-in-out;
+      /* Forces this layer onto its own DirectComposition-backed surface in
+       * the IE11 engine (WPF WebBrowser control) instead of the software
+       * rasterizer repainting the whole viewport on every opacity tick —
+       * the classic "null 3D transform" GPU-promotion hack, supported since
+       * IE10. Without it, crossfading two full-screen 5120x1440 photos is
+       * CPU-bound and visibly stutters on modest POD hardware. */
+      transform: translateZ(0);
+      -ms-transform: translateZ(0);
+      backface-visibility: hidden;
     }
     .scene-bg-layer.active { opacity: 1; }
     .scene-bg-overlay {
@@ -914,7 +928,16 @@ export class BlankingManager {
       ${fadeInStartPct}% { opacity: 0; }
       100% { opacity: 1; }
     }
-    .scene-bg-layer.slideshow { animation: scene-bg-slideshow ${totalMs}ms cubic-bezier(0.45, 0, 0.55, 1) infinite; }`;
+    .scene-bg-layer.slideshow {
+      /* The base .scene-bg-layer rule above sets a "transition: opacity"
+       * for the single-image (.active) case — left running here too, it
+       * fights the keyframe animation for the same property in IE11
+       * (the two engines disagree on which one "wins" a given frame,
+       * producing exactly the kind of micro-stutter this rewrite is
+       * fixing), so the slideshow variant explicitly turns it off. */
+      transition: none;
+      animation: scene-bg-slideshow ${totalMs}ms cubic-bezier(0.45, 0, 0.55, 1) infinite;
+    }`;
   }
 
   private toFileUrl(filePath: string): string {

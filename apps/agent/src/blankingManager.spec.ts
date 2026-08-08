@@ -437,8 +437,8 @@ describe('BlankingManager', () => {
     expect(html).toContain('@keyframes scene-bg-slideshow');
     expect(html).not.toContain('<script>');
     expect(html).toContain('animation-delay:0ms');
-    expect(html).toContain('animation-delay:2500ms');
-    expect(html).toContain('animation-delay:5000ms');
+    expect(html).toContain('animation-delay:4000ms');
+    expect(html).toContain('animation-delay:8000ms');
     expect(html).toContain('launch1.jpg');
     expect(html).toContain('launch2.jpg');
     expect(html).toContain('launch3.jpg');
@@ -448,6 +448,13 @@ describe('BlankingManager', () => {
     // crossfade). See renderSlideshowStyles()'s doc comment.
     expect(html).toContain('100% { opacity: 1; }');
     expect(html).not.toContain('100% { opacity: 0; }');
+    // GPU layer promotion (see .scene-bg-layer's doc comment) — without it
+    // the IE11 engine software-rasterizes the crossfade and it stutters.
+    expect(html).toContain('transform: translateZ(0);');
+    // The animation must fully own opacity on rotating layers — a leftover
+    // `transition: opacity` from the single-image (.active) rule fights the
+    // keyframe animation for the same property in IE11.
+    expect(html).toMatch(/\.scene-bg-layer\.slideshow\s*\{[^}]*transition:\s*none;/);
   });
 
   it('does not emit a rotation keyframe for a single launching background image', () => {

@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.109 — Diaporama de lancement : transition repensée pour être vraiment fluide
+
+### Changé
+
+- **Signalé par l'utilisateur après la mise à jour v2.2.108 : la transition n'était toujours pas fluide malgré le fondu enchaîné corrigé.** Root-cause probable identifiée en creusant : deux problèmes de rendu spécifiques au moteur IE11 (WPF WebBrowser control) faisaient concurrence au fondu, indépendamment de la correction du fondu croisé lui-même.
+  1. **Pas de promotion GPU** : `.scene-bg-layer` n'avait aucun hint de composition matérielle — le moteur software-rasterisait chaque image plein écran à chaque tick d'opacité au lieu de déléguer le blend au compositeur DirectComposition. Ajout du "null transform hack" (`transform: translateZ(0)`, supporté depuis IE10) sur toutes les couches de fond, y compris l'écran de résultats.
+  2. **`transition` et `animation` en conflit sur `opacity`** : la règle de base `.scene-bg-layer` posait un `transition: opacity` pensé pour le cas image unique (`.active`), toujours actif sur les couches en rotation où c'est le `@keyframes` qui pilote `opacity` — les deux mécanismes se disputaient la même propriété à chaque frame dans IE11. `.scene-bg-layer.slideshow` neutralise maintenant explicitement la transition.
+- **Rythme retravaillé pour un rendu plus posé/premium** : intervalle 2500ms → 4000ms, fondu 1200ms → 1800ms — l'ancien réglage ne laissait qu'1,3s d'image parfaitement stable entre deux fondus (près de la moitié du cycle en transition permanente), ce qui donnait une impression d'agitation plutôt que de fluidité, même une fois le fondu lui-même corrigé.
+- **Piste non retenue dans ce correctif, à évaluer séparément** : les photos de lancement actuellement en ligne pèsent 600 Ko–2,2 Mo en JPEG, très probablement à la résolution native des fonds d'écran sources (jusqu'à 5120×1440) — aucune redimension n'existe nulle part dans le pipeline d'upload (`blanking-media.service.ts`). Décoder et blender plusieurs images de cette taille en continu peut à lui seul rester coûteux pour le rendu logiciel d'IE11, même avec la promotion GPU. Un vrai correctif root-cause impliquerait de redimensionner les images côté backend (nouvelle dépendance `sharp`) et de corriger un bug de cache constaté au passage dans `blankingMediaSync.ts` (l'agent ne retélécharge jamais un média dont l'id existe déjà localement, même si son contenu a changé côté serveur) — hors scope de ce correctif, nécessite un go séparé de l'utilisateur avant d'y toucher (nouvelle dépendance + migration de données).
+
 ## v2.2.108 — Le diaporama de l'écran de lancement fait un vrai fondu enchaîné
 
 ### Corrigé
