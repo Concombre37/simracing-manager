@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -357,6 +357,7 @@ export function CreateDedicatedServer() {
                     showAdvanced={showAdvanced}
                     onToggleAdvanced={() => setShowAdvanced((v) => !v)}
                     cars={filteredCars}
+                    allCars={content.cars}
                     totalCars={content.cars.length}
                     carCounts={carCounts}
                     totalSelectedCars={totalSelectedCars}
@@ -618,6 +619,20 @@ function StepTrack({
   isSyncing: boolean;
 }) {
   const labelMap = useContentLabelMap();
+  const layoutSectionRef = useRef<HTMLDivElement>(null);
+
+  // The track grid caps its own height (see max-h below) precisely so a
+  // selection doesn't blow past the viewport, but on a short window (or a
+  // track with several layout rows) it still can — this nudges the layout
+  // picker into view instead of leaving the user to notice it needs
+  // scrolling on their own.
+  useEffect(() => {
+    if (selectedTrack && selectedTrack.layouts.length > 0) {
+      layoutSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTrack?.acId]);
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -657,8 +672,19 @@ function StepTrack({
           )}
         </div>
       ) : (
-        <>
-          <div className="grid max-h-[65vh] grid-cols-1 gap-3 overflow-y-auto p-1 sm:grid-cols-2 lg:grid-cols-3">
+        // Circuit grid and layout picker share a single scroll region instead
+        // of each capping their own height independently: on a short/small
+        // display the fixed-size header above (hero, stepper, step badge)
+        // eats a bigger share of the viewport, so a flat `vh` cap for the
+        // grid alone could still push "LAYOUT" below the fold even after
+        // shrinking. Bounding the *combined* region to the space actually
+        // left below that header (`calc(100vh-...)`, not a fraction of the
+        // full viewport) keeps both reachable with at most one small
+        // internal scroll, at any resolution — see layoutSectionRef's
+        // scrollIntoView effect above for what still nudges "LAYOUT" into
+        // view within this region once a track is picked.
+        <div className="max-h-[calc(100vh-430px)] min-h-[240px] overflow-y-auto p-1 pr-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {tracks.map((track) => {
               const selected = selectedTrack?.acId === track.acId;
               return (
@@ -717,7 +743,7 @@ function StepTrack({
           </div>
 
           {selectedTrack && selectedTrack.layouts.length > 0 && (
-            <div className="mt-4">
+            <div ref={layoutSectionRef} className="mt-4">
               <Label>Layout</Label>
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-5">
                 {selectedTrack.layouts.map((layout) => {
@@ -759,7 +785,7 @@ function StepTrack({
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -777,6 +803,7 @@ interface StepConfigProps {
   showAdvanced: boolean;
   onToggleAdvanced: () => void;
   cars: AcCar[];
+  allCars: AcCar[];
   totalCars: number;
   carCounts: Record<string, number>;
   totalSelectedCars: number;
@@ -803,6 +830,7 @@ function StepConfig({
   showAdvanced,
   onToggleAdvanced,
   cars,
+  allCars,
   totalCars,
   carCounts,
   totalSelectedCars,
@@ -1074,7 +1102,7 @@ function StepConfig({
           <div className="mt-2.5">
             <CarSlotsGrid
               carCounts={carCounts}
-              cars={cars}
+              cars={allCars}
               maxClients={maxClients}
               labelMap={labelMap}
               onRemoveCar={onRemoveCar}

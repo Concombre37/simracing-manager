@@ -13,6 +13,8 @@ import { JoinServer } from './pages/JoinServer';
 import { Users } from './pages/Users';
 import { Leaderboard } from './pages/Leaderboard';
 import { Sessions } from './pages/Sessions';
+import { SessionHistory } from './pages/SessionHistory';
+import { SessionDetail } from './pages/SessionDetail';
 import { SessionsKiosk } from './pages/SessionsKiosk';
 import { Kiosk } from './pages/Kiosk';
 import { ContentPreviews } from './pages/ContentPreviews';
@@ -125,6 +127,22 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <Sessions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sessions/history"
+          element={
+            <ProtectedRoute>
+              <SessionHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sessions/:id"
+          element={
+            <ProtectedRoute>
+              <SessionDetail />
             </ProtectedRoute>
           }
         />

@@ -26,11 +26,21 @@ import {
   MapPin,
   Users,
   Rows3,
+  Calendar,
 } from 'lucide-react';
 
 function findTrackPreview(trackAcId: string, content: unknown): string | undefined {
   const tracks = (content as { tracks?: { acId: string; preview?: string }[] } | undefined)?.tracks;
   return tracks?.find((t) => t.acId === trackAcId)?.preview;
+}
+
+function formatCreatedAt(iso: string): string {
+  const date = new Date(iso);
+  return `${date.toLocaleDateString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })} ${date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
 }
 
 const STATUS_VARIANT: Record<
@@ -273,6 +283,10 @@ export function DedicatedServers() {
                           <span className="flex items-center gap-1.5">
                             <Users className="h-3.5 w-3.5 text-racing-cyan" />
                             {occupied} / {server.maxClients} slots
+                          </span>
+                          <span className="flex items-center gap-1.5 text-gray-500">
+                            <Calendar className="h-3.5 w-3.5 text-racing-cyan" />
+                            Créé le {formatCreatedAt(server.createdAt)}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-1.5 pt-0.5">

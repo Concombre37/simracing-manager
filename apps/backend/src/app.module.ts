@@ -20,6 +20,9 @@ import { TelemetryModule } from './telemetry/telemetry.module';
 import { PowerManagementModule } from './power-management/power-management.module';
 import { SettingsModule } from './settings/settings.module';
 import { ClientsModule } from './clients/clients.module';
+import { LeaderboardModule } from './leaderboard/leaderboard.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { ExternalApiModule } from './external-api/external-api.module';
 import { envSchema } from './config/env.validation';
 
 @Module({
@@ -50,6 +53,9 @@ import { envSchema } from './config/env.validation';
     PowerManagementModule,
     SettingsModule,
     ClientsModule,
+    LeaderboardModule,
+    ApiKeysModule,
+    ExternalApiModule,
   ],
 })
 export class AppModule {}

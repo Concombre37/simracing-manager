@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.106 — Date de création visible sur les serveurs dédiés
+
+### Ajouté
+
+- **Demandé par l'utilisateur : ajouter une date de création visible sur les serveurs créés.** Chaque carte de la page `/dedicated-servers` affiche désormais "Créé le JJ/MM/AAAA HH:MM" (`DedicatedServer.createdAt`, déjà présent en base et déjà renvoyé par l'API — aucun changement backend nécessaire, seul l'affichage manquait côté frontend).
+
 ## v2.2.105 — Les serveurs dédiés restent en Practice 12h au lieu de basculer en Qualifying/Race au bout de 30 min
 
 ### Changé

@@ -2,18 +2,32 @@ import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { stationsApi, type Station } from '../services/stations';
 import { settingsApi } from '../services/settings';
+import { apiKeysApi, type ApiKeySummary } from '../services/apiKeys';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Input, Label } from '../components/ui/Input';
-import { Monitor, Wifi, Network, Power, PowerOff, AlertCircle, Clock } from 'lucide-react';
+import {
+  Monitor,
+  Wifi,
+  Network,
+  Power,
+  PowerOff,
+  AlertCircle,
+  Clock,
+  KeyRound,
+  Copy,
+  Trash2,
+  Ban,
+  Check,
+} from 'lucide-react';
+
+type Feedback = { type: 'success' | 'error'; message: string } | null;
 
 export function Settings() {
   const queryClient = useQueryClient();
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(
-    null,
-  );
+  const [feedback, setFeedback] = useState<Feedback>(null);
 
   const {
     data: stations,
@@ -151,6 +165,8 @@ export function Settings() {
         </div>
       </Card>
 
+      <ApiKeysCard setFeedback={setFeedback} />
+
       {isLoading && <p className="text-gray-500">Chargement des stations...</p>}
       {error && (
         <div className="p-4 bg-red-900/30 border border-red-800 rounded-lg text-red-300">
@@ -236,6 +252,166 @@ function StationCard({
         </Button>
       </div>
     </Card>
+  );
+}
+
+function ApiKeysCard({ setFeedback }: { setFeedback: (v: Feedback) => void }) {
+  const queryClient = useQueryClient();
+  const [name, setName] = useState('');
+  const [revealedKey, setRevealedKey] = useState<{ name: string; key: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const { data: keys, isLoading } = useQuery({
+    queryKey: ['api-keys'],
+    queryFn: apiKeysApi.list,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: () => apiKeysApi.create(name.trim() || 'Sans nom'),
+    onSuccess: (created) => {
+      setRevealedKey({ name: created.name, key: created.key });
+      setName('');
+      void queryClient.invalidateQueries({ queryKey: ['api-keys'] });
+    },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) => {
+      setFeedback({
+        type: 'error',
+        message: err.response?.data?.message ?? err.message ?? 'Erreur lors de la création',
+      });
+    },
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: apiKeysApi.revoke,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['api-keys'] }),
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: apiKeysApi.remove,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['api-keys'] }),
+  });
+
+  async function handleCopy(key: string) {
+    await navigator.clipboard.writeText(key);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
+
+  return (
+    <Card className="max-w-2xl">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="rounded-lg bg-racing-cyan/10 p-2">
+          <KeyRound className="h-5 w-5 text-racing-cyan" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-white">Clés API externes</h3>
+          <p className="text-xs text-gray-500">
+            Lecture seule (classement, sessions) — pour un usage hors dashboard (site web, bot...).
+            En-tête <code className="text-gray-400">X-Api-Key</code> ou{' '}
+            <code className="text-gray-400">Authorization: Bearer</code>.
+          </p>
+        </div>
+      </div>
+
+      {revealedKey && (
+        <div className="mb-4 rounded-lg border border-racing-cyan/40 bg-racing-cyan/[0.06] p-4">
+          <p className="text-sm font-semibold text-white">
+            Clé « {revealedKey.name} » créée — copie-la maintenant, elle ne sera plus jamais
+            affichée en entier.
+          </p>
+          <div className="mt-2 flex items-center gap-2">
+            <code className="flex-1 truncate rounded bg-dark-900 px-3 py-2 text-xs text-racing-cyan">
+              {revealedKey.key}
+            </code>
+            <Button variant="secondary" size="sm" onClick={() => handleCopy(revealedKey.key)}>
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            </Button>
+          </div>
+          <button
+            onClick={() => setRevealedKey(null)}
+            className="mt-2 text-xs text-gray-500 underline hover:text-gray-300"
+          >
+            J'ai copié la clé, masquer
+          </button>
+        </div>
+      )}
+
+      <div className="mb-4 flex items-end gap-3">
+        <div className="flex-1">
+          <Label htmlFor="apiKeyName">Nom de la clé</Label>
+          <Input
+            id="apiKeyName"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex: site web, bot Discord..."
+          />
+        </div>
+        <Button
+          variant="primary"
+          onClick={() => createMutation.mutate()}
+          isLoading={createMutation.isPending}
+        >
+          Générer
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <p className="text-sm text-gray-500">Chargement…</p>
+      ) : !keys?.length ? (
+        <p className="text-sm text-gray-500">Aucune clé créée pour l'instant.</p>
+      ) : (
+        <div className="divide-y divide-dark-700 rounded-lg border border-dark-700">
+          {keys.map((key) => (
+            <ApiKeyRow
+              key={key.id}
+              apiKey={key}
+              onRevoke={() => revokeMutation.mutate(key.id)}
+              onRemove={() => removeMutation.mutate(key.id)}
+              isRevoking={revokeMutation.isPending && revokeMutation.variables === key.id}
+              isRemoving={removeMutation.isPending && removeMutation.variables === key.id}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function ApiKeyRow({
+  apiKey,
+  onRevoke,
+  onRemove,
+  isRevoking,
+  isRemoving,
+}: {
+  apiKey: ApiKeySummary;
+  onRevoke: () => void;
+  onRemove: () => void;
+  isRevoking: boolean;
+  isRemoving: boolean;
+}) {
+  const isRevoked = !!apiKey.revokedAt;
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-white">{apiKey.name}</p>
+        <p className="truncate font-mono text-xs text-gray-500">
+          {apiKey.keyPrefix}… ·{' '}
+          {apiKey.lastUsedAt
+            ? `utilisée le ${new Date(apiKey.lastUsedAt).toLocaleDateString('fr-FR')}`
+            : 'jamais utilisée'}
+        </p>
+      </div>
+      {isRevoked ? <Badge variant="gray">Révoquée</Badge> : <Badge variant="green">Active</Badge>}
+      {!isRevoked && (
+        <Button variant="secondary" size="sm" onClick={onRevoke} isLoading={isRevoking}>
+          <Ban className="h-3.5 w-3.5" />
+        </Button>
+      )}
+      <Button variant="danger" size="sm" onClick={onRemove} isLoading={isRemoving}>
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
   );
 }
 

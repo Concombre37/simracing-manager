@@ -14,18 +14,26 @@ import {
   Settings,
   Image,
   Clock,
+  History,
   MonitorPlay,
   Flag,
   Tv,
   Tag,
 } from 'lucide-react';
 
-const navItems = [
+// L'essentiel du quotidien : toujours en pleine évidence, jamais replié.
+const primaryNavItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/stations', label: 'Postes', icon: Monitor },
   { path: '/dedicated-servers', label: 'Serveurs', icon: Server },
+];
+
+// Consulté occasionnellement — toujours à un clic, juste visuellement plus
+// discret pour ne pas concurrencer l'essentiel ci-dessus.
+const secondaryNavItems = [
   { path: '/leaderboard', label: 'Classement', icon: Trophy },
   { path: '/en-cours', label: 'En cours', icon: Clock },
+  { path: '/sessions/history', label: 'Historique', icon: History },
 ];
 
 const adminNavItems = [
@@ -43,6 +51,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/dedicated-servers/create': ['Serveurs', 'Nouveau serveur'],
   '/leaderboard': ['Classement'],
   '/en-cours': ['Sessions en cours'],
+  '/sessions/history': ['Historique'],
   '/users': ['Utilisateurs'],
   '/content-previews': ['Images'],
   '/content-names': ['Noms'],
@@ -76,7 +85,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     BREADCRUMBS[location.pathname] ??
     (/^\/dedicated-servers\/.+\/join$/.test(location.pathname)
       ? ['Serveurs', 'Envoyer les POD']
-      : ['Manager']);
+      : /^\/sessions\/[^/]+$/.test(location.pathname)
+        ? ['Historique', 'Détail session']
+        : ['Manager']);
   const initials = user.email.slice(0, 2).toUpperCase();
 
   return (
@@ -87,34 +98,62 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className="group/rail fixed inset-y-0 left-0 z-40 flex w-[72px] flex-col overflow-hidden border-r border-dark-700 bg-dark-900/95 backdrop-blur-md transition-[width] duration-200 ease-out hover:w-60">
         <Link
           to="/"
-          className="flex h-14 shrink-0 items-center gap-3 border-b border-dark-700 px-[18px]"
+          className="flex h-14 shrink-0 items-center gap-3 border-b border-dark-700 px-[14px]"
         >
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-accent-orange to-accent-red shadow-glow-orange">
-            {logo ? (
-              <img src={logo.downloadUrl} alt="Logo" className="h-full w-full object-cover" />
-            ) : (
-              <Flag className="h-[18px] w-[18px] text-white" />
-            )}
-          </div>
-          <div className="whitespace-nowrap leading-tight opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100">
-            <p className="text-base font-black tracking-tight">
-              <span className="text-accent-orange">SIM</span>
-              <span className="text-white">RACING</span>
-            </p>
-            <p className="text-[9px] font-semibold tracking-[0.2em] text-gray-500">MANAGER</p>
-          </div>
+          {logo ? (
+            // Le fichier uploadé est le wordmark complet ("ELSASS SIMRACING
+            // HAGUENAU") utilisé aussi comme fond d'écran de fin de session —
+            // on ne peut pas le recadrer à la source sans casser cet autre
+            // usage. Crop CSS (position/dimensions calculées sur le logo
+            // actuel) : n'affiche que le pictogramme "ES", assez compact
+            // pour tenir sans être rogné dans le rail replié (72px) comme
+            // dans le rail déplié au survol.
+            <div className="relative h-[22px] w-14 shrink-0 overflow-hidden rounded-md bg-dark-800/80 ring-1 ring-white/10">
+              <img
+                src={logo.downloadUrl}
+                alt="Logo"
+                className="absolute max-w-none"
+                style={{ width: 141, height: 69, left: -44, top: -14 }}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent-orange to-accent-red shadow-glow-orange">
+                <Flag className="h-[18px] w-[18px] text-white" />
+              </div>
+              <div className="whitespace-nowrap leading-tight opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100">
+                <p className="text-base font-black tracking-tight">
+                  <span className="text-accent-orange">SIM</span>
+                  <span className="text-white">RACING</span>
+                </p>
+                <p className="text-[9px] font-semibold tracking-[0.2em] text-gray-500">MANAGER</p>
+              </div>
+            </>
+          )}
         </Link>
 
         <nav className="flex-1 space-y-1 overflow-y-auto overflow-x-hidden px-3 py-3">
-          {navItems.map((item) => (
+          {primaryNavItems.map((item) => (
             <RailLink key={item.path} item={item} active={location.pathname === item.path} />
+          ))}
+
+          <div className="my-3 border-t border-dark-700" />
+          <RailSectionLabel>Suivi</RailSectionLabel>
+          {secondaryNavItems.map((item) => (
+            <RailLink key={item.path} item={item} active={location.pathname === item.path} muted />
           ))}
 
           {isAdmin && (
             <>
               <div className="my-3 border-t border-dark-700" />
+              <RailSectionLabel>Administration</RailSectionLabel>
               {adminNavItems.map((item) => (
-                <RailLink key={item.path} item={item} active={location.pathname === item.path} />
+                <RailLink
+                  key={item.path}
+                  item={item}
+                  active={location.pathname === item.path}
+                  muted
+                />
               ))}
             </>
           )}
@@ -199,12 +238,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Label de section discret : n'apparaît qu'au survol du rail (même pattern
+// que le texte des liens), pour ne rien ajouter au rail replié.
+function RailSectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-[13px] pb-1 pt-1.5 opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100">
+      <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider text-gray-600">
+        {children}
+      </span>
+    </div>
+  );
+}
+
 function RailLink({
   item,
   active,
+  muted,
 }: {
   item: { path: string; label: string; icon: React.ElementType };
   active: boolean;
+  /** Item consulté occasionnellement (suivi/administration) — plus discret
+   * au repos, mais identique une fois actif : rien n'est réellement caché,
+   * juste moins de poids visuel face à l'essentiel du quotidien. */
+  muted?: boolean;
 }) {
   const Icon = item.icon;
   return (
@@ -225,12 +281,12 @@ function RailLink({
       )}
       <Icon
         className={`relative h-5 w-5 shrink-0 transition-colors ${
-          active ? 'text-accent-orange' : 'text-gray-400'
+          active ? 'text-accent-orange' : muted ? 'text-gray-600' : 'text-gray-400'
         }`}
       />
       <span
         className={`relative whitespace-nowrap text-sm font-medium opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100 ${
-          active ? 'text-white' : 'text-gray-400'
+          active ? 'text-white' : muted ? 'text-gray-500' : 'text-gray-400'
         }`}
       >
         {item.label}

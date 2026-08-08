@@ -382,7 +382,7 @@ export class AgentGateway
         );
         return;
       }
-      await this.sessionsService.finish(payload.sessionId, {});
+      await this.sessionsService.finish(payload.sessionId);
       this.dashboardGateway.server.emit('session:updated', {
         sessionId: payload.sessionId,
         stationId: session.stationId,

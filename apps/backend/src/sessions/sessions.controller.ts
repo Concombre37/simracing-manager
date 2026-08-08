@@ -4,6 +4,7 @@ import {
   Post,
   Body,
   Param,
+  Query,
   UseGuards,
   ParseIntPipe,
   Logger,
@@ -50,6 +51,22 @@ export class SessionsController {
   @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
   async findActive() {
     return this.sessionsService.findActive();
+  }
+
+  @Get('history')
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
+  async findHistory(
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    const parsedLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    return this.sessionsService.findHistory({ limit: parsedLimit, cursor });
+  }
+
+  @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
+  async getDetail(@Param('id') id: string) {
+    return this.sessionsService.getDetail(id);
   }
 
   @Post(':id/extend')

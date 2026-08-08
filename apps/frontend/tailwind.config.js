@@ -27,6 +27,13 @@ export default {
           blue: '#0057ff',
           cyan: '#00c2ff',
         },
+        // Palette or du classement (record de circuit, médailles) — distincte
+        // d'accent.yellow (plus jaune vif/alerte) pour un rendu "trophée".
+        gold: {
+          DEFAULT: '#f5c451',
+          dark: '#cd8b4f',
+          text: '#ffdf94',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -84,6 +91,22 @@ export default {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.25' },
         },
+        'circuit-sweep': {
+          '0%': { transform: 'translateX(-120%)' },
+          '100%': { transform: 'translateX(320%)' },
+        },
+        'gold-glow': {
+          '0%, 100%': {
+            boxShadow: '0 0 0 1px rgba(245,196,81,.14), 0 0 26px rgba(245,196,81,.12)',
+          },
+          '50%': {
+            boxShadow: '0 0 0 1px rgba(245,196,81,.24), 0 0 44px rgba(245,196,81,.22)',
+          },
+        },
+        'row-in': {
+          '0%': { opacity: '0', transform: 'translateX(-14px)' },
+          '100%': { opacity: '1', transform: 'none' },
+        },
       },
       animation: {
         'wizard-in-right': 'wizard-in-right 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
@@ -94,6 +117,9 @@ export default {
         'blob-drift': 'blob-drift 20s ease-in-out infinite',
         'ring-pulse': 'ring-pulse 1.6s cubic-bezier(0,0,0.2,1) infinite',
         blink: 'blink 0.8s ease-in-out infinite',
+        'circuit-sweep': 'circuit-sweep 6.5s ease-in-out infinite',
+        'gold-glow': 'gold-glow 4.5s ease-in-out infinite',
+        'row-in': 'row-in 0.4s cubic-bezier(0.2,0.9,0.25,1) both',
       },
     },
   },
