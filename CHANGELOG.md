@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.114 — Le jeu se fermait tout seul dès qu'on rentrait en session, quand il était lancé sans passer par l'agent
+
+### Corrigé
+
+- **Signalé par l'utilisateur : "quand je lance le jeu sans passer par l'agent il se coupe tout de suite dès qu'on rentre dans la session".** Cause : `LuaBridge.sendCommand()` écrit chaque commande (`command.txt`) mais ne l'efface jamais après exécution — et `luaBridge.quit()` (la commande envoyée à la toute fin de **chaque** session, normale ou dédiée) écrit `type=quit`. Ce fichier restait donc sur disque avec `quit` comme dernière commande en permanence entre deux sessions. Le compteur `lastCommandId` de l'app Lua repart à `nil` à chaque nouveau chargement d'AC — au tout premier tick d'une nouvelle session, l'app Lua trouve ce `quit` périmé, le prend pour une commande toute neuve et l'exécute (`ac.shutdownAssettoCorsa()`), fermant le jeu quasi instantanément. Un lancement via l'agent échappe au bug par pur hasard de timing : `autoStart()` réécrit `command.txt` juste après avoir spawné `acs.exe`, bien avant qu'AC n'ait eu le temps de charger son environnement Lua — un lancement direct (Steam, Content Manager, double-clic sur `acs.exe`...) n'a rien qui réécrit ce fichier avant que l'app Lua ne lise le `quit` laissé par la session précédente.
+- Fix : nouvelle méthode `LuaBridge.clearCommand()` (supprime `command.txt`, best-effort), appelée dans `AcLauncher.stop()` une fois AC confirmé arrêté (gracieux ou forcé) — chaque fin de session repart donc sur un fichier de commande propre, quel que soit le prochain moyen de lancement.
+
 ## v2.2.113 — Diaporama de lancement repensé de zéro : bascule de classe par timer au lieu de keyframes CSS
 
 ### Changé

@@ -126,6 +126,10 @@ export class AcLauncher {
       await this.killProcess('acShowroom.exe');
       await this.killProcess('ContentManager.exe');
     }
+    // AC is now confirmed down (every caller of stop() reaches this point
+    // only once that's true, graceful or forced) — safe to drop whatever
+    // command was last sent to the Lua app (see LuaBridge.clearCommand()).
+    await this.luaBridge.clearCommand();
   }
 
   /**

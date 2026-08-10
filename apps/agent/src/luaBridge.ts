@@ -46,6 +46,27 @@ export class LuaBridge {
     await this.sendCommand('quit');
   }
 
+  /** Deletes command.txt once AC has actually stopped (see AcLauncher.stop()).
+   * Without this, whatever command was last written (almost always "quit",
+   * written at the end of every session) stays on disk indefinitely — the
+   * Lua app's own `lastCommandId` resets to nil on every fresh AC load, so
+   * on the very next launch it treats that stale leftover as brand new and
+   * executes it immediately, before any real command overwrites it. Agent-
+   * driven launches happen to dodge this in practice (autoStart() is sent
+   * right after spawning AC, long before AC's Lua environment can possibly
+   * have loaded), but a session launched by any other means (Steam,
+   * Content Manager, double-clicking acs.exe...) has nothing to overwrite
+   * it — the stale "quit" fires the instant the Lua app initializes,
+   * closing the game right as the session starts. Best-effort: a missing
+   * file is already the desired end state. */
+  async clearCommand(): Promise<void> {
+    try {
+      await fs.unlink(this.commandFile);
+    } catch {
+      // Already absent — nothing to do.
+    }
+  }
+
   async recenterVR(): Promise<void> {
     await this.sendCommand('recenterVR');
   }
