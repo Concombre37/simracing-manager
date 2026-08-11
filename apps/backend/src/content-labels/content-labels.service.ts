@@ -26,6 +26,8 @@ export interface KnownContentItem {
   country: string | null;
   countryCode: string | null;
   description: string | null;
+  powerHp: number | null;
+  weightKg: number | null;
 }
 
 export interface CatalogItem {
@@ -38,6 +40,8 @@ export interface CatalogItem {
   country: string | null;
   countryCode: string | null;
   description: string | null;
+  powerHp: number | null;
+  weightKg: number | null;
 }
 
 @Injectable()
@@ -95,6 +99,8 @@ export class ContentLabelsService {
           country: label?.country ?? null,
           countryCode: label?.countryCode ?? null,
           description: label?.description ?? null,
+          powerHp: label?.powerHp ?? null,
+          weightKg: label?.weightKg ?? null,
         };
       })
       .sort((a, b) => {
@@ -150,6 +156,8 @@ export class ContentLabelsService {
         country: label?.country ?? null,
         countryCode: label?.countryCode ?? null,
         description: label?.description ?? null,
+        powerHp: label?.powerHp ?? null,
+        weightKg: label?.weightKg ?? null,
       };
       (item.type === 'car' ? cars : tracks).push(entry);
     }
@@ -189,6 +197,8 @@ export class ContentLabelsService {
     const country = dto.country?.trim() || null;
     const countryCode = dto.countryCode?.trim() || null;
     const description = dto.description?.trim() || null;
+    const powerHp = dto.powerHp ?? null;
+    const weightKg = dto.weightKg ?? null;
 
     if (
       !displayName &&
@@ -197,7 +207,9 @@ export class ContentLabelsService {
       !year &&
       !country &&
       !countryCode &&
-      !description
+      !description &&
+      !powerHp &&
+      !weightKg
     ) {
       await this.prisma.contentLabel.deleteMany({
         where: { type: dto.type, acId: dto.acId },
@@ -217,6 +229,8 @@ export class ContentLabelsService {
         country,
         countryCode,
         description,
+        powerHp,
+        weightKg,
       },
       update: {
         displayName,
@@ -226,6 +240,8 @@ export class ContentLabelsService {
         country,
         countryCode,
         description,
+        powerHp,
+        weightKg,
       },
     });
   }

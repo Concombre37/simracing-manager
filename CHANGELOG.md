@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.120 — Puissance et poids sur les fiches voitures ("Tu peux me donner plus de jolie detail Poids puissance etc")
+
+### Ajouté
+
+- **Demandé par l'utilisateur.** `ContentLabel` gagne `powerHp` (chevaux) et `weightKg` (kg), mêmes règles que les autres champs de recherche (v2.2.118) : réservés aux voitures réelles identifiées, jamais une estimation pour un contenu ambigu/déguisé. `upsert()` étendu (suppression de la ligne seulement si **tous** les champs sont vides, désormais 9 champs).
+- **Peuplement des 259 voitures déjà identifiées** (mêmes acId que v2.2.118) avec puissance/poids réels — fiche constructeur pour les voitures de route, valeur représentative de la classe pour les catégories réglementées (GT3/GT4/LMP2/LMP3...) où la puissance exacte varie selon le "Balance of Performance".
+- **`/content-names`** : deux champs numériques de plus par ligne ("Puissance (ch)", "Poids (kg)"), enregistrés avec le reste via le même bouton "Enregistrer".
+- **`/tablet-menu`** : badge puissance ("450 ch") en haut à droite de chaque vignette voiture (symétrique au badge catégorie à gauche). Fiche détail enrichie d'une mini fiche technique (`SpecStat`) — Puissance / Poids / Rapport poids-puissance calculé (kg/ch) — n'apparaît que si au moins une des deux valeurs est renseignée.
+- Changement purement frontend/backend, aucun code agent modifié — pas de nouvelle release GitHub, seulement migration Prisma + rebuild/redéploiement du conteneur Docker `backend`.
+
 ## v2.2.119 — Sélecteur de voitures à tuiles photo (GT/Formula/LMDH/Drift)
 
 ### Changé

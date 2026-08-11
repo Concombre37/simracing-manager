@@ -16,6 +16,8 @@ export interface KnownContentItem {
   country: string | null;
   countryCode: string | null;
   description: string | null;
+  powerHp: number | null;
+  weightKg: number | null;
 }
 
 export const contentLabelsApi = {
@@ -33,6 +35,8 @@ export const contentLabelsApi = {
     country?: string;
     countryCode?: string;
     description?: string;
+    powerHp?: number;
+    weightKg?: number;
   }) => api.put('/content/labels', params).then((res) => res.data),
 };
 

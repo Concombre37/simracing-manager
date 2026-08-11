@@ -215,6 +215,11 @@ model ContentLabel {
   country     String?
   countryCode String?  @map("country_code")
   description String?  @db.Text
+  // Puissance (chevaux) et poids (kg) — mêmes règles, réservées aux
+  // voitures réelles identifiées, jamais une estimation pour un contenu
+  // ambigu/déguisé.
+  powerHp     Int?     @map("power_hp")
+  weightKg    Int?     @map("weight_kg")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

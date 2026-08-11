@@ -11,6 +11,8 @@ export interface CatalogItem {
   country: string | null;
   countryCode: string | null;
   description: string | null;
+  powerHp: number | null;
+  weightKg: number | null;
 }
 
 export interface Catalog {

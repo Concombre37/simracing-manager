@@ -114,6 +114,8 @@ interface RowPayload {
   country?: string;
   countryCode?: string;
   description?: string;
+  powerHp?: number;
+  weightKg?: number;
 }
 
 /** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
@@ -134,6 +136,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
   const [country, setCountry] = useState(item.country ?? '');
   const [countryCode, setCountryCode] = useState(item.countryCode ?? '');
   const [description, setDescription] = useState(item.description ?? '');
+  const [powerHp, setPowerHp] = useState(item.powerHp ? String(item.powerHp) : '');
+  const [weightKg, setWeightKg] = useState(item.weightKg ? String(item.weightKg) : '');
 
   useEffect(() => {
     setName(item.displayName ?? '');
@@ -143,6 +147,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     setCountry(item.country ?? '');
     setCountryCode(item.countryCode ?? '');
     setDescription(item.description ?? '');
+    setPowerHp(item.powerHp ? String(item.powerHp) : '');
+    setWeightKg(item.weightKg ? String(item.weightKg) : '');
   }, [
     item.displayName,
     item.category,
@@ -151,6 +157,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     item.country,
     item.countryCode,
     item.description,
+    item.powerHp,
+    item.weightKg,
   ]);
 
   const mutation = useMutation({
@@ -168,6 +176,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
   const trimmedCountryCode = countryCode.trim().toUpperCase();
   const trimmedDescription = description.trim();
   const parsedYear = year.trim() ? Number(year.trim()) : null;
+  const parsedPowerHp = powerHp.trim() ? Number(powerHp.trim()) : null;
+  const parsedWeightKg = weightKg.trim() ? Number(weightKg.trim()) : null;
   const hasChanged =
     trimmedName !== (item.displayName ?? '') ||
     trimmedCategory !== (item.category ?? '') ||
@@ -175,7 +185,9 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     parsedYear !== item.year ||
     trimmedCountry !== (item.country ?? '') ||
     trimmedCountryCode !== (item.countryCode ?? '') ||
-    trimmedDescription !== (item.description ?? '');
+    trimmedDescription !== (item.description ?? '') ||
+    parsedPowerHp !== item.powerHp ||
+    parsedWeightKg !== item.weightKg;
   const hasOverride = Boolean(
     item.displayName ||
     item.category ||
@@ -183,7 +195,9 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     item.year ||
     item.country ||
     item.countryCode ||
-    item.description,
+    item.description ||
+    item.powerHp ||
+    item.weightKg,
   );
 
   function save(overrides: Partial<RowPayload> = {}) {
@@ -195,6 +209,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
       country: trimmedCountry || undefined,
       countryCode: trimmedCountryCode || undefined,
       description: trimmedDescription || undefined,
+      powerHp: parsedPowerHp ?? undefined,
+      weightKg: parsedWeightKg ?? undefined,
       ...overrides,
     });
   }
@@ -259,6 +275,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
                 setCountry('');
                 setCountryCode('');
                 setDescription('');
+                setPowerHp('');
+                setWeightKg('');
                 save({
                   displayName: '',
                   category: undefined,
@@ -267,6 +285,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
                   country: undefined,
                   countryCode: undefined,
                   description: undefined,
+                  powerHp: undefined,
+                  weightKg: undefined,
                 });
               }}
               title="Tout réinitialiser"
@@ -320,6 +340,24 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Courte description (optionnel)"
+            className="w-full"
+          />
+        </div>
+        <div className="w-28">
+          <Input
+            value={powerHp}
+            onChange={(e) => setPowerHp(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
+            placeholder="Puissance (ch)"
+            inputMode="numeric"
+            className="w-full"
+          />
+        </div>
+        <div className="w-28">
+          <Input
+            value={weightKg}
+            onChange={(e) => setWeightKg(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
+            placeholder="Poids (kg)"
+            inputMode="numeric"
             className="w-full"
           />
         </div>

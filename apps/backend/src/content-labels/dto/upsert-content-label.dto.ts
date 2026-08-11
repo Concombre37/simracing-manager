@@ -16,6 +16,8 @@ export const upsertContentLabelSchema = z.object({
     .toUpperCase()
     .optional(),
   description: z.string().trim().max(500).optional(),
+  powerHp: z.number().int().min(1).max(20000).optional(),
+  weightKg: z.number().int().min(1).max(20000).optional(),
 });
 
 export type UpsertContentLabelDto = z.infer<typeof upsertContentLabelSchema>;

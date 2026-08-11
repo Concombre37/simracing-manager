@@ -596,6 +596,36 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
+/** Petite statistique fiche technique (puissance/poids/rapport) — n'apparaît
+ * que si la donnée a été renseignée sur `/content-names` pour une voiture
+ * réellement identifiée, jamais une estimation générique par catégorie. */
+function SpecStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <span
+        style={{
+          fontSize: 10.5,
+          letterSpacing: '.12em',
+          textTransform: 'uppercase',
+          color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontFamily: 'var(--tm-font-heading)',
+          fontSize: 18,
+          fontWeight: 700,
+          color: 'var(--tm-accent-200)',
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
 function DifficultyDots({ value }: { value: number }) {
   return (
     <span style={{ display: 'flex', gap: 4 }}>
@@ -677,6 +707,23 @@ function CatalogCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }
             }}
           >
             {item.category}
+          </span>
+        )}
+        {item.powerHp && (
+          <span
+            style={{
+              position: 'absolute',
+              right: 12,
+              top: 12,
+              padding: '3px 10px',
+              borderRadius: 8,
+              fontSize: 11,
+              fontWeight: 700,
+              background: 'color-mix(in srgb, #05060c 55%, transparent)',
+              color: 'var(--tm-text)',
+            }}
+          >
+            {item.powerHp} ch
           </span>
         )}
       </div>
@@ -989,14 +1036,31 @@ function DetailModal({
             </h2>
           </div>
         </div>
-        {(item.country || item.year || item.description || item.difficulty !== null) && (
+        {(item.country ||
+          item.year ||
+          item.description ||
+          item.powerHp ||
+          item.weightKg ||
+          item.difficulty !== null) && (
           <div
-            style={{ padding: '20px 26px 26px', display: 'flex', flexDirection: 'column', gap: 14 }}
+            style={{ padding: '20px 26px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}
           >
             {(item.country || item.year) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14.5 }}>
                 {flagEmoji(item.countryCode) && <span>{flagEmoji(item.countryCode)}</span>}
                 <span>{[item.country, item.year].filter(Boolean).join(' · ')}</span>
+              </div>
+            )}
+            {(item.powerHp || item.weightKg) && (
+              <div style={{ display: 'flex', gap: 28 }}>
+                {item.powerHp && <SpecStat label="Puissance" value={`${item.powerHp} ch`} />}
+                {item.weightKg && <SpecStat label="Poids" value={`${item.weightKg} kg`} />}
+                {item.powerHp && item.weightKg && (
+                  <SpecStat
+                    label="Rapport poids/puissance"
+                    value={`${(item.weightKg / item.powerHp).toFixed(1)} kg/ch`}
+                  />
+                )}
               </div>
             )}
             {item.description && (
