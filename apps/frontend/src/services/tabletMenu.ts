@@ -7,6 +7,10 @@ export interface CatalogItem {
   previewUrl: string | null;
   category: string | null;
   difficulty: number | null;
+  year: number | null;
+  country: string | null;
+  countryCode: string | null;
+  description: string | null;
 }
 
 export interface Catalog {

@@ -208,6 +208,13 @@ model ContentLabel {
   // l'admin n'a rien renseigné.
   category    String?
   difficulty  Int?
+  // Année, pays d'origine (nom + code ISO 3166-1 alpha-2 pour le drapeau)
+  // et courte description — mêmes règles : jamais de valeur inventée,
+  // seulement ce qui est confirmé pour une voiture/circuit réel identifiable.
+  year        Int?
+  country     String?
+  countryCode String?  @map("country_code")
+  description String?  @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

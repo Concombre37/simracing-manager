@@ -110,6 +110,19 @@ interface RowPayload {
   displayName: string;
   category?: string;
   difficulty?: number;
+  year?: number;
+  country?: string;
+  countryCode?: string;
+  description?: string;
+}
+
+/** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
+ * combinaison Unicode de deux "regional indicator symbols", pas d'image. */
+function flagEmoji(countryCode: string | null): string {
+  if (!countryCode || countryCode.length !== 2) return '';
+  return countryCode
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 }
 
 function ContentNameRow({ item }: { item: KnownContentItem }) {
@@ -117,12 +130,28 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
   const [name, setName] = useState(item.displayName ?? '');
   const [category, setCategory] = useState(item.category ?? '');
   const [difficulty, setDifficulty] = useState<number | null>(item.difficulty);
+  const [year, setYear] = useState(item.year ? String(item.year) : '');
+  const [country, setCountry] = useState(item.country ?? '');
+  const [countryCode, setCountryCode] = useState(item.countryCode ?? '');
+  const [description, setDescription] = useState(item.description ?? '');
 
   useEffect(() => {
     setName(item.displayName ?? '');
     setCategory(item.category ?? '');
     setDifficulty(item.difficulty);
-  }, [item.displayName, item.category, item.difficulty]);
+    setYear(item.year ? String(item.year) : '');
+    setCountry(item.country ?? '');
+    setCountryCode(item.countryCode ?? '');
+    setDescription(item.description ?? '');
+  }, [
+    item.displayName,
+    item.category,
+    item.difficulty,
+    item.year,
+    item.country,
+    item.countryCode,
+    item.description,
+  ]);
 
   const mutation = useMutation({
     mutationFn: (payload: RowPayload) =>
@@ -135,83 +164,165 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
 
   const trimmedName = name.trim();
   const trimmedCategory = category.trim();
+  const trimmedCountry = country.trim();
+  const trimmedCountryCode = countryCode.trim().toUpperCase();
+  const trimmedDescription = description.trim();
+  const parsedYear = year.trim() ? Number(year.trim()) : null;
   const hasChanged =
     trimmedName !== (item.displayName ?? '') ||
     trimmedCategory !== (item.category ?? '') ||
-    difficulty !== item.difficulty;
-  const hasOverride = Boolean(item.displayName || item.category || item.difficulty);
+    difficulty !== item.difficulty ||
+    parsedYear !== item.year ||
+    trimmedCountry !== (item.country ?? '') ||
+    trimmedCountryCode !== (item.countryCode ?? '') ||
+    trimmedDescription !== (item.description ?? '');
+  const hasOverride = Boolean(
+    item.displayName ||
+    item.category ||
+    item.difficulty ||
+    item.year ||
+    item.country ||
+    item.countryCode ||
+    item.description,
+  );
 
   function save(overrides: Partial<RowPayload> = {}) {
     mutation.mutate({
       displayName: trimmedName,
       category: trimmedCategory || undefined,
       difficulty: difficulty ?? undefined,
+      year: parsedYear ?? undefined,
+      country: trimmedCountry || undefined,
+      countryCode: trimmedCountryCode || undefined,
+      description: trimmedDescription || undefined,
       ...overrides,
     });
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-dark-700/30 transition-colors">
-      <Badge variant={item.type === 'car' ? 'blue' : 'green'}>
-        {item.type === 'car' ? <CarIcon className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
-        {item.type === 'car' ? 'Voiture' : 'Circuit'}
-      </Badge>
+    <div className="flex flex-col gap-2 px-4 py-3 hover:bg-dark-700/30 transition-colors">
+      <div className="flex flex-wrap items-center gap-3">
+        <Badge variant={item.type === 'car' ? 'blue' : 'green'}>
+          {item.type === 'car' ? <CarIcon className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
+          {item.type === 'car' ? 'Voiture' : 'Circuit'}
+        </Badge>
 
-      <div className="min-w-0 flex-1 basis-48">
-        <p className="truncate text-sm text-white" title={item.rawName}>
-          {item.rawName}
-        </p>
-        <p className="truncate text-[10px] text-gray-500" title={item.acId}>
-          {item.acId}
-        </p>
-      </div>
+        <div className="min-w-0 flex-1 basis-48">
+          <p className="truncate text-sm text-white" title={item.rawName}>
+            {item.rawName}
+          </p>
+          <p className="truncate text-[10px] text-gray-500" title={item.acId}>
+            {item.acId}
+          </p>
+        </div>
 
-      <div className="min-w-0 flex-[2] basis-56">
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={item.rawName}
-          className="w-full"
-        />
-      </div>
+        <div className="min-w-0 flex-[2] basis-56">
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={item.rawName}
+            className="w-full"
+          />
+        </div>
 
-      <div className="min-w-0 flex-1 basis-36">
-        <Input
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="Catégorie (ex: GT3)"
-          className="w-full"
-        />
-      </div>
+        <div className="min-w-0 flex-1 basis-36">
+          <Input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="Catégorie (ex: GT3)"
+            className="w-full"
+          />
+        </div>
 
-      <DifficultyPicker value={difficulty} onChange={setDifficulty} />
+        <DifficultyPicker value={difficulty} onChange={setDifficulty} />
 
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={!hasChanged}
-          isLoading={mutation.isPending}
-          onClick={() => save()}
-        >
-          <Check className="w-3.5 h-3.5" />
-          Enregistrer
-        </Button>
-        {hasOverride && (
+        <div className="flex items-center gap-2">
           <Button
             size="sm"
-            variant="secondary"
-            onClick={() => {
-              setName('');
-              setCategory('');
-              setDifficulty(null);
-              save({ displayName: '', category: undefined, difficulty: undefined });
-            }}
-            title="Tout réinitialiser (nom, catégorie, difficulté)"
+            variant="primary"
+            disabled={!hasChanged}
+            isLoading={mutation.isPending}
+            onClick={() => save()}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <Check className="w-3.5 h-3.5" />
+            Enregistrer
           </Button>
-        )}
+          {hasOverride && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => {
+                setName('');
+                setCategory('');
+                setDifficulty(null);
+                setYear('');
+                setCountry('');
+                setCountryCode('');
+                setDescription('');
+                save({
+                  displayName: '',
+                  category: undefined,
+                  difficulty: undefined,
+                  year: undefined,
+                  country: undefined,
+                  countryCode: undefined,
+                  description: undefined,
+                });
+              }}
+              title="Tout réinitialiser"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 pl-[3.75rem]">
+        <div className="w-24">
+          <Input
+            value={year}
+            onChange={(e) => setYear(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+            placeholder="Année"
+            inputMode="numeric"
+            className="w-full"
+          />
+        </div>
+        <div className="min-w-0 flex-1 basis-40">
+          <Input
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            placeholder="Pays (ex: Italie)"
+            className="w-full"
+          />
+        </div>
+        <div className="flex w-24 items-center gap-1.5">
+          <Input
+            value={countryCode}
+            onChange={(e) =>
+              setCountryCode(
+                e.target.value
+                  .replace(/[^a-zA-Z]/g, '')
+                  .slice(0, 2)
+                  .toUpperCase(),
+              )
+            }
+            placeholder="FR"
+            className="w-full"
+          />
+          {trimmedCountryCode.length === 2 && (
+            <span className="text-lg" title={trimmedCountryCode}>
+              {flagEmoji(trimmedCountryCode)}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 flex-[3] basis-64">
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Courte description (optionnel)"
+            className="w-full"
+          />
+        </div>
       </div>
     </div>
   );

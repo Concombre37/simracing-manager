@@ -1,8 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Car, Flag, UtensilsCrossed, GlassWater, X, Hand, ImageOff } from 'lucide-react';
+import { Car, Flag, UtensilsCrossed, GlassWater, X, Hand, ImageOff, Rotate3d } from 'lucide-react';
 import { tabletMenuApi, type CatalogItem } from '../services/tabletMenu';
 import type { MenuCategory } from '../services/menu';
+
+/** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
+ * même principe que `ContentNames.tsx`, dupliqué ici (page publique
+ * indépendante, pas de code partagé entre les deux). */
+function flagEmoji(countryCode: string | null): string {
+  if (!countryCode || countryCode.length !== 2) return '';
+  return countryCode
+    .toUpperCase()
+    .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
 
 // Nom réel de l'établissement (voir Layout.tsx — même logo/wordmark déjà
 // utilisé ailleurs sur le dashboard). Pas de compte utilisateur sur cette
@@ -492,10 +507,15 @@ function DifficultyDots({ value }: { value: number }) {
 }
 
 function CatalogCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }) {
+  const flag = flagEmoji(item.countryCode);
+  const subtitle = [flag ? `${flag} ${item.country ?? ''}`.trim() : item.country, item.year]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <div
       role="button"
       onClick={onOpen}
+      className="tm-card"
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -549,9 +569,110 @@ function CatalogCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }
           </span>
         )}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '14px 16px 16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 16px 16px' }}>
         <span style={{ fontFamily: 'var(--tm-font-heading)', fontSize: 17 }}>{item.name}</span>
+        {subtitle && (
+          <span
+            style={{ fontSize: 12.5, color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)' }}
+          >
+            {subtitle}
+          </span>
+        )}
         {item.difficulty !== null && <DifficultyDots value={item.difficulty} />}
+      </div>
+    </div>
+  );
+}
+
+/** Image inclinable au doigt/à la souris (effet "on tourne la voiture") —
+ * pas un vrai modèle 3D (voir décision produit : seule une photo 2D existe
+ * réellement en base, aucun modèle .kn5 n'est accessible côté serveur),
+ * juste une bascule/parallaxe CSS pilotée par le glissement du pointeur,
+ * bornée pour rester crédible sur une simple photo à plat. */
+function Tilt3DImage({ src, alt }: { src: string; alt: string }) {
+  const [rot, setRot] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [interacted, setInteracted] = useState(false);
+  const dragStart = useRef<{ x: number; y: number; rotX: number; rotY: number } | null>(null);
+
+  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true);
+    setInteracted(true);
+    dragStart.current = { x: e.clientX, y: e.clientY, rotX: rot.x, rotY: rot.y };
+  }
+  function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (!dragging || !dragStart.current) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    setRot({
+      x: clamp(dragStart.current.rotX - dy * 0.35, -16, 16),
+      y: clamp(dragStart.current.rotY + dx * 0.35, -28, 28),
+    });
+  }
+  function onPointerUp() {
+    setDragging(false);
+    dragStart.current = null;
+    setRot({ x: 0, y: 0 });
+  }
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, perspective: 900 }}>
+      <div
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className={interacted ? undefined : 'tm-tilt-hint'}
+        style={{
+          width: '100%',
+          height: '100%',
+          touchAction: 'none',
+          cursor: dragging ? 'grabbing' : 'grab',
+          transform: `rotateX(${rot.x}deg) rotateY(${rot.y}deg) scale(${dragging ? 1.04 : 1})`,
+          transition: dragging ? 'none' : 'transform .6s cubic-bezier(.16,1,.3,1)',
+          transformStyle: 'preserve-3d',
+        }}
+      >
+        <img
+          src={src}
+          alt={alt}
+          draggable={false}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block',
+            pointerEvents: 'none',
+          }}
+        />
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            background: `linear-gradient(${115 + rot.y}deg, color-mix(in srgb, #fff ${dragging ? 16 : 8}%, transparent), transparent 55%)`,
+          }}
+        />
+      </div>
+      <div
+        style={{
+          position: 'absolute',
+          left: 14,
+          top: 14,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '5px 10px',
+          borderRadius: 999,
+          fontSize: 11,
+          pointerEvents: 'none',
+          background: 'color-mix(in srgb, #05060c 55%, transparent)',
+          color: 'color-mix(in srgb, var(--tm-text) 80%, transparent)',
+        }}
+      >
+        <Rotate3d size={13} />
+        Glissez pour incliner
       </div>
     </div>
   );
@@ -686,11 +807,7 @@ function DetailModal({
           }}
         >
           {item.previewUrl ? (
-            <img
-              src={item.previewUrl}
-              alt={item.name}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+            <Tilt3DImage src={item.previewUrl} alt={item.name} />
           ) : (
             <div
               style={{
@@ -761,21 +878,43 @@ function DetailModal({
             </h2>
           </div>
         </div>
-        {item.difficulty !== null && (
+        {(item.country || item.year || item.description || item.difficulty !== null) && (
           <div
-            style={{ padding: '20px 26px 26px', display: 'flex', alignItems: 'center', gap: 12 }}
+            style={{ padding: '20px 26px 26px', display: 'flex', flexDirection: 'column', gap: 14 }}
           >
-            <span
-              style={{
-                fontSize: 11,
-                letterSpacing: '.14em',
-                textTransform: 'uppercase',
-                color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
-              }}
-            >
-              Difficulté
-            </span>
-            <DifficultyDots value={item.difficulty} />
+            {(item.country || item.year) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14.5 }}>
+                {flagEmoji(item.countryCode) && <span>{flagEmoji(item.countryCode)}</span>}
+                <span>{[item.country, item.year].filter(Boolean).join(' · ')}</span>
+              </div>
+            )}
+            {item.description && (
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  color: 'color-mix(in srgb, var(--tm-text) 68%, transparent)',
+                }}
+              >
+                {item.description}
+              </p>
+            )}
+            {item.difficulty !== null && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: '.14em',
+                    textTransform: 'uppercase',
+                    color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+                  }}
+                >
+                  Difficulté
+                </span>
+                <DifficultyDots value={item.difficulty} />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -921,9 +1060,23 @@ function TabletMenuStyles() {
       }
       .tablet-menu * { box-sizing: border-box; }
       .tablet-menu ::-webkit-scrollbar { width: 0; height: 0; }
+      .tablet-menu .tm-card { transform: perspective(900px) rotateX(0deg); }
+      @media (hover: hover) {
+        .tablet-menu .tm-card:hover {
+          transform: perspective(900px) rotateX(4deg) scale(1.015);
+          box-shadow: 0 14px 30px rgba(0,0,0,.35);
+        }
+      }
+      .tablet-menu .tm-tilt-hint { animation: tmTiltHint 5s ease-in-out 1; }
       @keyframes tmGlow {
         0%, 100% { opacity: .5; transform: translate(-3%, 1%) scale(1); }
         50% { opacity: .95; transform: translate(5%, -4%) scale(1.14); }
+      }
+      @keyframes tmTiltHint {
+        0%, 20%, 100% { transform: rotateX(0deg) rotateY(0deg); }
+        35% { transform: rotateX(4deg) rotateY(-12deg); }
+        55% { transform: rotateX(-3deg) rotateY(10deg); }
+        75% { transform: rotateX(2deg) rotateY(-5deg); }
       }
     `}</style>
   );

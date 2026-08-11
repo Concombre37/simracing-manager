@@ -12,6 +12,10 @@ export interface KnownContentItem {
   labelId: string | null;
   category: string | null;
   difficulty: number | null;
+  year: number | null;
+  country: string | null;
+  countryCode: string | null;
+  description: string | null;
 }
 
 export const contentLabelsApi = {
@@ -25,6 +29,10 @@ export const contentLabelsApi = {
     displayName: string;
     category?: string;
     difficulty?: number;
+    year?: number;
+    country?: string;
+    countryCode?: string;
+    description?: string;
   }) => api.put('/content/labels', params).then((res) => res.data),
 };
 

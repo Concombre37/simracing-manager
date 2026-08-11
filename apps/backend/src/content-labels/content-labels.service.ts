@@ -22,6 +22,10 @@ export interface KnownContentItem {
   labelId: string | null;
   category: string | null;
   difficulty: number | null;
+  year: number | null;
+  country: string | null;
+  countryCode: string | null;
+  description: string | null;
 }
 
 export interface CatalogItem {
@@ -30,6 +34,10 @@ export interface CatalogItem {
   previewUrl: string | null;
   category: string | null;
   difficulty: number | null;
+  year: number | null;
+  country: string | null;
+  countryCode: string | null;
+  description: string | null;
 }
 
 @Injectable()
@@ -83,6 +91,10 @@ export class ContentLabelsService {
           labelId: label?.id ?? null,
           category: label?.category ?? null,
           difficulty: label?.difficulty ?? null,
+          year: label?.year ?? null,
+          country: label?.country ?? null,
+          countryCode: label?.countryCode ?? null,
+          description: label?.description ?? null,
         };
       })
       .sort((a, b) => {
@@ -134,6 +146,10 @@ export class ContentLabelsService {
         previewUrl: previewByKey.get(`${item.type}:${item.acId}`) ?? null,
         category: label?.category ?? null,
         difficulty: label?.difficulty ?? null,
+        year: label?.year ?? null,
+        country: label?.country ?? null,
+        countryCode: label?.countryCode ?? null,
+        description: label?.description ?? null,
       };
       (item.type === 'car' ? cars : tracks).push(entry);
     }
@@ -159,18 +175,30 @@ export class ContentLabelsService {
     return map;
   }
 
-  /** Le formulaire (`ContentNames.tsx`) enregistre les trois champs
-   * ensemble depuis un seul bouton par ligne — `displayName` vide n'efface
-   * donc plus la ligne à lui seul, contrairement à avant l'ajout de
-   * category/difficulty : sinon retirer juste le nom personnalisé
-   * effacerait aussi le tag catégorie/difficulté déjà renseigné. La ligne
-   * n'est supprimée que si les trois champs sont vides à la fois. */
+  /** Le formulaire (`ContentNames.tsx`) enregistre tous les champs ensemble
+   * depuis un seul bouton par ligne — `displayName` vide n'efface donc pas
+   * la ligne à lui seul, contrairement à avant l'ajout de
+   * category/difficulty/année/pays/description : sinon retirer juste le nom
+   * personnalisé effacerait aussi tout le reste déjà renseigné. La ligne
+   * n'est supprimée que si tous les champs sont vides à la fois. */
   async upsert(dto: UpsertContentLabelDto) {
     const displayName = dto.displayName.trim();
     const category = dto.category?.trim() || null;
     const difficulty = dto.difficulty ?? null;
+    const year = dto.year ?? null;
+    const country = dto.country?.trim() || null;
+    const countryCode = dto.countryCode?.trim() || null;
+    const description = dto.description?.trim() || null;
 
-    if (!displayName && !category && !difficulty) {
+    if (
+      !displayName &&
+      !category &&
+      !difficulty &&
+      !year &&
+      !country &&
+      !countryCode &&
+      !description
+    ) {
       await this.prisma.contentLabel.deleteMany({
         where: { type: dto.type, acId: dto.acId },
       });
@@ -185,8 +213,20 @@ export class ContentLabelsService {
         displayName,
         category,
         difficulty,
+        year,
+        country,
+        countryCode,
+        description,
       },
-      update: { displayName, category, difficulty },
+      update: {
+        displayName,
+        category,
+        difficulty,
+        year,
+        country,
+        countryCode,
+        description,
+      },
     });
   }
 }
