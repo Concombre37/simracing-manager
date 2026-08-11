@@ -19,53 +19,25 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Regroupe les catégories très spécifiques renseignées sur `/content-names`
- * (ex: "Coupé sportif préparé", "Supercar historique préparée") en une
- * poignée de familles pour la barre de filtres — sinon un catalogue de 259
- * voitures avec des tags quasi-uniques par modèle produit ~80 pastilles de
- * filtre, illisible sur un écran tactile. Le tag exact reste affiché tel
- * quel sur la carte/fiche détail, seul le regroupement du filtre est lissé
- * ici (règles par mot-clé, ordre = priorité). */
-const CATEGORY_GROUP_RULES: [RegExp, string][] = [
-  [/kart/i, 'Kart'],
-  [/formule 1.*historique|historique.*formule 1/i, 'Formule 1 historique'],
-  [/formule 1/i, 'Formule 1'],
-  [/formule|monoplace/i, 'Monoplace'],
-  [/gt ?1\b/i, 'GT1'],
-  [/gt ?2\b/i, 'GT2'],
-  [/gt ?3\b/i, 'GT3'],
-  [/gt ?4\b/i, 'GT4'],
-  [/dtm/i, 'DTM'],
-  [/nascar/i, 'NASCAR'],
-  [/rallycross/i, 'Rallycross'],
-  [/rallye|wrc/i, 'Rallye'],
-  [/drift/i, 'Drift'],
-  [/lmh|hypercar\/lmh/i, 'Hypercar/LMH'],
-  [/hypercar/i, 'Hypercar'],
-  [/lmp1/i, 'Prototype LMP1'],
-  [/lmp2/i, 'Prototype LMP2'],
-  [/lmp3/i, 'Prototype LMP3'],
-  [/prototype|groupe c|groupe 5|groupe 6|can-am/i, 'Prototype historique'],
-  [/gt le mans|gt \/ le mans/i, 'GT Le Mans'],
-  [/gt historique/i, 'GT historique'],
-  [/tourisme|cup|tcr/i, 'Tourisme/Cup'],
-  [/muscle|trans-am/i, 'Muscle car'],
-  [/supercar/i, 'Supercar'],
-  [/roadster/i, 'Roadster'],
-  [/coupé/i, 'Coupé sportif'],
-  [/citadine/i, 'Citadine'],
-  [/berline/i, 'Berline sportive'],
-  [/suv/i, 'SUV sportif'],
-  [/compacte/i, 'Compacte sportive'],
-  [/voiture de piste|de c(o|ô)te/i, 'Voiture de piste'],
-];
-
-function categoryGroup(category: string): string {
-  for (const [pattern, group] of CATEGORY_GROUP_RULES) {
-    if (pattern.test(category)) return group;
-  }
-  return category;
+/** Quatre familles "vitrine" pour le sélecteur à tuiles photo de l'onglet
+ * Voitures — demandé explicitement par l'utilisateur ("il faut juste GT/
+ * FORMULA/LMDH ET DRIFT"), volontairement restreint plutôt qu'exhaustif :
+ * les voitures qui ne rentrent dans aucune de ces 4 familles (Kart, route,
+ * rallye, tourisme, muscle car...) restent visibles sous "Toutes", elles
+ * n'ont juste pas de tuile dédiée. Matché sur le champ `category` exact
+ * (renseigné via `/content-names`), pas une liste figée d'acId. */
+interface CarFamily {
+  key: string;
+  label: string;
+  match: RegExp;
 }
+
+const CAR_FAMILIES: CarFamily[] = [
+  { key: 'gt', label: 'GT', match: /gt ?[1-4]|gt le mans|gt historique|gt client|gt cup|gt500/i },
+  { key: 'formula', label: 'Formula', match: /formule|monoplace/i },
+  { key: 'lmdh', label: 'LMDH', match: /lmp|lmh|prototype|groupe c|can-am/i },
+  { key: 'drift', label: 'Drift', match: /drift/i },
+];
 
 // Nom réel de l'établissement (voir Layout.tsx — même logo/wordmark déjà
 // utilisé ailleurs sur le dashboard). Pas de compte utilisateur sur cette
@@ -194,20 +166,18 @@ export function TabletMenu() {
       tab === 'cars' ? (catalog?.cars ?? []) : tab === 'tracks' ? (catalog?.tracks ?? []) : [],
     [tab, catalog],
   );
-  const categories = useMemo(
+  const families = useMemo(
     () =>
-      Array.from(
-        new Set(
-          currentItems
-            .map((i) => i.category)
-            .filter(Boolean)
-            .map((c) => categoryGroup(c as string)),
-        ),
-      ).sort((a, b) => a.localeCompare(b)),
+      CAR_FAMILIES.map((family) => {
+        const matches = currentItems.filter((i) => i.category && family.match.test(i.category));
+        if (matches.length === 0) return null;
+        return { ...family, previewUrl: matches.find((i) => i.previewUrl)?.previewUrl ?? null };
+      }).filter((f): f is CarFamily & { previewUrl: string | null } => f !== null),
     [currentItems],
   );
-  const filteredItems = filter
-    ? currentItems.filter((i) => i.category && categoryGroup(i.category) === filter)
+  const activeFamily = families.find((f) => f.key === filter) ?? null;
+  const filteredItems = activeFamily
+    ? currentItems.filter((i) => i.category && activeFamily.match.test(i.category))
     : currentItems;
 
   const foodCategories = menuCategories.filter((c) => c.section === 'food');
@@ -423,15 +393,30 @@ export function TabletMenu() {
         >
           {isCatalogTab && (
             <>
-              {categories.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 9, marginBottom: 22 }}>
-                  <FilterChip active={filter === null} onClick={() => setFilter(null)}>
-                    Toutes
-                  </FilterChip>
-                  {categories.map((cat) => (
-                    <FilterChip key={cat} active={filter === cat} onClick={() => setFilter(cat)}>
-                      {cat}
-                    </FilterChip>
+              {families.length > 0 && (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: portrait
+                      ? 'repeat(2, minmax(0,1fr))'
+                      : 'repeat(auto-fit, minmax(160px, 1fr))',
+                    gap: 12,
+                    marginBottom: 24,
+                  }}
+                >
+                  <FamilyTile
+                    label="Toutes"
+                    active={filter === null}
+                    onClick={() => setFilter(null)}
+                  />
+                  {families.map((f) => (
+                    <FamilyTile
+                      key={f.key}
+                      label={f.label}
+                      previewUrl={f.previewUrl}
+                      active={filter === f.key}
+                      onClick={() => setFilter(f.key)}
+                    />
                   ))}
                 </div>
               )}
@@ -492,36 +477,104 @@ export function TabletMenu() {
   );
 }
 
-function FilterChip({
+/** Tuile de sélection de famille ("GT"/"Formula"/"LMDH"/"Drift") — photo
+ * réelle d'une voiture de la famille (désaturée + assombrie, façon
+ * référence visuelle fournie par l'utilisateur), étiquette centrée en bas.
+ * "Toutes" (pas de `previewUrl`) reste une tuile pleine unie, texte centré. */
+function FamilyTile({
+  label,
+  previewUrl,
   active,
   onClick,
-  children,
 }: {
+  label: string;
+  previewUrl?: string | null;
   active: boolean;
   onClick: () => void;
-  children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        padding: '10px 18px',
-        borderRadius: 999,
+        position: 'relative',
+        height: 108,
+        padding: 0,
+        borderRadius: 14,
+        overflow: 'hidden',
         cursor: 'pointer',
-        fontFamily: 'var(--tm-font-heading)',
-        fontSize: 13.5,
-        border: `1px solid ${active ? 'var(--tm-accent)' : 'var(--tm-divider)'}`,
-        background: active
-          ? 'color-mix(in srgb, var(--tm-accent) 16%, transparent)'
-          : 'transparent',
-        color: active
-          ? 'var(--tm-accent-200)'
-          : 'color-mix(in srgb, var(--tm-text) 66%, transparent)',
-        transition: 'all .22s ease',
+        background: 'var(--tm-surface)',
+        border: `2px solid ${active ? 'var(--tm-accent)' : 'transparent'}`,
+        boxShadow: active
+          ? '0 0 0 1px color-mix(in srgb, var(--tm-accent) 40%, transparent)'
+          : '0 0 0 1px color-mix(in srgb, var(--tm-text) 8%, transparent)',
+        transition: 'border-color .22s ease, box-shadow .22s ease',
       }}
     >
-      {children}
+      {previewUrl ? (
+        <>
+          <img
+            src={previewUrl}
+            alt=""
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              filter: active
+                ? 'grayscale(0.15) contrast(1.1) brightness(0.8)'
+                : 'grayscale(0.85) contrast(1.15) brightness(0.55)',
+              transition: 'filter .25s ease',
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background:
+                'linear-gradient(to top, rgba(5,6,12,.85) 0%, rgba(5,6,12,.2) 55%, transparent 100%)',
+            }}
+          />
+          <span
+            style={{
+              position: 'absolute',
+              left: 8,
+              right: 8,
+              bottom: 12,
+              textAlign: 'center',
+              fontFamily: 'var(--tm-font-heading)',
+              fontWeight: 700,
+              fontSize: 15,
+              letterSpacing: '.04em',
+              textTransform: 'uppercase',
+              color: active ? 'var(--tm-accent-100)' : 'var(--tm-accent-300)',
+            }}
+          >
+            {label}
+          </span>
+        </>
+      ) : (
+        <span
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'var(--tm-font-heading)',
+            fontWeight: 700,
+            fontSize: 15,
+            letterSpacing: '.04em',
+            textTransform: 'uppercase',
+            color: active
+              ? 'var(--tm-accent-100)'
+              : 'color-mix(in srgb, var(--tm-text) 66%, transparent)',
+          }}
+        >
+          {label}
+        </span>
+      )}
     </button>
   );
 }

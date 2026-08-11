@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.119 — Sélecteur de voitures à tuiles photo (GT/Formula/LMDH/Drift)
+
+### Changé
+
+- **Demandé par l'utilisateur, à partir d'une image de référence (4 tuiles photo GT/Formula/LMDH/Drift) : "regoupe les groupe dans ça".** La barre de filtres texte de l'onglet Voitures (`/tablet-menu`) est remplacée par une grille de tuiles avec photo réelle en fond (désaturée/assombrie) et étiquette centrée, dans l'esprit de la maquette fournie. Volontairement restreint à **4 familles fixes** (confirmé explicitement par l'utilisateur, pas une liste exhaustive) : GT, Formula, LMDH, Drift + une tuile "Toutes". Les voitures qui ne rentrent dans aucune des 4 (Kart, route, rallye, tourisme, muscle car...) restent visibles sous "Toutes", simplement sans tuile dédiée.
+- Chaque tuile utilise la photo de la première voiture de la famille qui en a une (`CAR_FAMILIES`, règles par mot-clé sur le champ `category` exact — LMDH regroupe en pratique tout le Prototype/Hypercar Le Mans : LMP1/2/3, Hypercar/LMH, Groupe C...). Le tag précis reste affiché tel quel sur chaque carte/fiche détail, seul le regroupement de la tuile est large.
+- Remplace le fix précédent (v2.2.118, regroupement en ~30 familles en pastilles texte) — gardé un temps mais jugé encore trop chargé visuellement pour un écran tactile.
+
 ## v2.2.118 — Fiches voitures enrichies (année/pays/description) + effet 3D sur la tablette
 
 ### Ajouté
