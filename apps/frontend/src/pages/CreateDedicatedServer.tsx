@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { dedicatedServersApi, type Car as AcCar, type Track } from '../services/dedicatedServers';
@@ -9,7 +9,7 @@ import { formatTrackName, formatCarName } from '../utils/track';
 import { useContentLabelMap, type ContentLabelMap } from '../services/contentLabels';
 import { setWizardBackgroundStep } from '../components/PageBackground';
 import { PageTransition } from '../components/PageTransition';
-import { Input, Label, Select } from '../components/ui/Input';
+import { Input, Label } from '../components/ui/Input';
 import {
   ArrowLeft,
   ArrowRight,
@@ -35,7 +35,11 @@ import {
   ShieldCheck,
   CheckCircle2,
   CircleDashed,
+  ExternalLink,
+  Clock,
+  CloudSun,
 } from 'lucide-react';
+import { RaceMode } from '@simracing/shared';
 
 const DEFAULT_MAX_CLIENTS = 11;
 
@@ -51,6 +55,7 @@ const STEPS = [
   { id: 1, label: 'Simulateur', icon: Monitor },
   { id: 2, label: 'Circuit', icon: MapPin },
   { id: 3, label: 'Configuration', icon: Server },
+  { id: 4, label: 'Course', icon: Flag },
 ];
 
 export function CreateDedicatedServer() {
@@ -246,7 +251,7 @@ export function CreateDedicatedServer() {
   function goNext() {
     if (!canProceed()) return;
     setDirection('next');
-    setStep((s) => Math.min(3, s + 1));
+    setStep((s) => Math.min(4, s + 1));
   }
 
   function goPrev() {
@@ -257,6 +262,7 @@ export function CreateDedicatedServer() {
   function canProceed(): boolean {
     if (step === 1) return !!stationId;
     if (step === 2) return !!trackId;
+    if (step === 3) return !!name.trim() && totalSelectedCars > 0;
     return false;
   }
 
@@ -392,9 +398,21 @@ export function CreateDedicatedServer() {
                     station={selectedStation}
                     track={selectedTrack}
                     trackLayout={trackLayout}
+                  />
+                )}
+
+                {step === 4 && (
+                  <StepRaceFormat
                     raceFormats={raceFormats}
                     raceFormatId={raceFormatId}
                     onRaceFormatId={setRaceFormatId}
+                    station={selectedStation}
+                    track={selectedTrack}
+                    trackLayout={trackLayout}
+                    maxClients={maxClients}
+                    password={password}
+                    name={name}
+                    totalSelectedCars={totalSelectedCars}
                   />
                 )}
               </motion.div>
@@ -415,10 +433,10 @@ export function CreateDedicatedServer() {
           </button>
 
           <span className="min-w-[8px] flex-1 text-center font-hud-mono text-xs text-gray-500">
-            Étape {step} / 3
+            Étape {step} / 4
           </span>
 
-          {step < 3 ? (
+          {step < 4 ? (
             <button
               type="button"
               onClick={goNext}
@@ -841,9 +859,6 @@ interface StepConfigProps {
   station?: Station;
   track?: Track;
   trackLayout: string;
-  raceFormats: RaceFormat[];
-  raceFormatId: string;
-  onRaceFormatId: (id: string) => void;
 }
 
 function StepConfig({
@@ -871,13 +886,9 @@ function StepConfig({
   station,
   track,
   trackLayout,
-  raceFormats,
-  raceFormatId,
-  onRaceFormatId,
 }: StepConfigProps) {
   const labelMap = useContentLabelMap();
   const atCapacity = totalSelectedCars >= maxClients;
-  const selectedRaceFormat = raceFormats.find((f) => f.id === raceFormatId);
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[1fr,280px]">
@@ -1116,31 +1127,6 @@ function StepConfig({
           />
           <RecapItem icon={Users} label="Slots" value={String(maxClients)} />
           <RecapItem icon={Lock} label="Accès" value={password ? 'Protégé' : 'Public'} />
-          <RecapItem icon={Flag} label="Format" value={selectedRaceFormat?.name ?? '—'} />
-        </div>
-
-        <div className="mt-4 border-t border-white/[0.09] pt-3.5">
-          <Label htmlFor="race-format" className="flex items-center gap-2">
-            <Flag className="h-3.5 w-3.5 text-gray-400" />
-            Format de course
-          </Label>
-          <Select
-            id="race-format"
-            value={raceFormatId}
-            onChange={(e) => onRaceFormatId(e.target.value)}
-          >
-            {raceFormats.length === 0 && <option value="">Aucun format disponible</option>}
-            {raceFormats.map((format) => (
-              <option key={format.id} value={format.id}>
-                {format.name}
-              </option>
-            ))}
-          </Select>
-          {raceFormats.length === 0 && (
-            <p className="mt-1 text-xs text-orange-400">
-              Crée d'abord un format dans "Formats de course" (menu Administration).
-            </p>
-          )}
         </div>
 
         <div className="mt-4 border-t border-white/[0.09] pt-3.5">
@@ -1170,11 +1156,199 @@ function StepConfig({
         <div className="mt-4 flex flex-col gap-2 border-t border-white/[0.09] pt-3.5">
           <CheckRow ok={!!name.trim()}>Nom défini</CheckRow>
           <CheckRow ok={totalSelectedCars > 0}>Au moins une voiture</CheckRow>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+interface StepRaceFormatProps {
+  raceFormats: RaceFormat[];
+  raceFormatId: string;
+  onRaceFormatId: (id: string) => void;
+  station?: Station;
+  track?: Track;
+  trackLayout: string;
+  maxClients: number;
+  password: string;
+  name: string;
+  totalSelectedCars: number;
+}
+
+/** Étape dédiée au système de course (Practice/Qualifying/Race) — volontairement
+ * séparée de StepConfig (§ système de base : poste/voitures/slots) plutôt que
+ * glissée dans son récapitulatif comme avant. Le récap ci-dessous duplique donc
+ * à dessein Poste/Circuit/Slots/Accès pour rester lisible seule. */
+function StepRaceFormat({
+  raceFormats,
+  raceFormatId,
+  onRaceFormatId,
+  station,
+  track,
+  trackLayout,
+  maxClients,
+  password,
+  name,
+  totalSelectedCars,
+}: StepRaceFormatProps) {
+  const labelMap = useContentLabelMap();
+  const selectedFormat = raceFormats.find((f) => f.id === raceFormatId);
+
+  return (
+    <div className="grid items-start gap-6 lg:grid-cols-[1fr,280px]">
+      <div className="space-y-6">
+        <section>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <h3 className="flex flex-none items-center gap-2.5 font-hud text-xl font-bold tracking-wide text-white">
+              <Flag className="h-5 w-5 text-racing-cyan" />
+              Choisis le format de course
+            </h3>
+            <div className="h-px min-w-[8px] flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+            <Link
+              to="/race-formats"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-none items-center gap-1.5 whitespace-nowrap rounded-md border border-white/10 px-3 py-1.5 font-hud text-[13.5px] font-bold text-gray-300 transition-colors hover:border-racing-cyan/40 hover:text-sky-200"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Gérer les formats
+            </Link>
+          </div>
+
+          {raceFormats.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-dark-900/50 py-16 text-center">
+              <AlertCircle className="mx-auto mb-3 h-10 w-10 text-gray-600" />
+              <p className="text-gray-400">Aucun format de course disponible.</p>
+              <p className="mt-1 text-sm text-gray-600">
+                Crée un format depuis la page dédiée pour pouvoir lancer ce serveur.
+              </p>
+              <Link
+                to="/race-formats"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mx-auto mt-3 flex w-fit items-center gap-2 rounded-md border border-white/10 px-4 py-2 font-hud text-sm font-bold text-gray-300 transition-colors hover:border-racing-cyan/40 hover:text-sky-200"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Créer un format
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {raceFormats.map((format) => {
+                const selected = raceFormatId === format.id;
+                return (
+                  <button
+                    key={format.id}
+                    type="button"
+                    onClick={() => onRaceFormatId(format.id)}
+                    className={`group relative overflow-hidden rounded-lg border p-4 text-left transition-all ${
+                      selected
+                        ? 'border-racing-cyan/50 bg-gradient-to-br from-racing-blue/15 to-dark-900/50 shadow-[0_0_22px_rgba(0,120,255,0.2)]'
+                        : 'border-white/[0.06] bg-dark-900/45 hover:border-racing-cyan/35'
+                    }`}
+                  >
+                    <span
+                      className={`absolute inset-y-0 left-0 w-[3px] ${
+                        selected
+                          ? 'bg-gradient-to-b from-racing-blue to-racing-cyan'
+                          : 'bg-gray-700'
+                      }`}
+                    />
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-hud text-lg font-bold text-white">
+                          {format.name}
+                        </p>
+                        {format.description && (
+                          <p className="mt-0.5 line-clamp-2 text-xs text-gray-500">
+                            {format.description}
+                          </p>
+                        )}
+                      </div>
+                      {selected && <CheckCircle2 className="h-5 w-5 flex-none text-racing-cyan" />}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {format.practiceEnabled && (
+                        <FormatBadge icon={Clock}>
+                          Practice {formatMinutes(format.practiceMinutes)}
+                        </FormatBadge>
+                      )}
+                      {format.qualifyingEnabled && (
+                        <FormatBadge icon={Clock}>
+                          Qualifying {formatMinutes(format.qualifyingMinutes)}
+                        </FormatBadge>
+                      )}
+                      {format.raceEnabled && (
+                        <FormatBadge icon={Flag}>
+                          Race{' '}
+                          {format.raceMode === RaceMode.LAPS
+                            ? `${format.raceLaps} tours`
+                            : formatMinutes(format.raceMinutes)}
+                        </FormatBadge>
+                      )}
+                    </div>
+                    <div className="mt-2.5 flex items-center gap-1.5 font-hud-mono text-[11px] text-gray-500">
+                      <CloudSun className="h-3.5 w-3.5" />
+                      {format.weatherGraphics.join(', ')}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <aside className="relative overflow-hidden rounded-lg border border-racing-cyan/30 bg-gradient-to-br from-racing-blue/[0.14] to-dark-900/50 p-4.5 lg:sticky lg:top-20">
+        <span className="absolute left-2 top-2 h-3 w-3 border-l border-t border-racing-cyan/70" />
+        <span className="absolute bottom-2 right-2 h-3 w-3 border-b border-r border-racing-cyan/70" />
+
+        <p className="font-hud text-lg font-bold tracking-wide text-white">Récapitulatif</p>
+        <div className="mt-3.5 flex flex-col gap-3">
+          <RecapItem icon={Monitor} label="Poste" value={station?.name ?? '—'} />
+          <RecapItem
+            icon={MapPin}
+            label="Circuit"
+            value={
+              track
+                ? `${formatTrackName(track.name, track.acId, labelMap)}${trackLayout ? ` (${trackLayout})` : ''}`
+                : '—'
+            }
+          />
+          <RecapItem icon={Users} label="Slots" value={String(maxClients)} />
+          <RecapItem icon={Lock} label="Accès" value={password ? 'Protégé' : 'Public'} />
+          <RecapItem icon={Flag} label="Format" value={selectedFormat?.name ?? '—'} />
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 border-t border-white/[0.09] pt-3.5">
+          <CheckRow ok={!!name.trim()}>Nom défini</CheckRow>
+          <CheckRow ok={totalSelectedCars > 0}>Au moins une voiture</CheckRow>
           <CheckRow ok={!!raceFormatId}>Format de course choisi</CheckRow>
         </div>
       </aside>
     </div>
   );
+}
+
+function FormatBadge({
+  icon: Icon,
+  children,
+}: {
+  icon: React.ElementType;
+  children: React.ReactNode;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 font-hud-mono text-[10.5px] font-bold text-gray-300">
+      <Icon className="h-3 w-3" />
+      {children}
+    </span>
+  );
+}
+
+function formatMinutes(minutes: number): string {
+  if (minutes % 60 === 0 && minutes >= 60) return `${minutes / 60}h`;
+  if (minutes >= 60) return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}`;
+  return `${minutes} min`;
 }
 
 /** "Team select" style roster: one tile per occupied slot (a car picked 3

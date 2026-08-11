@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.116 — Le format de course devient sa propre étape du wizard, séparée de la configuration de base
+
+### Changé
+
+- **Demandé par l'utilisateur : "il faut vraiment que tout le system de course soit dans une page différent si il faut dupliquer certainne choses fait le mais il faut bien séparer ça du system de bases".** En v2.2.115, le sélecteur de format de course avait été ajouté directement dans le panneau récapitulatif de l'étape 3 ("Configuration") du wizard `CreateDedicatedServer.tsx`, mélangeant un choix de nature "course" (Practice/Qualifying/Race) avec la configuration de base du serveur (poste, circuit, voitures, slots, mot de passe).
+- Le wizard passe de 3 à **4 étapes** : Simulateur → Circuit → Configuration → **Course**. La nouvelle étape 4 (`StepRaceFormat`) reprend la sélection de format sous forme de grille de cartes cliquables (un preset par carte, badges Practice/Qualifying/Race/grille/météo — même contenu visuel que `RaceFormatCard` de `RaceFormats.tsx`, dupliqué localement plutôt que partagé entre les deux pages) plutôt qu'un simple `<select>` noyé dans un récapitulatif d'étape précédente. Un lien "Gérer les formats" ouvre `/race-formats` dans un nouvel onglet sans perdre la progression du wizard.
+- Le panneau récapitulatif (Poste/Circuit/Slots/Accès/Format + checklist finale) est **dupliqué** entre l'étape 3 et l'étape 4 plutôt que partagé — chaque étape reste lisible seule, sans dépendre de ce qui restait affiché à l'écran précédent.
+- `canProceed()` pour l'étape 3 exige désormais nom + au moins une voiture (le format de course n'est plus une condition à ce stade, il est vérifié à l'étape 4 avec `canSubmit`).
+- Changement purement frontend, aucun code agent modifié — pas de nouvelle release GitHub, seulement rebuild + redéploiement du conteneur Docker `backend` (qui sert aussi le frontend).
+
 ## v2.2.115 — Formats de course : Practice/Qualifying/Race entièrement configurables
 
 ### Ajouté
