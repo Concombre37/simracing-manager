@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.115 — Formats de course : Practice/Qualifying/Race entièrement configurables
+
+### Ajouté
+
+- **Demandé par l'utilisateur : "créer un system de race donc practice qualif et race vraiment propre et avec toute les fonctionaliter choix des temps etc".** Nouvelle page admin **Formats de course** (`/race-formats`) : CRUD de presets réutilisables, chacun définissant Practice (activé + durée), Qualifying (activé + durée), Race (activé + tours **ou** durée, grille de départ normale/inversée top 3/top 8/complète), et une ou plusieurs météo (le serveur alterne entre elles s'il y en a plusieurs). Un format nommé **"Practice libre (12h)"** est créé automatiquement par la migration, avec exactement le comportement par défaut existant (v2.2.105) — rien ne change pour les serveurs créés sans y toucher.
+- **Assistant "Créer un serveur dédié"** : nouveau sélecteur **Format de course**, obligatoire, toujours visible dans le récapitulatif de configuration (pas caché dans "Options avancées") — présélectionné sur le premier format disponible.
+- **Backend** : modèle `RaceFormat` (Prisma) + `RaceFormatsModule` (`GET/POST/PATCH/DELETE /api/race-formats`, lecture admin+technicien pour l'assistant, écriture admin uniquement). `DedicatedServer.raceFormatId` (FK nullable, `SetNull` à la suppression d'un format). Le format choisi est résolu une seule fois à la création du serveur et envoyé à l'agent sous forme de valeurs déjà calculées (`RaceFormatConfig`, `@simracing/shared`) — l'agent ne connaît jamais l'entité `RaceFormat`, même principe que `carName`/`trackName` déjà résolus côté backend.
+- **Agent** : `serverLauncher.ts#writeServerConfig()` génère désormais `[PRACTICE]`/`[QUALIFY]`/`[RACE]`/`[WEATHER_N]` dynamiquement à partir du format reçu — une session désactivée est **absente** du `server_cfg.ini` (`acServer.exe` passe simplement à la session suivante) plutôt que représentée par un faux "off". `[RACE]` écrit `LAPS=` ou `TIME=` selon le mode choisi, plus `REVERSED_GRID_RACE_POSITIONS=` (0/3/8/-1 selon le type de grille). Filet de sécurité si un payload arrive sans `raceFormat` (décalage de version pendant un déploiement) : mêmes valeurs par défaut qu'avant cette fonctionnalité.
+- **Limite honnête assumée** : `acServer.exe` (protocole dédié vanilla, sans extension serveur CSP) n'a pas de notion de météo _par session_ — les `[WEATHER_N]` s'appliquent à tout le serveur, avec rotation entre plusieurs entrées d'un lancement à l'autre si plusieurs sont configurées. Pas de "Practice ensoleillé, Race sous la pluie" déterministe possible avec ce protocole.
+
 ## v2.2.114 — Le jeu se fermait tout seul dès qu'on rentrait en session, quand il était lancé sans passer par l'agent
 
 ### Corrigé

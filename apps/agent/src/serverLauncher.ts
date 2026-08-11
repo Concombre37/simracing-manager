@@ -5,7 +5,12 @@ import net from 'net';
 import dgram from 'dgram';
 import { promisify } from 'util';
 import { Logger } from 'pino';
-import { LaunchDedicatedServerPayload } from '@simracing/shared';
+import {
+  LaunchDedicatedServerPayload,
+  RaceFormatConfig,
+  RaceMode,
+  GridType,
+} from '@simracing/shared';
 import { resolveAcInstallPath } from './acPathResolver';
 
 const execFileAsync = promisify(execFile);
@@ -14,6 +19,33 @@ const execFileAsync = promisify(execFile);
  * covers every dynamic port a server ever binds, so it only needs to exist
  * once rather than being recreated per launch/per port. */
 const FIREWALL_RULE_NAME = 'SimCenterManager-acServer';
+
+/** Matches the hardcoded behavior this file used before race formats
+ * existed (v2.2.105) — used only when a payload somehow arrives without
+ * `raceFormat` (backend/agent version mismatch during a rolling deploy,
+ * see `LaunchDedicatedServerPayload` in @simracing/shared). */
+const DEFAULT_RACE_FORMAT: RaceFormatConfig = {
+  practiceEnabled: true,
+  practiceMinutes: 720,
+  qualifyingEnabled: false,
+  qualifyingMinutes: 15,
+  raceEnabled: false,
+  raceMode: RaceMode.LAPS,
+  raceLaps: 5,
+  raceMinutes: 20,
+  gridType: GridType.NORMAL,
+  weatherGraphics: ['3_clear'],
+};
+
+/** AC's `REVERSED_GRID_RACE_POSITIONS` ([RACE] section): 0 disables it,
+ * -1 fully reverses the grid, N reverses only the top N qualifying
+ * positions. */
+const GRID_TYPE_TO_REVERSED_POSITIONS: Record<GridType, number> = {
+  [GridType.NORMAL]: 0,
+  [GridType.REVERSED_TOP_3]: 3,
+  [GridType.REVERSED_TOP_8]: 8,
+  [GridType.REVERSED_FULL]: -1,
+};
 
 export interface LaunchedServerInfo {
   serverDir: string;
@@ -482,41 +514,14 @@ export class ServerLauncher {
       // dependency on Kunos' master server being reachable at all.
       'REGISTER_TO_LOBBY=0',
       '',
-      '[PRACTICE]',
-      'NAME=Practice',
-      // Demandé par l'utilisateur : 12h (720 min) au lieu de 30 — avec
-      // LOOP_MODE=1 ci-dessus, une durée courte fait automatiquement
-      // basculer le serveur en Qualifying puis Race au bout de 30/45 min,
-      // ce qui coupe les pilotes en pleine conduite libre (grille imposée,
-      // écran de session). 12h couvre toute une journée d'exploitation du
-      // lieu sans jamais quitter Practice.
-      'TIME=720',
-      'IS_OPEN=1',
-      '',
-      '[QUALIFY]',
-      'NAME=Qualifying',
-      'TIME=15',
-      'IS_OPEN=1',
-      '',
-      '[RACE]',
-      'NAME=Race',
-      'LAPS=5',
-      'WAIT_TIME=60',
-      'IS_OPEN=1',
-      '',
+      ...this.buildSessionSections(payload.raceFormat ?? DEFAULT_RACE_FORMAT),
       '[DYNAMIC_TRACK]',
       'SESSION_START=89',
       'RANDOMNESS=2',
       'LAP_GAIN=22',
       'SESSION_TRANSFER=90',
       '',
-      '[WEATHER_0]',
-      'GRAPHICS=3_clear',
-      'BASE_TEMPERATURE_AMBIENT=26',
-      'BASE_TEMPERATURE_TRACK=34',
-      'VARIATION_AMBIENT=2',
-      'VARIATION_TRACK=2',
-      '',
+      ...this.buildWeatherSections(payload.raceFormat ?? DEFAULT_RACE_FORMAT),
     ].join('\n');
 
     let entryList = '';
@@ -528,6 +533,71 @@ export class ServerLauncher {
     await fs.writeFile(entryListPath, entryList, 'utf-8');
 
     this.logger.info({ serverDir, mainPort, httpPort }, 'Server config written');
+  }
+
+  /** Builds `[PRACTICE]`/`[QUALIFY]`/`[RACE]`, each entirely omitted when
+   * disabled — acServer.exe simply skips straight to the next configured
+   * session rather than needing an explicit "off" flag, so a disabled
+   * session is represented by *absence*, not a false-y field. At least one
+   * must end up enabled (validated both in the "Formats de course" admin
+   * page and `RaceFormatsService.update()`) or acServer.exe has nothing to
+   * run at all. */
+  private buildSessionSections(format: RaceFormatConfig): string[] {
+    const lines: string[] = [];
+
+    if (format.practiceEnabled) {
+      lines.push('[PRACTICE]', 'NAME=Practice', `TIME=${format.practiceMinutes}`, 'IS_OPEN=1', '');
+    }
+
+    if (format.qualifyingEnabled) {
+      lines.push(
+        '[QUALIFY]',
+        'NAME=Qualifying',
+        `TIME=${format.qualifyingMinutes}`,
+        'IS_OPEN=1',
+        '',
+      );
+    }
+
+    if (format.raceEnabled) {
+      const durationLine =
+        format.raceMode === RaceMode.TIME
+          ? `TIME=${format.raceMinutes}`
+          : `LAPS=${format.raceLaps}`;
+      lines.push(
+        '[RACE]',
+        'NAME=Race',
+        durationLine,
+        `REVERSED_GRID_RACE_POSITIONS=${GRID_TYPE_TO_REVERSED_POSITIONS[format.gridType]}`,
+        'WAIT_TIME=60',
+        'IS_OPEN=1',
+        '',
+      );
+    }
+
+    return lines;
+  }
+
+  /** One `[WEATHER_N]` section per configured graphics id — acServer.exe
+   * rotates between several across session/server restarts when more than
+   * one is given, the closest vanilla-AC equivalent to "varied weather"
+   * (there is no per-session-type weather assignment in the dedicated
+   * server protocol). */
+  private buildWeatherSections(format: RaceFormatConfig): string[] {
+    const graphics = format.weatherGraphics.length > 0 ? format.weatherGraphics : ['3_clear'];
+    const lines: string[] = [];
+    graphics.forEach((id, index) => {
+      lines.push(
+        `[WEATHER_${index}]`,
+        `GRAPHICS=${id}`,
+        'BASE_TEMPERATURE_AMBIENT=26',
+        'BASE_TEMPERATURE_TRACK=34',
+        'VARIATION_AMBIENT=2',
+        'VARIATION_TRACK=2',
+        '',
+      );
+    });
+    return lines;
   }
 }
 

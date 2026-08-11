@@ -33,6 +33,7 @@ import {
 } from '@simracing/shared';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { ContentLabelsService } from '../content-labels/content-labels.service';
+import { RaceFormatsService } from '../race-formats/race-formats.service';
 
 interface StationContentShape {
   cars?: { acId: string; name?: string }[];
@@ -50,6 +51,7 @@ export class DedicatedServersController {
     private readonly prisma: PrismaService,
     private readonly clientsService: ClientsService,
     private readonly contentLabelsService: ContentLabelsService,
+    private readonly raceFormatsService: RaceFormatsService,
   ) {}
 
   @Post()
@@ -59,6 +61,9 @@ export class DedicatedServersController {
     dto: CreateDedicatedServerDto,
   ) {
     const server = await this.dedicatedServersService.create(dto);
+    // Always present: create() rejects an unknown/missing raceFormatId
+    // before the server row is even written (see RaceFormatsService.findOne).
+    const raceFormat = this.raceFormatsService.toConfig(server.raceFormat!);
     await this.agentGateway.emitLaunchDedicatedServer(
       server.station.stationId,
       {
@@ -73,6 +78,7 @@ export class DedicatedServersController {
         udpPort: server.udpPort ?? undefined,
         tcpPort: server.tcpPort ?? undefined,
         httpPort: server.httpPort ?? undefined,
+        raceFormat,
       },
     );
     return this.dedicatedServersService.updateStatus(server.id, 'starting');

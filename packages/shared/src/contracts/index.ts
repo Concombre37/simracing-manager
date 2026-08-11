@@ -1,4 +1,4 @@
-import { StationConfig } from '../types';
+import { StationConfig, RaceFormatConfig } from '../types';
 import { StationStatus, StationRole } from '../enums';
 
 export interface AgentToServerEvents {
@@ -183,4 +183,9 @@ export interface LaunchDedicatedServerPayload {
   udpPort?: number;
   tcpPort?: number;
   httpPort?: number;
+  /** Optional only for resilience against a backend/agent version mismatch
+   * during a rolling deploy — `serverLauncher.ts` falls back to the same
+   * defaults it always used (Practice only, no Qualifying/Race) when
+   * absent. Every current backend build always sends it. */
+  raceFormat?: RaceFormatConfig;
 }

@@ -9,6 +9,7 @@ export const createDedicatedServerSchema = z.object({
   maxClients: z.number().int().min(1).max(64).default(10),
   password: z.string().optional(),
   rconPassword: z.string().optional(),
+  raceFormatId: z.string().uuid(),
 });
 
 export type CreateDedicatedServerDto = z.infer<

@@ -9,8 +9,9 @@ import { Prisma } from '@prisma/client';
 import { StationRole } from '@simracing/shared';
 import { CreateDedicatedServerDto } from './dto/create-dedicated-server.dto';
 import { UpdateDedicatedServerDto } from './dto/update-dedicated-server.dto';
+import { RaceFormatsService } from '../race-formats/race-formats.service';
 
-const serverInclude = { station: true } as const;
+const serverInclude = { station: true, raceFormat: true } as const;
 
 type DedicatedServerWithStation = Prisma.DedicatedServerGetPayload<{
   include: typeof serverInclude;
@@ -18,11 +19,19 @@ type DedicatedServerWithStation = Prisma.DedicatedServerGetPayload<{
 
 @Injectable()
 export class DedicatedServersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly raceFormatsService: RaceFormatsService,
+  ) {}
 
   async create(
     dto: CreateDedicatedServerDto,
   ): Promise<DedicatedServerWithStation> {
+    // Throws NotFoundException if the format doesn't exist (deleted since
+    // the wizard loaded its list, for example) — fail before allocating
+    // ports/creating anything rather than leaving a half-created server.
+    await this.raceFormatsService.findOne(dto.raceFormatId);
+
     const isUuid =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
         dto.stationId,
@@ -58,6 +67,7 @@ export class DedicatedServersService {
         maxClients: dto.maxClients,
         password: dto.password,
         rconPassword: dto.rconPassword,
+        raceFormatId: dto.raceFormatId,
         udpPort: mainPort,
         tcpPort: mainPort,
         httpPort,

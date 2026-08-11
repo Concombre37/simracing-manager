@@ -5,6 +5,8 @@ import {
   ScreenMode,
   AssistPreset,
   SessionStatus,
+  RaceMode,
+  GridType,
 } from '../enums';
 
 export interface User {
@@ -74,6 +76,29 @@ export interface RacePlayer {
   bestLapTimeMs: number | null;
   totalTimeMs: number | null;
   laps: number;
+}
+
+/** Resolved Practice/Qualifying/Race format for a dedicated server, sent to
+ * the agent as-is inside `LaunchDedicatedServerPayload` (the agent never
+ * fetches `RaceFormat` itself — the backend resolves the preset once and
+ * hands over plain values, same pattern as `carName`/`trackName`). At least
+ * one of `practiceEnabled`/`qualifyingEnabled`/`raceEnabled` must be true —
+ * `acServer.exe` needs at least one session configured to start at all. */
+export interface RaceFormatConfig {
+  practiceEnabled: boolean;
+  practiceMinutes: number;
+  qualifyingEnabled: boolean;
+  qualifyingMinutes: number;
+  raceEnabled: boolean;
+  raceMode: RaceMode;
+  raceLaps: number;
+  raceMinutes: number;
+  gridType: GridType;
+  /** One or more AC weather graphics ids (e.g. `3_clear`, `rain`) —
+   * `acServer.exe` writes one `[WEATHER_N]` section per entry and rotates
+   * between them across session/server restarts when more than one is
+   * given. Always at least one entry. */
+  weatherGraphics: string[];
 }
 
 export type BlankingMediaCategory = 'idle' | 'launching' | 'results';

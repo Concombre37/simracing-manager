@@ -24,7 +24,8 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  apiKeys ApiKey[]
+  apiKeys     ApiKey[]
+  raceFormats RaceFormat[]
 
   @@map("users")
 }
@@ -124,28 +125,62 @@ model ContentPackage {
 }
 
 model DedicatedServer {
-  id             String    @id @default(uuid()) @db.Uuid
+  id             String      @id @default(uuid()) @db.Uuid
   name           String
-  stationId      String    @map("station_id") @db.Uuid
-  station        Station   @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  stationId      String      @map("station_id") @db.Uuid
+  station        Station     @relation(fields: [stationId], references: [id], onDelete: Cascade)
   track          String
-  trackLayout    String?   @map("track_layout")
+  trackLayout    String?     @map("track_layout")
   cars           String[]
-  maxClients     Int       @default(10) @map("max_clients")
+  maxClients     Int         @default(10) @map("max_clients")
   password       String?
-  rconPassword   String?   @map("rcon_password")
+  rconPassword   String?     @map("rcon_password")
   config         Json?
-  status         String    @default("stopped")
-  serverDir      String?   @map("server_dir")
-  udpPort        Int?      @map("udp_port")
-  tcpPort        Int?      @map("tcp_port")
-  httpPort       Int?      @map("http_port")
-  startedAt      DateTime? @map("started_at")
-  endedAt        DateTime? @map("ended_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  status         String      @default("stopped")
+  serverDir      String?     @map("server_dir")
+  udpPort        Int?        @map("udp_port")
+  tcpPort        Int?        @map("tcp_port")
+  httpPort       Int?        @map("http_port")
+  raceFormatId   String?     @map("race_format_id") @db.Uuid
+  raceFormat     RaceFormat? @relation(fields: [raceFormatId], references: [id], onDelete: SetNull)
+  startedAt      DateTime?   @map("started_at")
+  endedAt        DateTime?   @map("ended_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   @@map("dedicated_servers")
+}
+
+// Reusable Practice/Qualifying/Race preset for dedicated servers — created
+// once from the "Formats de course" admin page, then picked by id when
+// creating a server. Resolved server-side into `RaceFormatConfig` (shared
+// package) and sent to the agent as plain values; the agent never queries
+// this table itself.
+model RaceFormat {
+  id                String   @id @default(uuid()) @db.Uuid
+  name              String
+  description       String?
+  practiceEnabled   Boolean  @default(true) @map("practice_enabled")
+  practiceMinutes   Int      @default(720) @map("practice_minutes")
+  qualifyingEnabled Boolean  @default(false) @map("qualifying_enabled")
+  qualifyingMinutes Int      @default(15) @map("qualifying_minutes")
+  raceEnabled       Boolean  @default(false) @map("race_enabled")
+  // RaceMode ('LAPS'|'TIME') — plain String, same convention as every other
+  // enum-like column in this schema (validated app-side via @simracing/shared).
+  raceMode          String   @default("LAPS") @map("race_mode")
+  raceLaps          Int      @default(5) @map("race_laps")
+  raceMinutes       Int      @default(20) @map("race_minutes")
+  // GridType — same String convention as raceMode above.
+  gridType          String   @default("NORMAL") @map("grid_type")
+  weatherGraphics   String[] @map("weather_graphics")
+  createdById       String?  @map("created_by_id") @db.Uuid
+  createdBy         User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  dedicatedServers DedicatedServer[]
+
+  @@map("race_formats")
 }
 
 model ContentPreview {

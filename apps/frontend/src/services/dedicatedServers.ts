@@ -21,6 +21,7 @@ export interface DedicatedServer {
   endedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  raceFormat: { id: string; name: string } | null;
 }
 
 export interface Car {
@@ -57,6 +58,7 @@ export interface CreateDedicatedServerData {
   maxClients: number;
   password?: string;
   rconPassword?: string;
+  raceFormatId: string;
 }
 
 export interface UpdateDedicatedServerData {

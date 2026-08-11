@@ -19,6 +19,7 @@ import { SessionsKiosk } from './pages/SessionsKiosk';
 import { Kiosk } from './pages/Kiosk';
 import { ContentPreviews } from './pages/ContentPreviews';
 import { ContentNames } from './pages/ContentNames';
+import { RaceFormats } from './pages/RaceFormats';
 import { BlankingMedia } from './pages/BlankingMedia';
 import { Settings } from './pages/Settings';
 
@@ -191,6 +192,14 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute adminOnly>
               <ContentNames />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/race-formats"
+          element={
+            <ProtectedRoute adminOnly>
+              <RaceFormats />
             </ProtectedRoute>
           }
         />

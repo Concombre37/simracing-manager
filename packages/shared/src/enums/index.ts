@@ -51,3 +51,20 @@ export enum GearboxMode {
   MANUAL = 'MANUAL',
   AUTO = 'AUTO',
 }
+
+/** How a dedicated server's Race session ends — a fixed lap count, or a
+ * fixed duration (AC's `[RACE]` section uses exactly one of `LAPS=`/`TIME=`,
+ * never both). */
+export enum RaceMode {
+  LAPS = 'LAPS',
+  TIME = 'TIME',
+}
+
+/** Maps to AC's `REVERSED_GRID_RACE_POSITIONS` (`[RACE]` section): how many
+ * of the qualifying top positions get reversed for the race start grid. */
+export enum GridType {
+  NORMAL = 'NORMAL',
+  REVERSED_TOP_3 = 'REVERSED_TOP_3',
+  REVERSED_TOP_8 = 'REVERSED_TOP_8',
+  REVERSED_FULL = 'REVERSED_FULL',
+}

@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { dedicatedServersApi, type Car as AcCar, type Track } from '../services/dedicatedServers';
 import { stationsApi, type Station } from '../services/stations';
+import { raceFormatsApi, type RaceFormat } from '../services/raceFormats';
 import { formatTrackName, formatCarName } from '../utils/track';
 import { useContentLabelMap, type ContentLabelMap } from '../services/contentLabels';
 import { setWizardBackgroundStep } from '../components/PageBackground';
 import { PageTransition } from '../components/PageTransition';
-import { Input, Label } from '../components/ui/Input';
+import { Input, Label, Select } from '../components/ui/Input';
 import {
   ArrowLeft,
   ArrowRight,
@@ -80,6 +81,21 @@ export function CreateDedicatedServer() {
   const [password, setPassword] = useState('');
   const [rconPassword, setRconPassword] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [raceFormatId, setRaceFormatId] = useState('');
+
+  const { data: raceFormats = [] } = useQuery({
+    queryKey: ['race-formats'],
+    queryFn: raceFormatsApi.list,
+  });
+
+  // Toujours un format sélectionné dès que la liste est chargée — évite un
+  // select vide bloquant sans qu'il soit évident pourquoi "Suivant"/"Créer"
+  // ne fonctionne pas.
+  useEffect(() => {
+    if (!raceFormatId && raceFormats.length > 0) {
+      setRaceFormatId(raceFormats[0].id);
+    }
+  }, [raceFormats, raceFormatId]);
 
   const totalSelectedCars = useMemo(
     () => Object.values(carCounts).reduce((sum, n) => sum + n, 0),
@@ -245,7 +261,12 @@ export function CreateDedicatedServer() {
   }
 
   const canSubmit =
-    !!name.trim() && !!stationId && !!trackId && totalSelectedCars > 0 && maxClients >= 1;
+    !!name.trim() &&
+    !!stationId &&
+    !!trackId &&
+    totalSelectedCars > 0 &&
+    maxClients >= 1 &&
+    !!raceFormatId;
 
   function handleSubmit() {
     if (!canSubmit) return;
@@ -258,6 +279,7 @@ export function CreateDedicatedServer() {
       maxClients,
       ...(password && { password }),
       ...(rconPassword && { rconPassword }),
+      raceFormatId,
     });
   }
 
@@ -370,6 +392,9 @@ export function CreateDedicatedServer() {
                     station={selectedStation}
                     track={selectedTrack}
                     trackLayout={trackLayout}
+                    raceFormats={raceFormats}
+                    raceFormatId={raceFormatId}
+                    onRaceFormatId={setRaceFormatId}
                   />
                 )}
               </motion.div>
@@ -816,6 +841,9 @@ interface StepConfigProps {
   station?: Station;
   track?: Track;
   trackLayout: string;
+  raceFormats: RaceFormat[];
+  raceFormatId: string;
+  onRaceFormatId: (id: string) => void;
 }
 
 function StepConfig({
@@ -843,9 +871,13 @@ function StepConfig({
   station,
   track,
   trackLayout,
+  raceFormats,
+  raceFormatId,
+  onRaceFormatId,
 }: StepConfigProps) {
   const labelMap = useContentLabelMap();
   const atCapacity = totalSelectedCars >= maxClients;
+  const selectedRaceFormat = raceFormats.find((f) => f.id === raceFormatId);
 
   return (
     <div className="grid items-start gap-6 lg:grid-cols-[1fr,280px]">
@@ -1084,6 +1116,31 @@ function StepConfig({
           />
           <RecapItem icon={Users} label="Slots" value={String(maxClients)} />
           <RecapItem icon={Lock} label="Accès" value={password ? 'Protégé' : 'Public'} />
+          <RecapItem icon={Flag} label="Format" value={selectedRaceFormat?.name ?? '—'} />
+        </div>
+
+        <div className="mt-4 border-t border-white/[0.09] pt-3.5">
+          <Label htmlFor="race-format" className="flex items-center gap-2">
+            <Flag className="h-3.5 w-3.5 text-gray-400" />
+            Format de course
+          </Label>
+          <Select
+            id="race-format"
+            value={raceFormatId}
+            onChange={(e) => onRaceFormatId(e.target.value)}
+          >
+            {raceFormats.length === 0 && <option value="">Aucun format disponible</option>}
+            {raceFormats.map((format) => (
+              <option key={format.id} value={format.id}>
+                {format.name}
+              </option>
+            ))}
+          </Select>
+          {raceFormats.length === 0 && (
+            <p className="mt-1 text-xs text-orange-400">
+              Crée d'abord un format dans "Formats de course" (menu Administration).
+            </p>
+          )}
         </div>
 
         <div className="mt-4 border-t border-white/[0.09] pt-3.5">
@@ -1113,6 +1170,7 @@ function StepConfig({
         <div className="mt-4 flex flex-col gap-2 border-t border-white/[0.09] pt-3.5">
           <CheckRow ok={!!name.trim()}>Nom défini</CheckRow>
           <CheckRow ok={totalSelectedCars > 0}>Au moins une voiture</CheckRow>
+          <CheckRow ok={!!raceFormatId}>Format de course choisi</CheckRow>
         </div>
       </aside>
     </div>

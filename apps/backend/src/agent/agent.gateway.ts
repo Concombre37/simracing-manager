@@ -29,7 +29,7 @@ import {
 import { DashboardGateway } from '../dashboard/dashboard.gateway';
 import { TelemetryService } from '../telemetry/telemetry.service';
 import { SettingsService } from '../settings/settings.service';
-import { TelemetrySnapshot } from '@simracing/shared';
+import { TelemetrySnapshot, RaceFormatConfig } from '@simracing/shared';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -589,6 +589,7 @@ export class AgentGateway
       udpPort?: number;
       tcpPort?: number;
       httpPort?: number;
+      raceFormat: RaceFormatConfig;
     },
   ): Promise<void> {
     this.server.to(`station:${stationId}`).emit('server:launch', {
@@ -603,6 +604,7 @@ export class AgentGateway
       udpPort: payload.udpPort,
       tcpPort: payload.tcpPort,
       httpPort: payload.httpPort,
+      raceFormat: payload.raceFormat,
     });
   }
 

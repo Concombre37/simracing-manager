@@ -27,6 +27,7 @@ import {
   Users,
   Rows3,
   Calendar,
+  Flag,
 } from 'lucide-react';
 
 function findTrackPreview(trackAcId: string, content: unknown): string | undefined {
@@ -288,6 +289,12 @@ export function DedicatedServers() {
                             <Calendar className="h-3.5 w-3.5 text-racing-cyan" />
                             Créé le {formatCreatedAt(server.createdAt)}
                           </span>
+                          {server.raceFormat && (
+                            <span className="flex items-center gap-1.5">
+                              <Flag className="h-3.5 w-3.5 text-racing-cyan" />
+                              {server.raceFormat.name}
+                            </span>
+                          )}
                         </div>
                         <div className="flex flex-wrap gap-1.5 pt-0.5">
                           <PortChip label="TCP" value={server.tcpPort ?? 9600} />
