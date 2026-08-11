@@ -20,6 +20,8 @@ import { Kiosk } from './pages/Kiosk';
 import { ContentPreviews } from './pages/ContentPreviews';
 import { ContentNames } from './pages/ContentNames';
 import { RaceFormats } from './pages/RaceFormats';
+import { Menu } from './pages/Menu';
+import { TabletMenu } from './pages/TabletMenu';
 import { BlankingMedia } from './pages/BlankingMedia';
 import { Settings } from './pages/Settings';
 
@@ -203,6 +205,18 @@ function AnimatedRoutes() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/restaurant-menu"
+          element={
+            <ProtectedRoute adminOnly>
+              <Menu />
+            </ProtectedRoute>
+          }
+        />
+        {/* Publique, sans connexion — destinée aux tablettes clients, pas au
+            staff. Ni ProtectedRoute (pas de compte requis) ni Layout (pas
+            de chrome admin) — plein écran, comme le prototype importé. */}
+        <Route path="/tablet-menu" element={<TabletMenu />} />
         <Route
           path="/blanking-media"
           element={

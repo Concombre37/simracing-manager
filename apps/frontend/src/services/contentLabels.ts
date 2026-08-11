@@ -10,6 +10,8 @@ export interface KnownContentItem {
   rawName: string;
   displayName: string | null;
   labelId: string | null;
+  category: string | null;
+  difficulty: number | null;
 }
 
 export const contentLabelsApi = {
@@ -17,8 +19,13 @@ export const contentLabelsApi = {
 
   getMap: () => api.get<ContentLabelMap>('/content/labels/map').then((res) => res.data),
 
-  upsert: (params: { type: 'car' | 'track'; acId: string; displayName: string }) =>
-    api.put('/content/labels', params).then((res) => res.data),
+  upsert: (params: {
+    type: 'car' | 'track';
+    acId: string;
+    displayName: string;
+    category?: string;
+    difficulty?: number;
+  }) => api.put('/content/labels', params).then((res) => res.data),
 };
 
 const EMPTY_LABEL_MAP: ContentLabelMap = { car: {}, track: {} };

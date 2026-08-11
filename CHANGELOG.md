@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.2.117 — App tablette "Menu interactif" : catalogue voitures/circuits + carte resto-bar
+
+### Ajouté
+
+- **Demandé par l'utilisateur : "crée moi un petit application ... une sorte d'app kiosque pour le centre de simu sur des tablette", à partir d'une maquette Claude Design importée (`Menu Tablette.dc.html`, projet "Menu interactif sur tablette").** Nouvelle page **publique, sans connexion** `/tablet-menu` — pensée pour être ouverte en plein écran sur des tablettes posées dans le centre : catalogue voitures/circuits réellement scanné sur les postes (photo, catégorie, difficulté), et carte resto/bar. Onglets Voitures/Circuits/Cuisine/Bar, filtres par catégorie (dynamiques, affichés seulement s'il existe au moins un item catégorisé), fiche détail au clic, écran de veille après 90s d'inactivité (accroche qui tourne, horloge, "Touchez l'écran"), responsive portrait/paysage. Thème repris de la maquette ("Nocturne", accent blurple `#9184d9`) mais scopé à cette seule page (`.tablet-menu`), sans toucher au thème du reste du dashboard.
+- **Écart assumé avec la maquette** : celle-ci invente un catalogue fictif (F1 2024, Porsche 911 GT3 R, specs puissance/poids/année) et une carte alsacienne fictive — le vrai système ne connaît que `acId` + nom + photo scannés. Plutôt que d'inventer des specs, deux nouvelles pages d'administration permettent de renseigner le **vrai** contenu :
+  - **`ContentNames.tsx`** (`/content-names`) : ajout de deux champs par voiture/circuit — catégorie (texte libre, ex "GT3") et difficulté (1-5) — en plus du nom déjà personnalisable. `ContentLabel` (Prisma) gagne `category`/`difficulty` (nullable). `upsert()` ne supprime plus la ligne quand seul le nom est vidé (sinon ça effacerait aussi la catégorie/difficulté déjà renseignées) — suppression seulement si les trois champs sont vides à la fois.
+  - **Nouvelle page `/restaurant-menu`** (`Menu.tsx`) : CRUD complet de la carte resto/bar — catégories (Cuisine/Bar, titre, sous-titre) contenant des articles (nom, description, prix en texte libre). Nouveau module backend `menu/` (`MenuCategory`/`MenuItem`, mêmes conventions CRUD que `race-formats/`).
+- **Backend, nouvelles routes externes** (`ExternalApiController`, déjà authentifié par clé API dédiée `ApiKeysModule` — pas le JWT dashboard) : `GET /external/v1/content` (catalogue voitures/circuits agrégé sur tous les postes, dédoublonné par `acId`, image + catégorie + difficulté) et `GET /external/v1/menu` (carte resto/bar groupée). La tablette consomme ces deux routes avec une clé créée par l'utilisateur (`ext_...`, nom "Catalogue").
+- **Frontend, nouvelle instance axios dédiée** (`services/externalApi.ts`) — jamais `services/api.ts` (celle-ci attache le JWT localStorage et redirige vers `/login` sur 401, ce qui casserait une tablette publique sans compte). Clé API lue au build depuis `VITE_TABLET_MENU_API_KEY` (`apps/frontend/.env`, gitignored, jamais committée en clair).
+- **Simplifications volontaires par rapport à la maquette** (hors scope de la demande, notées explicitement) : pas de toggle FR/EN (tout le reste du site est 100% français, sans infra i18n), pas de photo d'ambiance sur l'écran de veille (pas de source réelle disponible pour l'instant — juste le fond dégradé).
+
 ## v2.2.116 — Le format de course devient sa propre étape du wizard, séparée de la configuration de base
 
 ### Changé

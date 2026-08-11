@@ -203,11 +203,46 @@ model ContentLabel {
   type        String
   acId        String   @map("ac_id")
   displayName String   @map("display_name")
+  // Tag libre (ex: "GT3", "Rallye") et difficulté 1-5 — utilisés par la
+  // page tablette (/tablet-menu), pas de valeur inventée : null tant que
+  // l'admin n'a rien renseigné.
+  category    String?
+  difficulty  Int?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@unique([type, acId])
   @@map("content_labels")
+}
+
+// Carte resto/bar affichée sur la page tablette publique (/tablet-menu),
+// gérée par les admins via /restaurant-menu — voir ExternalApiController.
+model MenuCategory {
+  id        String     @id @default(uuid()) @db.Uuid
+  section   String // 'food' | 'drinks'
+  title     String
+  subtitle  String?
+  sortOrder Int        @default(0) @map("sort_order")
+  items     MenuItem[]
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id          String       @id @default(uuid()) @db.Uuid
+  categoryId  String       @map("category_id") @db.Uuid
+  category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  // Texte libre ("9,50 €") — juste affiché sur la tablette, pas de calcul.
+  price       String
+  sortOrder   Int          @default(0) @map("sort_order")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@map("menu_items")
 }
 
 model BlankingMedia {

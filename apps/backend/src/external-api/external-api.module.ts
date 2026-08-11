@@ -3,9 +3,17 @@ import { ExternalApiController } from './external-api.controller';
 import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { LeaderboardModule } from '../leaderboard/leaderboard.module';
 import { SessionsModule } from '../sessions/sessions.module';
+import { ContentLabelsModule } from '../content-labels/content-labels.module';
+import { MenuModule } from '../menu/menu.module';
 
 @Module({
-  imports: [ApiKeysModule, LeaderboardModule, SessionsModule],
+  imports: [
+    ApiKeysModule,
+    LeaderboardModule,
+    SessionsModule,
+    ContentLabelsModule,
+    MenuModule,
+  ],
   controllers: [ExternalApiController],
 })
 export class ExternalApiModule {}

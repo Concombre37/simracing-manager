@@ -24,6 +24,7 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { ExternalApiModule } from './external-api/external-api.module';
 import { RaceFormatsModule } from './race-formats/race-formats.module';
+import { MenuModule } from './menu/menu.module';
 import { envSchema } from './config/env.validation';
 
 @Module({
@@ -58,6 +59,7 @@ import { envSchema } from './config/env.validation';
     ApiKeysModule,
     ExternalApiModule,
     RaceFormatsModule,
+    MenuModule,
   ],
 })
 export class AppModule {}

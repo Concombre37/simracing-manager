@@ -19,6 +19,8 @@ import {
   Flag,
   Tv,
   Tag,
+  UtensilsCrossed,
+  Tablet,
 } from 'lucide-react';
 
 // L'essentiel du quotidien : toujours en pleine évidence, jamais replié.
@@ -41,6 +43,7 @@ const adminNavItems = [
   { path: '/content-previews', label: 'Images', icon: Image },
   { path: '/content-names', label: 'Noms', icon: Tag },
   { path: '/race-formats', label: 'Formats de course', icon: Flag },
+  { path: '/restaurant-menu', label: 'Carte resto/bar', icon: UtensilsCrossed },
   { path: '/blanking-media', label: 'Écrans', icon: MonitorPlay },
   { path: '/settings', label: 'Paramètres', icon: Settings },
 ];
@@ -57,6 +60,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/content-previews': ['Images'],
   '/content-names': ['Noms'],
   '/race-formats': ['Formats de course'],
+  '/restaurant-menu': ['Carte resto/bar'],
   '/blanking-media': ['Écrans'],
   '/settings': ['Paramètres'],
 };
@@ -204,6 +208,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Tv className="h-3.5 w-3.5" />
               Mode kiosque
             </Link>
+            {/* Simple raccourci de prévisualisation pour le staff — pas le
+                point d'accès principal (les tablettes clients ont l'URL en
+                favori), donc target="_blank" est acceptable ici contrairement
+                au lien "Mode kiosque" ci-dessus. */}
+            <a
+              href="/tablet-menu"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-lg border border-dark-600 px-3 py-1.5 text-xs font-bold text-gray-300 transition-colors hover:border-accent-orange/40 hover:text-accent-orange"
+            >
+              <Tablet className="h-3.5 w-3.5" />
+              Menu tablette
+            </a>
             <div className="hidden h-6 w-px bg-dark-700 sm:block" />
             <div className="hidden items-center gap-2 font-mono text-xs tabular-nums text-gray-500 sm:flex">
               <span className="relative flex h-1.5 w-1.5">

@@ -41,7 +41,7 @@ export function ContentNames() {
     <PageShell
       title="Noms"
       accent="affichés"
-      subtitle="Donne un nom plus joli aux voitures et circuits vus par les agents — affiché partout à la place du nom technique"
+      subtitle="Donne un nom plus joli aux voitures et circuits vus par les agents, une catégorie et une difficulté — affichés partout dans le dashboard, et sur la page tablette /tablet-menu"
       actions={
         <div className="flex items-center gap-2">
           <Badge variant="gray">Total {stats.total}</Badge>
@@ -106,26 +106,49 @@ export function ContentNames() {
   );
 }
 
+interface RowPayload {
+  displayName: string;
+  category?: string;
+  difficulty?: number;
+}
+
 function ContentNameRow({ item }: { item: KnownContentItem }) {
   const queryClient = useQueryClient();
-  const [value, setValue] = useState(item.displayName ?? '');
+  const [name, setName] = useState(item.displayName ?? '');
+  const [category, setCategory] = useState(item.category ?? '');
+  const [difficulty, setDifficulty] = useState<number | null>(item.difficulty);
 
   useEffect(() => {
-    setValue(item.displayName ?? '');
-  }, [item.displayName]);
+    setName(item.displayName ?? '');
+    setCategory(item.category ?? '');
+    setDifficulty(item.difficulty);
+  }, [item.displayName, item.category, item.difficulty]);
 
   const mutation = useMutation({
-    mutationFn: (displayName: string) =>
-      contentLabelsApi.upsert({ type: item.type, acId: item.acId, displayName }),
+    mutationFn: (payload: RowPayload) =>
+      contentLabelsApi.upsert({ type: item.type, acId: item.acId, ...payload }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['content-labels-known'] });
       void queryClient.invalidateQueries({ queryKey: ['content-labels-map'] });
     },
   });
 
-  const trimmed = value.trim();
-  const hasChanged = trimmed !== (item.displayName ?? '');
-  const hasOverride = Boolean(item.displayName);
+  const trimmedName = name.trim();
+  const trimmedCategory = category.trim();
+  const hasChanged =
+    trimmedName !== (item.displayName ?? '') ||
+    trimmedCategory !== (item.category ?? '') ||
+    difficulty !== item.difficulty;
+  const hasOverride = Boolean(item.displayName || item.category || item.difficulty);
+
+  function save(overrides: Partial<RowPayload> = {}) {
+    mutation.mutate({
+      displayName: trimmedName,
+      category: trimmedCategory || undefined,
+      difficulty: difficulty ?? undefined,
+      ...overrides,
+    });
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-dark-700/30 transition-colors">
@@ -134,7 +157,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
         {item.type === 'car' ? 'Voiture' : 'Circuit'}
       </Badge>
 
-      <div className="min-w-0 flex-1 basis-56">
+      <div className="min-w-0 flex-1 basis-48">
         <p className="truncate text-sm text-white" title={item.rawName}>
           {item.rawName}
         </p>
@@ -143,22 +166,33 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
         </p>
       </div>
 
-      <div className="min-w-0 flex-[2] basis-64">
+      <div className="min-w-0 flex-[2] basis-56">
         <Input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           placeholder={item.rawName}
           className="w-full"
         />
       </div>
 
+      <div className="min-w-0 flex-1 basis-36">
+        <Input
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          placeholder="Catégorie (ex: GT3)"
+          className="w-full"
+        />
+      </div>
+
+      <DifficultyPicker value={difficulty} onChange={setDifficulty} />
+
       <div className="flex items-center gap-2">
         <Button
           size="sm"
           variant="primary"
-          disabled={!hasChanged || !trimmed}
-          isLoading={mutation.isPending && mutation.variables !== ''}
-          onClick={() => mutation.mutate(trimmed)}
+          disabled={!hasChanged}
+          isLoading={mutation.isPending}
+          onClick={() => save()}
         >
           <Check className="w-3.5 h-3.5" />
           Enregistrer
@@ -167,14 +201,42 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
           <Button
             size="sm"
             variant="secondary"
-            isLoading={mutation.isPending && mutation.variables === ''}
-            onClick={() => mutation.mutate('')}
-            title="Revenir au nom technique"
+            onClick={() => {
+              setName('');
+              setCategory('');
+              setDifficulty(null);
+              save({ displayName: '', category: undefined, difficulty: undefined });
+            }}
+            title="Tout réinitialiser (nom, catégorie, difficulté)"
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </Button>
         )}
       </div>
+    </div>
+  );
+}
+
+function DifficultyPicker({
+  value,
+  onChange,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+}) {
+  return (
+    <div className="flex flex-none items-center gap-1" title="Difficulté (1-5)">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onChange(value === n ? null : n)}
+          className={`h-5 w-3 rounded-sm transition-colors ${
+            value !== null && n <= value ? 'bg-accent-orange' : 'bg-dark-600 hover:bg-dark-500'
+          }`}
+          title={`Difficulté ${n}/5`}
+        />
+      ))}
     </div>
   );
 }
