@@ -19,6 +19,54 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+/** Regroupe les catégories très spécifiques renseignées sur `/content-names`
+ * (ex: "Coupé sportif préparé", "Supercar historique préparée") en une
+ * poignée de familles pour la barre de filtres — sinon un catalogue de 259
+ * voitures avec des tags quasi-uniques par modèle produit ~80 pastilles de
+ * filtre, illisible sur un écran tactile. Le tag exact reste affiché tel
+ * quel sur la carte/fiche détail, seul le regroupement du filtre est lissé
+ * ici (règles par mot-clé, ordre = priorité). */
+const CATEGORY_GROUP_RULES: [RegExp, string][] = [
+  [/kart/i, 'Kart'],
+  [/formule 1.*historique|historique.*formule 1/i, 'Formule 1 historique'],
+  [/formule 1/i, 'Formule 1'],
+  [/formule|monoplace/i, 'Monoplace'],
+  [/gt ?1\b/i, 'GT1'],
+  [/gt ?2\b/i, 'GT2'],
+  [/gt ?3\b/i, 'GT3'],
+  [/gt ?4\b/i, 'GT4'],
+  [/dtm/i, 'DTM'],
+  [/nascar/i, 'NASCAR'],
+  [/rallycross/i, 'Rallycross'],
+  [/rallye|wrc/i, 'Rallye'],
+  [/drift/i, 'Drift'],
+  [/lmh|hypercar\/lmh/i, 'Hypercar/LMH'],
+  [/hypercar/i, 'Hypercar'],
+  [/lmp1/i, 'Prototype LMP1'],
+  [/lmp2/i, 'Prototype LMP2'],
+  [/lmp3/i, 'Prototype LMP3'],
+  [/prototype|groupe c|groupe 5|groupe 6|can-am/i, 'Prototype historique'],
+  [/gt le mans|gt \/ le mans/i, 'GT Le Mans'],
+  [/gt historique/i, 'GT historique'],
+  [/tourisme|cup|tcr/i, 'Tourisme/Cup'],
+  [/muscle|trans-am/i, 'Muscle car'],
+  [/supercar/i, 'Supercar'],
+  [/roadster/i, 'Roadster'],
+  [/coupé/i, 'Coupé sportif'],
+  [/citadine/i, 'Citadine'],
+  [/berline/i, 'Berline sportive'],
+  [/suv/i, 'SUV sportif'],
+  [/compacte/i, 'Compacte sportive'],
+  [/voiture de piste|de c(o|ô)te/i, 'Voiture de piste'],
+];
+
+function categoryGroup(category: string): string {
+  for (const [pattern, group] of CATEGORY_GROUP_RULES) {
+    if (pattern.test(category)) return group;
+  }
+  return category;
+}
+
 // Nom réel de l'établissement (voir Layout.tsx — même logo/wordmark déjà
 // utilisé ailleurs sur le dashboard). Pas de compte utilisateur sur cette
 // page publique, donc pas d'accès à `useSiteLogo()` (endpoint protégé par
@@ -147,10 +195,20 @@ export function TabletMenu() {
     [tab, catalog],
   );
   const categories = useMemo(
-    () => Array.from(new Set(currentItems.map((i) => i.category).filter(Boolean) as string[])),
+    () =>
+      Array.from(
+        new Set(
+          currentItems
+            .map((i) => i.category)
+            .filter(Boolean)
+            .map((c) => categoryGroup(c as string)),
+        ),
+      ).sort((a, b) => a.localeCompare(b)),
     [currentItems],
   );
-  const filteredItems = filter ? currentItems.filter((i) => i.category === filter) : currentItems;
+  const filteredItems = filter
+    ? currentItems.filter((i) => i.category && categoryGroup(i.category) === filter)
+    : currentItems;
 
   const foodCategories = menuCategories.filter((c) => c.section === 'food');
   const drinkCategories = menuCategories.filter((c) => c.section === 'drinks');
