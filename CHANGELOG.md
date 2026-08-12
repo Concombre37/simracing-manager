@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.121 — Tuiles voitures GT2/GT3/GT4/Hypercar/DTM/Cup/Historique/Autres/Formula 1/2/4
+
+### Changé
+
+- **Demandé par l'utilisateur, à partir d'une image de référence (liste de catégories) : "replace en les catégorie suivant".** Les 4 tuiles fixes de l'onglet Voitures (`/tablet-menu`, v2.2.119 : GT/Formula/LMDH/Drift) sont remplacées par 11 tuiles correspondant exactement à la liste fournie : GT2, GT3, GT4, Hypercar, DTM, Cup, Historique, Autres, Formula 1, Formula 2, Formula 4 (+ "Toutes"). Portée confirmée explicitement (via AskUserQuestion) : uniquement les tuiles de la page tablette — le champ `category` texte libre déjà enregistré sur les 259 voitures n'est pas modifié.
+- Les familles se recouvrent volontairement (ex: "Formule 1 historique" apparaît à la fois sous Historique et Formula 1) — aucune n'est exclusive, même principe qu'avant. **"Autres" est un vrai filtre** (regex négative : toute voiture qui ne matche aucune des 10 autres familles), distinct de "Toutes" qui n'exclut rien — n'existait pas dans la version précédente. Une famille sans aucune voiture correspondante ne s'affiche pas (`Formula 2` n'a aucune voiture taguée actuellement en prod, donc invisible tant qu'aucune n'est ajoutée via `/content-names`).
+- Changement purement frontend, aucune donnée modifiée en base, aucun code agent touché.
+
 ## v2.2.120 — Puissance et poids sur les fiches voitures ("Tu peux me donner plus de jolie detail Poids puissance etc")
 
 ### Ajouté

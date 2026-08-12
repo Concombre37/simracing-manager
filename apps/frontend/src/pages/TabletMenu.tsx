@@ -19,13 +19,17 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-/** Quatre familles "vitrine" pour le sélecteur à tuiles photo de l'onglet
- * Voitures — demandé explicitement par l'utilisateur ("il faut juste GT/
- * FORMULA/LMDH ET DRIFT"), volontairement restreint plutôt qu'exhaustif :
- * les voitures qui ne rentrent dans aucune de ces 4 familles (Kart, route,
- * rallye, tourisme, muscle car...) restent visibles sous "Toutes", elles
- * n'ont juste pas de tuile dédiée. Matché sur le champ `category` exact
- * (renseigné via `/content-names`), pas une liste figée d'acId. */
+/** Familles "vitrine" pour le sélecteur à tuiles photo de l'onglet Voitures
+ * — remplace la liste GT/Formula/LMDH/Drift par la liste fournie par
+ * l'utilisateur (capture d'écran, v2.2.121) : GT2/GT3/GT4/Hypercar/DTM/Cup/
+ * Historique/Autres/Formula 1/Formula 2/Formula 4. Matché sur le champ
+ * `category` exact (renseigné via `/content-names`), pas une liste figée
+ * d'acId — les familles se recouvrent volontairement (ex: "Formule 1
+ * historique" matche à la fois Historique et Formula 1), aucune n'est
+ * exclusive. "Autres" est un vrai filtre (voitures qui ne matchent aucune
+ * des 10 autres familles), distinct de "Toutes" qui n'exclut rien. Une
+ * famille sans aucune voiture correspondante ne s'affiche simplement pas
+ * (voir `families` ci-dessous). */
 interface CarFamily {
   key: string;
   label: string;
@@ -33,10 +37,22 @@ interface CarFamily {
 }
 
 const CAR_FAMILIES: CarFamily[] = [
-  { key: 'gt', label: 'GT', match: /gt ?[1-4]|gt le mans|gt historique|gt client|gt cup|gt500/i },
-  { key: 'formula', label: 'Formula', match: /formule|monoplace/i },
-  { key: 'lmdh', label: 'LMDH', match: /lmp|lmh|prototype|groupe c|can-am/i },
-  { key: 'drift', label: 'Drift', match: /drift/i },
+  { key: 'gt2', label: 'GT2', match: /\bgt ?2\b/i },
+  { key: 'gt3', label: 'GT3', match: /\bgt ?3\b/i },
+  { key: 'gt4', label: 'GT4', match: /\bgt ?4\b/i },
+  { key: 'hypercar', label: 'Hypercar', match: /hypercar/i },
+  { key: 'dtm', label: 'DTM', match: /\bdtm\b/i },
+  { key: 'cup', label: 'Cup', match: /\bcup\b/i },
+  { key: 'historique', label: 'Historique', match: /historique/i },
+  {
+    key: 'autres',
+    label: 'Autres',
+    match:
+      /^(?!.*(?:\bgt ?[234]\b|hypercar|\bdtm\b|\bcup\b|historique|formule ?[124]\b|formula ?[124]\b)).+$/i,
+  },
+  { key: 'formula1', label: 'Formula 1', match: /formule ?1\b|formula ?1\b/i },
+  { key: 'formula2', label: 'Formula 2', match: /formule ?2\b|formula ?2\b/i },
+  { key: 'formula4', label: 'Formula 4', match: /formule ?4\b|formula ?4\b/i },
 ];
 
 // Nom réel de l'établissement (voir Layout.tsx — même logo/wordmark déjà
