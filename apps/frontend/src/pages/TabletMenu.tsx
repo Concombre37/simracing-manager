@@ -653,23 +653,41 @@ function SpecStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DifficultyDots({ value }: { value: number }) {
+/** Échelle nommée réutilisée partout où la difficulté (1-5) est affichée —
+ * voitures et circuits, mêmes libellés (demandé par l'utilisateur), copie
+ * de `DIFFICULTY_LABELS` dans `ContentNames.tsx` (page publique indépendante,
+ * pas de code partagé entre les deux). */
+const DIFFICULTY_LABELS = ['Débutant', 'Facile', 'Moyen', 'Difficile', 'Expert'];
+
+function DifficultyDots({ value, showLabel }: { value: number; showLabel?: boolean }) {
   return (
-    <span style={{ display: 'flex', gap: 4 }}>
-      {[1, 2, 3, 4, 5].map((n) => (
+    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <span style={{ display: 'flex', gap: 4 }}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <span
+            key={n}
+            style={{
+              width: 16,
+              height: 4,
+              borderRadius: 2,
+              background:
+                n <= value
+                  ? 'var(--tm-accent)'
+                  : 'color-mix(in srgb, var(--tm-text) 14%, transparent)',
+            }}
+          />
+        ))}
+      </span>
+      {showLabel && (
         <span
-          key={n}
           style={{
-            width: 16,
-            height: 4,
-            borderRadius: 2,
-            background:
-              n <= value
-                ? 'var(--tm-accent)'
-                : 'color-mix(in srgb, var(--tm-text) 14%, transparent)',
+            fontSize: 12.5,
+            color: 'color-mix(in srgb, var(--tm-text) 60%, transparent)',
           }}
-        />
-      ))}
+        >
+          {DIFFICULTY_LABELS[value - 1]}
+        </span>
+      )}
     </span>
   );
 }
@@ -1074,7 +1092,8 @@ function DetailModal({
           item.description ||
           item.powerHp ||
           item.weightKg ||
-          item.difficulty !== null) && (
+          item.difficulty !== null ||
+          item.layoutImageUrl) && (
           <div
             style={{ padding: '20px 26px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}
           >
@@ -1120,7 +1139,37 @@ function DetailModal({
                 >
                   Difficulté
                 </span>
-                <DifficultyDots value={item.difficulty} />
+                <DifficultyDots value={item.difficulty} showLabel />
+              </div>
+            )}
+            {item.layoutImageUrl && (
+              <div>
+                <span
+                  style={{
+                    fontSize: 11,
+                    letterSpacing: '.14em',
+                    textTransform: 'uppercase',
+                    color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+                  }}
+                >
+                  Tracé
+                </span>
+                <div
+                  style={{
+                    marginTop: 10,
+                    borderRadius: 10,
+                    padding: 14,
+                    background: '#fff',
+                    display: 'flex',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <img
+                    src={item.layoutImageUrl}
+                    alt={`Tracé du circuit ${item.name}`}
+                    style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain' }}
+                  />
+                </div>
               </div>
             )}
           </div>

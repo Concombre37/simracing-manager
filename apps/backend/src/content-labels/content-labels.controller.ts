@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Put,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import { Response } from 'express';
 import { ContentLabelsService } from './content-labels.service';
 import {
   upsertContentLabelSchema,
@@ -25,6 +35,28 @@ export class ContentLabelsController {
   @UseGuards(JwtAuthGuard)
   getMap() {
     return this.contentLabelsService.getMap();
+  }
+
+  /** Public, sans auth — consommé par la page tablette publique
+   * (`/tablet-menu`) au même titre que `ContentPreviewsController#findOne`. */
+  @Get('layout-image/:id')
+  async getLayoutImage(@Param('id') id: string, @Res() res: Response) {
+    const data = await this.contentLabelsService.getLayoutImage(id);
+    if (!data) {
+      throw new NotFoundException('Layout image not found');
+    }
+    const buffer = Buffer.from(data, 'base64');
+    res.setHeader('Content-Type', this.inferMime(data));
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.send(buffer);
+  }
+
+  private inferMime(data: string): string {
+    if (data.startsWith('iVBOR')) return 'image/png';
+    if (data.startsWith('/9j/')) return 'image/jpeg';
+    if (data.startsWith('PHN2Zy') || data.startsWith('PD94bWwg'))
+      return 'image/svg+xml';
+    return 'application/octet-stream';
   }
 
   @Put()

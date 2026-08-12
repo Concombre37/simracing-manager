@@ -453,6 +453,10 @@ function Field({
   );
 }
 
+/** Échelle nommée réutilisée partout où la difficulté (1-5) est affichée —
+ * voitures et circuits, mêmes libellés (demandé par l'utilisateur). */
+export const DIFFICULTY_LABELS = ['Débutant', 'Facile', 'Moyen', 'Difficile', 'Expert'];
+
 function DifficultyPicker({
   value,
   onChange,
@@ -461,18 +465,23 @@ function DifficultyPicker({
   onChange: (v: number | null) => void;
 }) {
   return (
-    <div className="flex flex-none items-center gap-1" title="Difficulté (1-5)">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          onClick={() => onChange(value === n ? null : n)}
-          className={`h-5 w-3 rounded-sm transition-colors ${
-            value !== null && n <= value ? 'bg-accent-orange' : 'bg-dark-600 hover:bg-dark-500'
-          }`}
-          title={`Difficulté ${n}/5`}
-        />
-      ))}
+    <div className="flex flex-none items-center gap-2">
+      <div className="flex items-center gap-1" title="Difficulté (1-5)">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(value === n ? null : n)}
+            className={`h-5 w-3 rounded-sm transition-colors ${
+              value !== null && n <= value ? 'bg-accent-orange' : 'bg-dark-600 hover:bg-dark-500'
+            }`}
+            title={DIFFICULTY_LABELS[n - 1]}
+          />
+        ))}
+      </div>
+      <span className="w-16 text-[11px] text-gray-400">
+        {value !== null ? DIFFICULTY_LABELS[value - 1] : '—'}
+      </span>
     </div>
   );
 }

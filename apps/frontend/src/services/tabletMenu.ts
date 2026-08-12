@@ -14,6 +14,7 @@ export interface CatalogItem {
   powerHp: number | null;
   weightKg: number | null;
   mirrored: boolean;
+  layoutImageUrl: string | null;
 }
 
 export interface Catalog {

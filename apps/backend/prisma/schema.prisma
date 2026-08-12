@@ -229,6 +229,10 @@ model ContentLabel {
   // (true) pour tout contenu, décoché retire l'item du catalogue sans
   // toucher au reste de son contenu scanné/renseigné.
   visible     Boolean  @default(true)
+  // Schéma réel du circuit (tracé vu du dessus, pas une photo) — circuits
+  // uniquement, source externe (web, licence libre), jamais un plan inventé.
+  // Stocké en base64 comme ContentPreview.data, servi via un endpoint dédié.
+  layoutImage String?  @map("layout_image") @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

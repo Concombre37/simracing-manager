@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.125 — Difficulté nommée (Débutant→Expert) + infrastructure schéma de circuit
+
+### Ajouté
+
+- **Demandé par l'utilisateur ("difficulté dans les voitures débutant/facile/moyen/difficile/expert, et fait aussi ce les circuit").** Échelle 1-5 existante renommée avec des libellés explicites (`DIFFICULTY_LABELS` : Débutant/Facile/Moyen/Difficile/Expert), affichés à côté des barres sur `/content-names` (`DifficultyPicker`) et sur `/tablet-menu` (`DifficultyDots`, prop `showLabel` pour la fiche détail). Le champ `difficulty` était déjà générique (voitures **et** circuits, jamais limité aux voitures) — seul l'étiquetage change, aucune migration nécessaire.
+- **`ContentLabel.layoutImage`** (base64, texte libre) : nouveau champ pour le vrai schéma d'un circuit (tracé vu du dessus), distinct de la photo scannée par l'agent. Servi via un nouvel endpoint public `GET /content/labels/layout-image/:id` (même principe que `ContentPreviewsController`, mime déduit du préfixe base64 — PNG/JPEG/SVG). Pas de champ dans `RowPayload`/formulaire admin : renseigné uniquement via script one-off (source externe, voir prochaine entrée) — `upsert()` ne le touche jamais, donc aucun risque de l'écraser en éditant un autre champ depuis `/content-names`.
+- **`/tablet-menu`** : la fiche détail (`DetailModal`) affiche le tracé (`item.layoutImageUrl`) sous un encart blanc (les schémas sont typiquement des traits sombres sur fond clair/transparent) quand disponible, section "Tracé" sous la difficulté.
+- Changement purement frontend/backend, aucune donnée de circuit encore peuplée à ce stade (voir entrée suivante) — infrastructure seule.
+
 ## v2.2.124 — Case à cocher "Afficher sur le catalogue" (/content-names)
 
 ### Ajouté

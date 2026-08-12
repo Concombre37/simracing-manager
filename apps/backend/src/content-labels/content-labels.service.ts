@@ -45,6 +45,7 @@ export interface CatalogItem {
   powerHp: number | null;
   weightKg: number | null;
   mirrored: boolean;
+  layoutImageUrl: string | null;
 }
 
 @Injectable()
@@ -165,6 +166,9 @@ export class ContentLabelsService {
         powerHp: label?.powerHp ?? null,
         weightKg: label?.weightKg ?? null,
         mirrored: label?.mirrored ?? false,
+        layoutImageUrl: label?.layoutImage
+          ? `/api/content/labels/layout-image/${label.id}`
+          : null,
       };
       (item.type === 'car' ? cars : tracks).push(entry);
     }
@@ -259,5 +263,14 @@ export class ContentLabelsService {
         visible,
       },
     });
+  }
+
+  /** Sert le schéma de circuit (base64) pour `ContentLabelsController`.
+   * Pas de champ dédié dans `RowPayload`/`upsert()` — renseigné directement
+   * en base via un script one-off (source externe, voir 3.2), jamais via le
+   * formulaire admin ; `upsert()` ne le touche donc jamais. */
+  async getLayoutImage(id: string): Promise<string | null> {
+    const label = await this.prisma.contentLabel.findUnique({ where: { id } });
+    return label?.layoutImage ?? null;
   }
 }
