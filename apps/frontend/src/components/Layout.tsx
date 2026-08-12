@@ -19,6 +19,7 @@ import {
   Flag,
   Tv,
   Tag,
+  Tags,
   UtensilsCrossed,
   Tablet,
 } from 'lucide-react';
@@ -42,6 +43,7 @@ const adminNavItems = [
   { path: '/users', label: 'Utilisateurs', icon: Users },
   { path: '/content-previews', label: 'Images', icon: Image },
   { path: '/content-names', label: 'Noms', icon: Tag },
+  { path: '/content-categories', label: 'Catégories', icon: Tags },
   { path: '/race-formats', label: 'Formats de course', icon: Flag },
   { path: '/restaurant-menu', label: 'Carte resto/bar', icon: UtensilsCrossed },
   { path: '/blanking-media', label: 'Écrans', icon: MonitorPlay },
@@ -59,6 +61,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/users': ['Utilisateurs'],
   '/content-previews': ['Images'],
   '/content-names': ['Noms'],
+  '/content-categories': ['Catégories'],
   '/race-formats': ['Formats de course'],
   '/restaurant-menu': ['Carte resto/bar'],
   '/blanking-media': ['Écrans'],

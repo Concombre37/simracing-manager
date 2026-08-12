@@ -3,6 +3,7 @@ import { ExternalApiKeyGuard } from '../api-keys/external-api-key.guard';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
 import { SessionsService } from '../sessions/sessions.service';
 import { ContentLabelsService } from '../content-labels/content-labels.service';
+import { ContentCategoriesService } from '../content-categories/content-categories.service';
 import { MenuService } from '../menu/menu.service';
 
 /** Surface en lecture seule pensée pour un consommateur externe (site web,
@@ -18,6 +19,7 @@ export class ExternalApiController {
     private readonly leaderboardService: LeaderboardService,
     private readonly sessionsService: SessionsService,
     private readonly contentLabelsService: ContentLabelsService,
+    private readonly contentCategoriesService: ContentCategoriesService,
     private readonly menuService: MenuService,
   ) {}
 
@@ -46,6 +48,14 @@ export class ExternalApiController {
   @Get('content')
   getContent() {
     return this.contentLabelsService.getCatalog();
+  }
+
+  // Liste des catégories configurées (/content-categories) — sert à
+  // /tablet-menu à générer ses tuiles de filtre voitures/circuits sans
+  // liste figée dans le code (voir ContentCategoriesService).
+  @Get('categories')
+  getCategories() {
+    return this.contentCategoriesService.listGroupedByType();
   }
 
   @Get('menu')

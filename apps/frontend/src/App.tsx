@@ -19,6 +19,7 @@ import { SessionsKiosk } from './pages/SessionsKiosk';
 import { Kiosk } from './pages/Kiosk';
 import { ContentPreviews } from './pages/ContentPreviews';
 import { ContentNames } from './pages/ContentNames';
+import { ContentCategories } from './pages/ContentCategories';
 import { RaceFormats } from './pages/RaceFormats';
 import { Menu } from './pages/Menu';
 import { TabletMenu } from './pages/TabletMenu';
@@ -194,6 +195,14 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute adminOnly>
               <ContentNames />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/content-categories"
+          element={
+            <ProtectedRoute adminOnly>
+              <ContentCategories />
             </ProtectedRoute>
           }
         />

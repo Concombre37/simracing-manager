@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Car, Flag, UtensilsCrossed, GlassWater, X, Hand, ImageOff, Rotate3d } from 'lucide-react';
-import { tabletMenuApi, type CatalogItem } from '../services/tabletMenu';
+import { tabletMenuApi, type CatalogItem, type CategoryTag } from '../services/tabletMenu';
 import type { MenuCategory } from '../services/menu';
 
 /** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
@@ -18,42 +18,6 @@ function flagEmoji(countryCode: string | null): string {
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
-
-/** Familles "vitrine" pour le sélecteur à tuiles photo de l'onglet Voitures
- * — remplace la liste GT/Formula/LMDH/Drift par la liste fournie par
- * l'utilisateur (capture d'écran, v2.2.121) : GT2/GT3/GT4/Hypercar/DTM/Cup/
- * Historique/Autres/Formula 1/Formula 2/Formula 4. Matché sur le champ
- * `category` exact (renseigné via `/content-names`), pas une liste figée
- * d'acId — les familles se recouvrent volontairement (ex: "Formule 1
- * historique" matche à la fois Historique et Formula 1), aucune n'est
- * exclusive. "Autres" est un vrai filtre (voitures qui ne matchent aucune
- * des 10 autres familles), distinct de "Toutes" qui n'exclut rien. Une
- * famille sans aucune voiture correspondante ne s'affiche simplement pas
- * (voir `families` ci-dessous). */
-interface CarFamily {
-  key: string;
-  label: string;
-  match: RegExp;
-}
-
-const CAR_FAMILIES: CarFamily[] = [
-  { key: 'gt2', label: 'GT2', match: /\bgt ?2\b/i },
-  { key: 'gt3', label: 'GT3', match: /\bgt ?3\b/i },
-  { key: 'gt4', label: 'GT4', match: /\bgt ?4\b/i },
-  { key: 'hypercar', label: 'Hypercar', match: /hypercar/i },
-  { key: 'dtm', label: 'DTM', match: /\bdtm\b/i },
-  { key: 'cup', label: 'Cup', match: /\bcup\b/i },
-  { key: 'historique', label: 'Historique', match: /historique/i },
-  {
-    key: 'autres',
-    label: 'Autres',
-    match:
-      /^(?!.*(?:\bgt ?[234]\b|hypercar|\bdtm\b|\bcup\b|historique|formule ?[124]\b|formula ?[124]\b)).+$/i,
-  },
-  { key: 'formula1', label: 'Formula 1', match: /formule ?1\b|formula ?1\b/i },
-  { key: 'formula2', label: 'Formula 2', match: /formule ?2\b|formula ?2\b/i },
-  { key: 'formula4', label: 'Formula 4', match: /formule ?4\b|formula ?4\b/i },
-];
 
 // Nom réel de l'établissement (voir Layout.tsx — même logo/wordmark déjà
 // utilisé ailleurs sur le dashboard). Pas de compte utilisateur sur cette
@@ -120,6 +84,17 @@ export function TabletMenu() {
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
   });
+  // Liste de catégories configurée via /content-categories (admin) — les
+  // tuiles de filtre voitures/circuits en sont dérivées dynamiquement,
+  // plus de liste figée dans le code (voir git blame pour l'ancienne
+  // CAR_FAMILIES à base de regex, retirée quand la catégorie est devenue
+  // un champ sélectionnable plutôt que du texte libre).
+  const { data: categoryTags } = useQuery({
+    queryKey: ['tablet-categories'],
+    queryFn: tabletMenuApi.getCategories,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+  });
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -182,25 +157,31 @@ export function TabletMenu() {
       tab === 'cars' ? (catalog?.cars ?? []) : tab === 'tracks' ? (catalog?.tracks ?? []) : [],
     [tab, catalog],
   );
-  const families = useMemo(
-    () =>
-      CAR_FAMILIES.map((family) => {
-        const matches = currentItems.filter((i) => i.category && family.match.test(i.category));
+  const families = useMemo(() => {
+    const categoryList: CategoryTag[] =
+      tab === 'cars'
+        ? (categoryTags?.cars ?? [])
+        : tab === 'tracks'
+          ? (categoryTags?.tracks ?? [])
+          : [];
+    return categoryList
+      .map((cat) => {
+        const matches = currentItems.filter((i) => i.category === cat.name);
         if (matches.length === 0) return null;
         const previewItem = matches.find((i) => i.previewUrl) ?? null;
         return {
-          ...family,
+          name: cat.name,
           previewUrl: previewItem?.previewUrl ?? null,
           mirrored: previewItem?.mirrored ?? false,
         };
-      }).filter(
-        (f): f is CarFamily & { previewUrl: string | null; mirrored: boolean } => f !== null,
-      ),
-    [currentItems],
-  );
-  const activeFamily = families.find((f) => f.key === filter) ?? null;
+      })
+      .filter(
+        (f): f is { name: string; previewUrl: string | null; mirrored: boolean } => f !== null,
+      );
+  }, [tab, categoryTags, currentItems]);
+  const activeFamily = families.find((f) => f.name === filter) ?? null;
   const filteredItems = activeFamily
-    ? currentItems.filter((i) => i.category && activeFamily.match.test(i.category))
+    ? currentItems.filter((i) => i.category === activeFamily.name)
     : currentItems;
 
   const foodCategories = menuCategories.filter((c) => c.section === 'food');
@@ -434,12 +415,12 @@ export function TabletMenu() {
                   />
                   {families.map((f) => (
                     <FamilyTile
-                      key={f.key}
-                      label={f.label}
+                      key={f.name}
+                      label={f.name}
                       previewUrl={f.previewUrl}
                       mirrored={f.mirrored}
-                      active={filter === f.key}
-                      onClick={() => setFilter(f.key)}
+                      active={filter === f.name}
+                      onClick={() => setFilter(f.name)}
                     />
                   ))}
                 </div>

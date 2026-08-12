@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.2.132 — Catégories configurables en admin (remplace le texte libre)
+
+### Ajouté
+
+- **Demandé par l'utilisateur ("j'aimerais que les catégorie soit configurable dans l'admin sim et que la catégorie soit selectionable en liste pour envoyer la voiture dans la catégorie").** La catégorie d'une voiture/d'un circuit était jusqu'ici un simple champ texte libre sur `/content-names` — en pratique, ça avait dérivé en 88 valeurs quasi-doublons pour les seules voitures (`Formula 1`/`Formule 1`, `Cup`/`CUP`/`Tourisme/Cup`, etc.), et le sélecteur de filtre de `/tablet-menu` s'appuyait sur une liste `CAR_FAMILIES` figée dans le code (11 familles, matching par regex) plutôt que sur ces valeurs réelles.
+- **Nouveau modèle `ContentCategory`** (`id, type ('car'|'track'), name, sortOrder`, unique `(type, name)`) — liste de catégories gérée par type, seedée à la migration avec les 88 valeurs déjà en base pour les voitures (aucune fusion/invention à ce stade, juste une promotion du texte libre existant vers une liste éditable).
+- **Nouveau module backend `content-categories`** (`GET/POST/PATCH/DELETE /api/content-categories`, admin) — renommer une catégorie met à jour tous les `ContentLabel` qui la référencent ; la supprimer les détache (`category` → `null`) plutôt que de laisser une valeur orpheline hors de la liste.
+- **Nouvel endpoint externe `GET /external/v1/categories`** — consommé par `/tablet-menu` pour générer ses tuiles de filtre.
+- **Nouvelle page admin `/content-categories`** (`ContentCategories.tsx`, lien "Gérer les catégories" depuis `/content-names`) — deux colonnes Voitures/Circuits, renommage inline, réordonnancement, suppression, ajout, filtre texte.
+- **`/content-names`** : le champ catégorie devient un `<select>` alimenté par cette liste (filtré par type) au lieu d'un texte libre.
+- **`/tablet-menu`** : `CAR_FAMILIES` (liste figée + regex, v2.2.121) supprimé — les tuiles de filtre sont désormais générées dynamiquement depuis `ContentCategory`, correspondance exacte sur `item.category`. Le bucket spécial "Autres" disparaît (n'a plus de sens avec une liste finie plutôt que du texte libre).
+- **Premier nettoyage des 88 catégories voitures, demandé explicitement par l'utilisateur après avoir vu l'explosion de tuiles que cette migration a révélée sur `/tablet-menu`** (voir AskUserQuestion — l'utilisateur a choisi "fais un premier nettoyage maintenant" plutôt que de tout laisser en l'état) : fusion des 4 doublons de casse/langue sans ambiguïté (`Formule 1`→`Formula 1`, `Formule 4`→`Formula 4`, `LMP2`→`Prototype LMP2`, `CUP`→`Cup`), suppression de `Hors Catégories` (redondante avec l'absence de catégorie), détachement des 35 catégories ne s'appliquant plus qu'à une seule voiture après fusion (`category` remis à `null`, aucun autre champ touché). 88 → 48 catégories. Les sous-catégories réelles à faible effectif mais légitimes (`NASCAR`, `WRC`...) ont été conservées ; aucune fusion incertaine (`GT1` vs `GT1 / Le Mans`, variantes historique/préparé de chaque famille) n'a été décidée unilatéralement — laissées à l'admin via la nouvelle page.
+- Vérifié en conditions réelles : CRUD complet (création, renommage avec cascade, suppression avec détachement, doublon rejeté en 409) testé via un compte admin jetable directement sur l'API de prod, puis visuellement sur `/content-categories`, `/content-names` et `/tablet-menu` (Playwright).
+
 ## v2.2.131 — Tracé du circuit sur la tuile catalogue (au lieu de la photo)
 
 ### Changé

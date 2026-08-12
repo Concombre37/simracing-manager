@@ -241,6 +241,25 @@ model ContentLabel {
   @@map("content_labels")
 }
 
+// Liste de catégories configurable par l'admin (/content-categories),
+// remplace le texte libre historique de ContentLabel.category — évite les
+// quasi-doublons ("Formula 1"/"Formule 1", "Cup"/"CUP"...) et permet à
+// /tablet-menu de générer ses tuiles de filtre depuis une vraie liste
+// gérée plutôt qu'une liste figée dans le code. `type` distingue
+// voitures/circuits (mêmes valeurs que ContentLabel.type) car les deux
+// n'ont pas le même vocabulaire de catégories.
+model ContentCategory {
+  id        String   @id @default(uuid()) @db.Uuid
+  type      String
+  name      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([type, name])
+  @@map("content_categories")
+}
+
 // Carte resto/bar affichée sur la page tablette publique (/tablet-menu),
 // gérée par les admins via /restaurant-menu — voir ExternalApiController.
 model MenuCategory {

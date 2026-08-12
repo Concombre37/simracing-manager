@@ -11,11 +11,13 @@ import {
   ImageOff,
 } from 'lucide-react';
 import { contentLabelsApi, type KnownContentItem } from '../services/contentLabels';
+import { contentCategoriesApi, type ContentCategory } from '../services/contentCategories';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { Input } from '../components/ui/Input';
+import { Input, Select } from '../components/ui/Input';
+import { Link } from 'react-router-dom';
 
 export function ContentNames() {
   const [search, setSearch] = useState('');
@@ -25,6 +27,12 @@ export function ContentNames() {
     queryKey: ['content-labels-known'],
     queryFn: contentLabelsApi.getKnown,
   });
+  const { data: categories = [] } = useQuery({
+    queryKey: ['content-categories'],
+    queryFn: () => contentCategoriesApi.list(),
+  });
+  const carCategories = useMemo(() => categories.filter((c) => c.type === 'car'), [categories]);
+  const trackCategories = useMemo(() => categories.filter((c) => c.type === 'track'), [categories]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -57,6 +65,11 @@ export function ContentNames() {
           <Badge variant="blue">Voitures {stats.cars}</Badge>
           <Badge variant="green">Circuits {stats.tracks}</Badge>
           <Badge variant="purple">Renommés {stats.renamed}</Badge>
+          <Link to="/content-categories">
+            <Button size="sm" variant="secondary">
+              Gérer les catégories
+            </Button>
+          </Link>
         </div>
       }
     >
@@ -106,7 +119,11 @@ export function ContentNames() {
         <Card padding="none" className="overflow-hidden">
           <div className="divide-y divide-dark-700">
             {filtered.map((item) => (
-              <ContentNameRow key={`${item.type}:${item.acId}`} item={item} />
+              <ContentNameRow
+                key={`${item.type}:${item.acId}`}
+                item={item}
+                categories={item.type === 'car' ? carCategories : trackCategories}
+              />
             ))}
           </div>
         </Card>
@@ -139,7 +156,13 @@ function flagEmoji(countryCode: string | null): string {
     .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 }
 
-function ContentNameRow({ item }: { item: KnownContentItem }) {
+function ContentNameRow({
+  item,
+  categories,
+}: {
+  item: KnownContentItem;
+  categories: ContentCategory[];
+}) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(item.displayName ?? '');
   const [category, setCategory] = useState(item.category ?? '');
@@ -352,12 +375,14 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
         </Field>
 
         <Field label="Catégorie">
-          <Input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="ex: GT3"
-            className="w-full"
-          />
+          <Select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full">
+            <option value="">— Aucune —</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
         </Field>
 
         <Field label="Difficulté">

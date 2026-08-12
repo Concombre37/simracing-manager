@@ -14,6 +14,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ContentModule } from './content/content.module';
 import { ContentPreviewsModule } from './content-previews/content-previews.module';
 import { ContentLabelsModule } from './content-labels/content-labels.module';
+import { ContentCategoriesModule } from './content-categories/content-categories.module';
 import { BlankingMediaModule } from './blanking-media/blanking-media.module';
 import { DedicatedServersModule } from './dedicated-servers/dedicated-servers.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
@@ -49,6 +50,7 @@ import { envSchema } from './config/env.validation';
     ContentModule,
     ContentPreviewsModule,
     ContentLabelsModule,
+    ContentCategoriesModule,
     BlankingMediaModule,
     DedicatedServersModule,
     TelemetryModule,
