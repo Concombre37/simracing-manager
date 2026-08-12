@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.127 — Miniature photo sur /content-names
+
+### Ajouté
+
+- **Demandé par l'utilisateur ("il me faudrais un petit mais visible la photo de la voiture").** Chaque ligne de `/content-names` (voitures et circuits) affiche désormais une petite vignette (56×40, coins arrondis) avec la vraie photo scannée par l'agent, avant le badge de type — icône de remplacement discrète si aucune preview n'a encore été scannée pour cet acId.
+- `ContentLabelsService.getKnown()` réutilise désormais le même mécanisme de résolution d'image que `getCatalog()` (extrait en une méthode privée partagée `loadPreviewMap()` — une preview par acId, n'importe quel poste l'ayant scannée fait l'affaire), plutôt que de dupliquer la logique.
+- Changement purement frontend/backend, aucune donnée modifiée.
+
 ## v2.2.126 — Schémas et difficulté des circuits peuplés (63/68)
 
 ### Ajouté

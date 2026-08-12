@@ -20,6 +20,7 @@ export interface KnownContentItem {
   weightKg: number | null;
   mirrored: boolean;
   visible: boolean;
+  previewUrl: string | null;
 }
 
 export const contentLabelsApi = {

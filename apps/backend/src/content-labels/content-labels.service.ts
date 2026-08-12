@@ -30,6 +30,7 @@ export interface KnownContentItem {
   weightKg: number | null;
   mirrored: boolean;
   visible: boolean;
+  previewUrl: string | null;
 }
 
 export interface CatalogItem {
@@ -83,9 +84,30 @@ export class ContentLabelsService {
     return rawByKey;
   }
 
+  /** Une preview par acId — n'importe quel poste l'ayant scannée fait
+   * l'affaire, même principe que `LeaderboardService.loadPreviewMap()`. */
+  private async loadPreviewMap(): Promise<Map<string, string>> {
+    const previews = await this.prisma.contentPreview.findMany({
+      where: { type: { in: ['car', 'track'] } },
+      select: { id: true, type: true, acId: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const previewByKey = new Map<string, string>();
+    for (const p of previews) {
+      const key = `${p.type}:${p.acId}`;
+      if (!previewByKey.has(key)) {
+        previewByKey.set(key, `/api/content/previews/${p.id}`);
+      }
+    }
+    return previewByKey;
+  }
+
   async getKnown(): Promise<KnownContentItem[]> {
-    const rawByKey = await this.gatherRawContent();
-    const labels = await this.prisma.contentLabel.findMany();
+    const [rawByKey, labels, previewByKey] = await Promise.all([
+      this.gatherRawContent(),
+      this.prisma.contentLabel.findMany(),
+      this.loadPreviewMap(),
+    ]);
     const labelByKey = new Map(labels.map((l) => [`${l.type}:${l.acId}`, l]));
 
     return Array.from(rawByKey.values())
@@ -107,6 +129,7 @@ export class ContentLabelsService {
           weightKg: label?.weightKg ?? null,
           mirrored: label?.mirrored ?? false,
           visible: label?.visible ?? true,
+          previewUrl: previewByKey.get(`${item.type}:${item.acId}`) ?? null,
         };
       })
       .sort((a, b) => {
@@ -116,27 +139,15 @@ export class ContentLabelsService {
   }
 
   /** Catalogue voitures/circuits pour la page tablette (`/tablet-menu`) —
-   * même agrégation que `getKnown()`, enrichie de l'image (une par acId,
-   * n'importe quel poste l'ayant scannée fait l'affaire, même principe que
-   * `LeaderboardService.loadPreviewMap()`) et triée par nom affiché. */
+   * même agrégation que `getKnown()`, enrichie de l'image et triée par nom
+   * affiché. */
   async getCatalog(): Promise<{ cars: CatalogItem[]; tracks: CatalogItem[] }> {
-    const [rawByKey, labels, previews] = await Promise.all([
+    const [rawByKey, labels, previewByKey] = await Promise.all([
       this.gatherRawContent(),
       this.prisma.contentLabel.findMany(),
-      this.prisma.contentPreview.findMany({
-        where: { type: { in: ['car', 'track'] } },
-        select: { id: true, type: true, acId: true },
-        orderBy: { createdAt: 'desc' },
-      }),
+      this.loadPreviewMap(),
     ]);
     const labelByKey = new Map(labels.map((l) => [`${l.type}:${l.acId}`, l]));
-    const previewByKey = new Map<string, string>();
-    for (const p of previews) {
-      const key = `${p.type}:${p.acId}`;
-      if (!previewByKey.has(key)) {
-        previewByKey.set(key, `/api/content/previews/${p.id}`);
-      }
-    }
 
     const cars: CatalogItem[] = [];
     const tracks: CatalogItem[] = [];

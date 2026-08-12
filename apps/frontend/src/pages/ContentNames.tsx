@@ -8,6 +8,7 @@ import {
   Car as CarIcon,
   MapPin,
   FlipHorizontal,
+  ImageOff,
 } from 'lucide-react';
 import { contentLabelsApi, type KnownContentItem } from '../services/contentLabels';
 import { PageShell } from '../components/ui/PageShell';
@@ -243,6 +244,18 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     >
       {/* Identité (lecture seule) + actions */}
       <div className="flex flex-wrap items-center gap-3">
+        {item.previewUrl ? (
+          <img
+            src={item.previewUrl}
+            alt=""
+            className="h-10 w-14 flex-none rounded-md border border-dark-600 object-cover"
+          />
+        ) : (
+          <div className="flex h-10 w-14 flex-none items-center justify-center rounded-md border border-dark-600 bg-dark-900">
+            <ImageOff className="h-4 w-4 text-gray-600" />
+          </div>
+        )}
+
         <Badge variant={item.type === 'car' ? 'blue' : 'green'}>
           {item.type === 'car' ? <CarIcon className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
           {item.type === 'car' ? 'Voiture' : 'Circuit'}
