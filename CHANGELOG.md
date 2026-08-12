@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.131 — Tracé du circuit sur la tuile catalogue (au lieu de la photo)
+
+### Changé
+
+- **Demandé par l'utilisateur ("dans l'image du circuit dans le catalogue j'aimerais un truc propre mais il me faut le tracé du circuit").** La tuile circuit de `/tablet-menu` (grille "Choisissez votre circuit") affichait la photo de piste (`preview`, type `'track'` — souvent sombre/encombrée, coupée en `object-fit: cover` sur seulement 176px de haut) au lieu du tracé propre déjà utilisé dans la fiche détail depuis v2.2.129.
+- **`CatalogCard` (`TabletMenu.tsx`)** : quand un tracé existe (`layoutImages[0]` ou repli `layoutImageUrl`), la tuile l'affiche à la place de la photo — fond noir, `object-fit: contain`, marge intérieure pour ne pas coller aux bords. Aucun tracé disponible → repli sur l'ancienne photo, puis sur l'icône "pas d'image" si aucune des deux n'existe. Les voitures ne sont pas concernées (`layoutImages` est toujours vide pour un item `car`) — leur tuile garde la photo inchangée.
+- Vérifié en conditions réelles sur `/tablet-menu` (Playwright) : tuiles circuits (24h Du Mans, Bahrain, Anneau du Rhin, etc.) affichent chacune leur tracé blanc sur fond noir ; onglet Voitures inchangé (photos couleur, badges catégorie/puissance intacts).
+- Changement purement frontend, aucun code agent modifié — build + redéploiement du conteneur `backend` (qui sert aussi le frontend).
+
 ## v2.2.130 — Vitesse max + peuplement de 66 voitures via le catalogue elsass_catalogue
 
 ### Ajouté

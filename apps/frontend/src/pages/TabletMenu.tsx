@@ -697,6 +697,10 @@ function CatalogCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }
   const subtitle = [flag ? `${flag} ${item.country ?? ''}`.trim() : item.country, item.year]
     .filter(Boolean)
     .join(' · ');
+  // Un circuit a un tracé (schéma propre, ligne blanche) en plus de sa photo
+  // de piste (souvent sombre/encombrée) — sur la tuile catalogue, le tracé
+  // se lit mieux qu'une photo réduite en 176px de haut.
+  const traceUrl = item.layoutImages[0]?.url ?? item.layoutImageUrl;
   return (
     <div
       role="button"
@@ -717,10 +721,27 @@ function CatalogCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }
         style={{
           position: 'relative',
           height: 176,
-          background: 'color-mix(in srgb, #000 70%, var(--tm-surface))',
+          background: traceUrl ? '#000' : 'color-mix(in srgb, #000 70%, var(--tm-surface))',
         }}
       >
-        {item.previewUrl ? (
+        {traceUrl ? (
+          <div
+            style={{
+              display: 'flex',
+              height: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 18,
+              boxSizing: 'border-box',
+            }}
+          >
+            <img
+              src={traceUrl}
+              alt={item.name}
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            />
+          </div>
+        ) : item.previewUrl ? (
           <img
             src={item.previewUrl}
             alt={item.name}
