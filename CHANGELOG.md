@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.126 — Schémas et difficulté des circuits peuplés (63/68)
+
+### Ajouté
+
+- **Suite de v2.2.125 : peuplement réel des 68 circuits scannés en prod ("pour les circuit récupère les vrais schema du circuit").** Recherche menée en parallèle (5 agents, un par lot d'une quinzaine de circuits) : identification de chaque acId comme circuit réel ou non (aucune devinette — les mods au nom trop générique ou les circuits fictifs Kunos confirmés sont explicitement exclus), puis recherche du vrai plan de tracé (vue du dessus) sur Wikimedia Commons (licences libres CC/GFDL/domaine public), téléchargement, vérification visuelle individuelle (planche-contact + inspection à pleine résolution) avant import.
+- **63/68 circuits reconnus comme réels et identifiables** : 59 avec un vrai schéma de tracé (`layoutImage`, normalisé en PNG max 900px de large, fond blanc), tous avec pays/code pays, tous avec une difficulté (1-5) estimée selon la réputation technique réelle du circuit (ex: Nordschleife/Spa/Suzuka/Monaco = Expert, petits circuits club = Débutant/Facile) — même principe que la difficulté des voitures (estimation experte documentée, pas une donnée mesurée).
+- **5 circuits volontairement exclus, aucune donnée inventée** : `drift` et `marshal` (noms trop génériques), `ks_black_cat_county` (circuit fictif confirmé, DLC Kunos), `ks_drag` (drag strip générique sans lieu réel), `glava-zete` (route réelle au Monténégro mais sans circuit officiel/schéma publié fiable).
+- **4 circuits réels sans schéma disponible** (mais avec pays/difficulté quand même renseignés) : `ack_nkrc_2023`, `chambley`, `circuit_mirecourt2025`, `spa_karting` — aucune image en licence libre trouvée malgré une recherche confirmée du circuit réel.
+- Peuplement via script Prisma one-off (comme pour les voitures) — aucun code modifié dans cette entrée, uniquement des données.
+
 ## v2.2.125 — Difficulté nommée (Débutant→Expert) + infrastructure schéma de circuit
 
 ### Ajouté
