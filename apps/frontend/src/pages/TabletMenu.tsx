@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Car, Flag, UtensilsCrossed, GlassWater, X, Hand, ImageOff, Rotate3d } from 'lucide-react';
+import { X, ImageOff, Rotate3d } from 'lucide-react';
 import { tabletMenuApi, type CatalogItem, type CategoryTag } from '../services/tabletMenu';
 import type { MenuCategory } from '../services/menu';
 
 /** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
  * même principe que `ContentNames.tsx`, dupliqué ici (page publique
- * indépendante, pas de code partagé entre les deux). */
+ * indépendante, pas de code partagé entre les deux). Préféré à un jeu de
+ * drapeaux SVG dessinés à la main (voir la maquette v2 importée) : un
+ * dessin manuel ne couvrirait que les quelques pays anticipés, alors que
+ * l'emoji fonctionne pour n'importe quel code pays réellement renseigné. */
 function flagEmoji(countryCode: string | null): string {
   if (!countryCode || countryCode.length !== 2) return '';
   return countryCode
@@ -20,46 +23,104 @@ function clamp(value: number, min: number, max: number) {
 }
 
 // Nom réel de l'établissement (voir Layout.tsx — même logo/wordmark déjà
-// utilisé ailleurs sur le dashboard). Pas de compte utilisateur sur cette
-// page publique, donc pas d'accès à `useSiteLogo()` (endpoint protégé par
-// JWT/clé station) — un texte simple suffit, le design d'origine n'affiche
-// de toute façon que du texte ici, jamais une image de logo.
-const VENUE_NAME = 'ELSASS SIMRACING HAGUENAU';
+// utilisé ailleurs sur le dashboard, et le vrai site vitrine
+// elsass-simracing.fr). Pas de compte utilisateur sur cette page publique,
+// donc pas d'accès à `useSiteLogo()` (endpoint protégé par JWT/clé
+// station) — texte stylé pour reprendre le wordmark réel du site.
+const VENUE_WORD_1 = 'ELSASS';
+const VENUE_WORD_2 = 'SIMRACING';
+const VENUE_CITY = 'HAGUENAU';
 
 const IDLE_MS = 90_000;
 const TAGLINE_INTERVAL_MS = 4600;
 
 type TabKey = 'cars' | 'tracks' | 'food' | 'drinks';
 
-const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
-  { key: 'cars', label: 'Voitures', icon: Car },
-  { key: 'tracks', label: 'Circuits', icon: Flag },
-  { key: 'food', label: 'Cuisine', icon: UtensilsCrossed },
-  { key: 'drinks', label: 'Bar', icon: GlassWater },
-];
-
-const TAB_COPY: Record<TabKey, { kicker: string; title: string; sub: string }> = {
-  cars: {
-    kicker: 'Le garage',
-    title: 'Choisissez votre voiture',
-    sub: 'Le catalogue de voitures disponibles sur nos simulateurs.',
-  },
-  tracks: {
-    kicker: 'Les tracés',
-    title: 'Choisissez votre circuit',
-    sub: 'Les circuits disponibles sur nos simulateurs.',
-  },
-  food: {
-    kicker: 'La cuisine',
-    title: 'À table',
-    sub: 'Servi en salle comme au bord des simulateurs.',
-  },
-  drinks: {
-    kicker: 'Le bar',
-    title: 'À boire',
-    sub: 'Pressions locales, softs et boissons chaudes.',
-  },
+const TAB_TITLES: Record<TabKey, string> = {
+  cars: 'Le garage',
+  tracks: 'Les circuits',
+  food: 'La cuisine',
+  drinks: 'Le bar',
 };
+
+/** Icônes de navigation dessinées au trait, reprises de la maquette v2
+ * (identité visuelle du vrai site elsass-simracing.fr — Montserrat,
+ * bleu #245E97) plutôt que des icônes génériques lucide, pour coller à la
+ * marque réelle. Purement présentationnel (aucune donnée). */
+function NavIconCars({ size = 26 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="2.6" />
+      <path d="M3.3 10.6h5.6M15.1 10.6h5.6M12 14.6v6.3" />
+    </svg>
+  );
+}
+function NavIconTracks({ size = 26 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M13.4 4.3c4.1.4 7 2.6 7 5.5 0 2.5-2.1 4-5.1 4.8-2.4.6-4 1.3-4 2.5 0 1.3 1.3 2 3.3 2.1" />
+      <path d="M13.4 4.3c-.9-.1-1.8-.1-2.7 0C6.4 4.7 3.6 7 3.6 10c0 2.7 2.3 4.2 4.9 5.3 2.2.9 3.7 1.9 3.7 3.2 0 1-.6 1.7-1.6 2.1" />
+      <path d="M9.6 3.1v2.6" />
+    </svg>
+  );
+}
+function NavIconKitchen({ size = 26 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M6.6 3v6.2a2.3 2.3 0 0 0 4.6 0V3M8.9 11.5V21M17.4 3c-1.6 1.6-2.3 3.2-2.3 5.3 0 1.8.9 3 2.3 3.2V21" />
+    </svg>
+  );
+}
+function NavIconBar({ size = 26 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4.4 4.6h15.2L12 12.6 4.4 4.6ZM12 12.6V20M8.6 20h6.8" />
+    </svg>
+  );
+}
+
+const TABS: { key: TabKey; label: string; Icon: (p: { size?: number }) => JSX.Element }[] = [
+  { key: 'cars', label: 'Voitures', Icon: NavIconCars },
+  { key: 'tracks', label: 'Circuits', Icon: NavIconTracks },
+  { key: 'food', label: 'Cuisine', Icon: NavIconKitchen },
+  { key: 'drinks', label: 'Bar', Icon: NavIconBar },
+];
 
 export function TabletMenu() {
   const [tab, setTab] = useState<TabKey>('cars');
@@ -86,9 +147,7 @@ export function TabletMenu() {
   });
   // Liste de catégories configurée via /content-categories (admin) — les
   // tuiles de filtre voitures/circuits en sont dérivées dynamiquement,
-  // plus de liste figée dans le code (voir git blame pour l'ancienne
-  // CAR_FAMILIES à base de regex, retirée quand la catégorie est devenue
-  // un champ sélectionnable plutôt que du texte libre).
+  // aucune liste figée dans le code.
   const { data: categoryTags } = useQuery({
     queryKey: ['tablet-categories'],
     queryFn: tabletMenuApi.getCategories,
@@ -171,12 +230,14 @@ export function TabletMenu() {
         const previewItem = matches.find((i) => i.previewUrl) ?? null;
         return {
           name: cat.name,
+          count: matches.length,
           previewUrl: previewItem?.previewUrl ?? null,
           mirrored: previewItem?.mirrored ?? false,
         };
       })
       .filter(
-        (f): f is { name: string; previewUrl: string | null; mirrored: boolean } => f !== null,
+        (f): f is { name: string; count: number; previewUrl: string | null; mirrored: boolean } =>
+          f !== null,
       );
   }, [tab, categoryTags, currentItems]);
   const activeFamily = families.find((f) => f.name === filter) ?? null;
@@ -188,9 +249,11 @@ export function TabletMenu() {
   const drinkCategories = menuCategories.filter((c) => c.section === 'drinks');
   const menuGroups: MenuCategory[] = tab === 'food' ? foodCategories : drinkCategories;
 
-  const copy = TAB_COPY[tab];
   const isCatalogTab = tab === 'cars' || tab === 'tracks';
   const isMenuTab = tab === 'food' || tab === 'drinks';
+  const countLabel = isCatalogTab
+    ? `${filteredItems.length} ${tab === 'cars' ? (filteredItems.length > 1 ? 'véhicules' : 'véhicule') : filteredItems.length > 1 ? 'circuits' : 'circuit'}`
+    : null;
 
   return (
     <div
@@ -200,9 +263,9 @@ export function TabletMenu() {
         position: 'fixed',
         inset: 0,
         display: 'flex',
-        flexDirection: portrait ? 'column-reverse' : 'row',
+        flexDirection: 'column',
         overflow: 'hidden',
-        background: 'var(--tm-bg)',
+        background: 'var(--tm-stage)',
         color: 'var(--tm-text)',
         fontFamily: 'var(--tm-font-body)',
       }}
@@ -216,175 +279,193 @@ export function TabletMenu() {
           pointerEvents: 'none',
           zIndex: 0,
           background:
-            'radial-gradient(42% 42% at 24% 20%, color-mix(in srgb, var(--tm-accent) 18%, transparent), transparent 68%)',
-          animation: 'tmGlow 20s ease-in-out infinite',
+            'radial-gradient(45% 40% at 78% -8%, color-mix(in srgb, var(--tm-accent) 22%, transparent), transparent 62%)',
         }}
       />
 
-      {/* Navigation */}
-      <div
+      {/* En-tête */}
+      <header
         style={{
           position: 'relative',
           zIndex: 3,
-          display: 'flex',
-          flexDirection: portrait ? 'row' : 'column',
-          alignItems: 'stretch',
-          justifyContent: 'center',
-          gap: 8,
           flex: 'none',
-          width: portrait ? '100%' : 150,
-          height: portrait ? 108 : '100%',
-          padding: portrait ? '10px 14px' : '18px 12px',
-          background: 'color-mix(in srgb, var(--tm-surface) 62%, var(--tm-bg))',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 20,
+          padding: portrait ? '18px 22px' : '22px 44px',
+          borderBottom: '1px solid var(--tm-divider)',
         }}
       >
-        {TABS.map(({ key, label, icon: Icon }) => {
-          const active = tab === key;
-          return (
-            <button
-              key={key}
-              type="button"
-              onClick={() => selectTab(key)}
-              style={{
-                position: 'relative',
-                flex: '1 1 0',
-                minWidth: 0,
-                minHeight: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 9,
-                padding: '10px 4px',
-                border: 0,
-                borderRadius: 14,
-                cursor: 'pointer',
-                fontFamily: 'var(--tm-font-heading)',
-                background: active
-                  ? 'color-mix(in srgb, var(--tm-accent) 14%, transparent)'
-                  : 'transparent',
-                color: active
-                  ? 'var(--tm-accent-300)'
-                  : 'color-mix(in srgb, var(--tm-text) 62%, transparent)',
-                transition: 'background .28s ease, color .28s ease',
-              }}
-            >
-              <Icon size={28} />
-              <span style={{ fontSize: 12.5, letterSpacing: '.1em', textTransform: 'uppercase' }}>
-                {label}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: portrait ? 8 : 12,
+              fontWeight: 900,
+              fontSize: portrait ? 22 : 30,
+              lineHeight: 1,
+              letterSpacing: '.08em',
+            }}
+          >
+            <span style={{ color: 'var(--tm-text)' }}>{VENUE_WORD_1}</span>
+            <span style={{ color: 'var(--tm-accent)' }}>{VENUE_WORD_2}</span>
+          </div>
+          {!portrait && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
+              <span
+                style={{
+                  flex: 1,
+                  height: 1,
+                  background:
+                    'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tm-text) 45%, transparent))',
+                }}
+              />
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: '.4em',
+                  paddingLeft: '.4em',
+                  color: 'color-mix(in srgb, var(--tm-text) 60%, transparent)',
+                }}
+              >
+                {VENUE_CITY}
               </span>
               <span
                 style={{
-                  position: 'absolute',
-                  left: '50%',
-                  bottom: 6,
-                  transform: 'translateX(-50%)',
-                  width: active ? 22 : 0,
-                  height: 2,
-                  borderRadius: 2,
-                  background: 'var(--tm-accent)',
-                  transition: 'width .3s cubic-bezier(.16,1,.3,1)',
+                  flex: 1,
+                  height: 1,
+                  background:
+                    'linear-gradient(90deg, color-mix(in srgb, var(--tm-text) 45%, transparent), transparent)',
                 }}
               />
-            </button>
-          );
-        })}
-      </div>
+            </div>
+          )}
+        </div>
 
-      {/* Colonne principale */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: portrait ? 16 : 26 }}>
+          <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {!portrait && (
+              <span
+                style={{
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: '.16em',
+                  textTransform: 'uppercase',
+                  color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
+                }}
+              >
+                {now.toLocaleDateString('fr-FR', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                })}
+              </span>
+            )}
+            <span
+              style={{
+                fontWeight: 900,
+                fontSize: portrait ? 22 : 28,
+                lineHeight: 1,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+          {!portrait && (
+            <>
+              <div style={{ width: 1, height: 40, background: 'var(--tm-divider)' }} />
+              <div
+                style={{ display: 'flex', flexDirection: 'column', gap: 5, alignItems: 'flex-end' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: '#5FCB6B',
+                      boxShadow: '0 0 10px rgba(95,203,107,.9)',
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontWeight: 800,
+                      fontSize: 11.5,
+                      letterSpacing: '.16em',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    Centre ouvert
+                  </span>
+                </div>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 11.5,
+                    letterSpacing: '.08em',
+                    textTransform: 'uppercase',
+                    color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+                  }}
+                >
+                  Menu interactif
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+      </header>
+
+      {/* Contenu */}
       <div
         style={{
           position: 'relative',
-          zIndex: 2,
+          zIndex: 1,
           flex: '1 1 auto',
-          minWidth: 0,
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        <div
-          style={{
-            flex: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 14,
-            padding: portrait ? '18px 26px 6px' : '20px 34px 6px',
-          }}
-        >
+        {(isCatalogTab || isMenuTab) && (
           <div
             style={{
+              flex: 'none',
               display: 'flex',
-              alignItems: 'center',
-              gap: 11,
-              marginRight: 'auto',
-              minWidth: 0,
+              alignItems: 'flex-end',
+              justifyContent: 'space-between',
+              gap: 16,
+              padding: portrait ? '20px 22px 16px' : '26px 44px 18px',
             }}
           >
-            <span
+            <div
               style={{
-                width: 9,
-                height: 9,
-                flex: 'none',
-                borderRadius: '50%',
-                background: 'var(--tm-accent)',
-                boxShadow: '0 0 16px var(--tm-accent)',
-              }}
-            />
-            <span
-              style={{
-                fontFamily: 'var(--tm-font-heading)',
-                fontSize: 14,
-                letterSpacing: '.24em',
-                whiteSpace: 'nowrap',
+                fontWeight: 900,
+                fontSize: portrait ? 24 : 30,
+                letterSpacing: '.1em',
+                textTransform: 'uppercase',
               }}
             >
-              {VENUE_NAME}
-            </span>
+              {TAB_TITLES[tab]}
+            </div>
+            {countLabel && (
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  letterSpacing: '.14em',
+                  textTransform: 'uppercase',
+                  color: 'color-mix(in srgb, var(--tm-text) 50%, transparent)',
+                }}
+              >
+                {countLabel}
+              </div>
+            )}
           </div>
-          <span
-            style={{
-              fontSize: 13,
-              letterSpacing: '.08em',
-              color: 'color-mix(in srgb, var(--tm-text) 50%, transparent)',
-            }}
-          >
-            {now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-          </span>
-        </div>
-
-        <div style={{ flex: 'none', padding: portrait ? '10px 26px 18px' : '10px 34px 20px' }}>
-          <div
-            style={{
-              fontSize: 11.5,
-              letterSpacing: '.2em',
-              textTransform: 'uppercase',
-              color: 'var(--tm-accent)',
-            }}
-          >
-            {copy.kicker}
-          </div>
-          <h1
-            style={{
-              margin: '8px 0 0',
-              fontSize: portrait ? 36 : 40,
-              letterSpacing: '-.02em',
-              fontFamily: 'var(--tm-font-heading)',
-            }}
-          >
-            {copy.title}
-          </h1>
-          <p
-            style={{
-              margin: '8px 0 0',
-              maxWidth: '62ch',
-              fontSize: 14.5,
-              color: 'color-mix(in srgb, var(--tm-text) 58%, transparent)',
-            }}
-          >
-            {copy.sub}
-          </p>
-        </div>
+        )}
 
         <div
           ref={scrollRef}
@@ -392,7 +473,7 @@ export function TabletMenu() {
             flex: '1 1 auto',
             minHeight: 0,
             overflowY: 'auto',
-            padding: portrait ? '0 26px 34px' : '0 34px 40px',
+            padding: portrait ? '0 22px 28px' : '0 44px 36px',
           }}
         >
           {isCatalogTab && (
@@ -401,28 +482,55 @@ export function TabletMenu() {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: portrait
-                      ? 'repeat(2, minmax(0,1fr))'
-                      : 'repeat(auto-fit, minmax(160px, 1fr))',
+                    gridTemplateColumns:
+                      tab === 'cars'
+                        ? portrait
+                          ? 'repeat(2, minmax(0,1fr))'
+                          : 'repeat(auto-fit, minmax(180px, 1fr))'
+                        : portrait
+                          ? 'repeat(2, minmax(0,1fr))'
+                          : 'repeat(auto-fit, minmax(220px, 1fr))',
                     gap: 12,
-                    marginBottom: 24,
+                    marginBottom: 22,
                   }}
                 >
-                  <FamilyTile
-                    label="Toutes"
-                    active={filter === null}
-                    onClick={() => setFilter(null)}
-                  />
-                  {families.map((f) => (
-                    <FamilyTile
-                      key={f.name}
-                      label={f.name}
-                      previewUrl={f.previewUrl}
-                      mirrored={f.mirrored}
-                      active={filter === f.name}
-                      onClick={() => setFilter(f.name)}
-                    />
-                  ))}
+                  {tab === 'cars' ? (
+                    <>
+                      <CategoryTile
+                        label="Toutes"
+                        active={filter === null}
+                        onClick={() => setFilter(null)}
+                      />
+                      {families.map((f) => (
+                        <CategoryTile
+                          key={f.name}
+                          label={f.name}
+                          count={f.count}
+                          previewUrl={f.previewUrl}
+                          mirrored={f.mirrored}
+                          active={filter === f.name}
+                          onClick={() => setFilter(f.name)}
+                        />
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <PillFilter
+                        label="Tous"
+                        active={filter === null}
+                        onClick={() => setFilter(null)}
+                      />
+                      {families.map((f) => (
+                        <PillFilter
+                          key={f.name}
+                          label={f.name}
+                          count={f.count}
+                          active={filter === f.name}
+                          onClick={() => setFilter(f.name)}
+                        />
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
               {filteredItems.length === 0 ? (
@@ -438,11 +546,17 @@ export function TabletMenu() {
                   style={{
                     display: 'grid',
                     gridTemplateColumns: `repeat(${portrait ? 2 : 3}, minmax(0,1fr))`,
-                    gap: portrait ? 16 : 20,
+                    gap: portrait ? 14 : 20,
                   }}
                 >
                   {filteredItems.map((item) => (
-                    <CatalogCard key={item.acId} item={item} onOpen={() => setOpenItem(item)} />
+                    <CatalogCard
+                      key={item.acId}
+                      item={item}
+                      kind={tab === 'cars' ? 'car' : 'track'}
+                      portrait={portrait}
+                      onOpen={() => setOpenItem(item)}
+                    />
                   ))}
                 </div>
               )}
@@ -456,9 +570,8 @@ export function TabletMenu() {
               ) : (
                 <div
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${portrait ? 1 : 2}, minmax(0,1fr))`,
-                    gap: portrait ? 18 : 22,
+                    columnCount: portrait ? 1 : 2,
+                    columnGap: 48,
                   }}
                 >
                   {menuGroups.map((group) => (
@@ -471,8 +584,78 @@ export function TabletMenu() {
         </div>
       </div>
 
+      {/* Navigation */}
+      <nav
+        style={{
+          position: 'relative',
+          zIndex: 3,
+          flex: 'none',
+          display: 'flex',
+          height: portrait ? 96 : 116,
+          background: 'var(--tm-nav)',
+          borderTop: '1px solid var(--tm-divider)',
+        }}
+      >
+        {TABS.map(({ key, label, Icon }) => {
+          const active = tab === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => selectTab(key)}
+              style={{
+                position: 'relative',
+                flex: '1 1 0',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 9,
+                border: 0,
+                cursor: 'pointer',
+                background: 'transparent',
+                fontFamily: 'var(--tm-font-heading)',
+                color: active
+                  ? 'var(--tm-text)'
+                  : 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+              }}
+            >
+              {active && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 4,
+                    background: 'var(--tm-accent)',
+                  }}
+                />
+              )}
+              <Icon size={portrait ? 22 : 28} />
+              <span
+                style={{
+                  fontWeight: 800,
+                  fontSize: portrait ? 11 : 13,
+                  letterSpacing: '.14em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </nav>
+
       {openItem && (
-        <DetailModal item={openItem} onClose={() => setOpenItem(null)} portrait={portrait} />
+        <DetailModal
+          item={openItem}
+          kind={tab === 'cars' ? 'car' : 'track'}
+          onClose={() => setOpenItem(null)}
+          portrait={portrait}
+        />
       )}
 
       {idle && (
@@ -482,18 +665,20 @@ export function TabletMenu() {
   );
 }
 
-/** Tuile de sélection de famille ("GT"/"Formula"/"LMDH"/"Drift") — photo
- * réelle d'une voiture de la famille (désaturée + assombrie, façon
- * référence visuelle fournie par l'utilisateur), étiquette centrée en bas.
- * "Toutes" (pas de `previewUrl`) reste une tuile pleine unie, texte centré. */
-function FamilyTile({
+/** Tuile de filtre catégorie voitures — deux traitements : "photo" quand la
+ * catégorie a une voiture réelle avec preview (photo en duotone + voile
+ * bleu diagonal), "plain" sinon (fond uni + trait d'accent), comme dans la
+ * maquette v2. "Toutes" (pas de `previewUrl`) reste toujours "plain". */
+function CategoryTile({
   label,
+  count,
   previewUrl,
   mirrored,
   active,
   onClick,
 }: {
   label: string;
+  count?: number;
   previewUrl?: string | null;
   mirrored?: boolean;
   active: boolean;
@@ -503,19 +688,17 @@ function FamilyTile({
     <button
       type="button"
       onClick={onClick}
+      className="tm-tile"
       style={{
         position: 'relative',
         height: 108,
         padding: 0,
-        borderRadius: 14,
+        border: active ? '2px solid var(--tm-accent)' : '1px solid var(--tm-divider)',
+        borderRadius: 12,
         overflow: 'hidden',
         cursor: 'pointer',
-        background: 'var(--tm-surface)',
-        border: `2px solid ${active ? 'var(--tm-accent)' : 'transparent'}`,
-        boxShadow: active
-          ? '0 0 0 1px color-mix(in srgb, var(--tm-accent) 40%, transparent)'
-          : '0 0 0 1px color-mix(in srgb, var(--tm-text) 8%, transparent)',
-        transition: 'border-color .22s ease, box-shadow .22s ease',
+        background: 'var(--tm-panel)',
+        textAlign: 'left',
       }}
     >
       {previewUrl ? (
@@ -530,57 +713,122 @@ function FamilyTile({
               height: '100%',
               objectFit: 'cover',
               transform: mirrored ? 'scaleX(-1)' : undefined,
-              filter: active
-                ? 'grayscale(0.15) contrast(1.1) brightness(0.8)'
-                : 'grayscale(0.85) contrast(1.15) brightness(0.55)',
-              transition: 'filter .25s ease',
+              filter: 'var(--tm-duotone)',
+            }}
+          />
+          <div className="tm-hatch" style={{ position: 'absolute', inset: 0 }} />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: active
+                ? 'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 90%, transparent) 0%, color-mix(in srgb, var(--tm-accent) 40%, transparent) 42%, transparent 78%)'
+                : 'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 55%, transparent) 0%, transparent 68%)',
             }}
           />
           <div
             style={{
               position: 'absolute',
               inset: 0,
-              background:
-                'linear-gradient(to top, rgba(5,6,12,.85) 0%, rgba(5,6,12,.2) 55%, transparent 100%)',
+              background: 'linear-gradient(180deg, transparent 30%, rgba(10,10,10,.86) 100%)',
             }}
           />
+        </>
+      ) : (
+        active && (
           <span
             style={{
               position: 'absolute',
-              left: 8,
-              right: 8,
-              bottom: 12,
-              textAlign: 'center',
-              fontFamily: 'var(--tm-font-heading)',
-              fontWeight: 700,
-              fontSize: 15,
-              letterSpacing: '.04em',
-              textTransform: 'uppercase',
-              color: active ? 'var(--tm-accent-100)' : 'var(--tm-accent-300)',
+              left: 16,
+              top: 16,
+              width: 32,
+              height: 3,
+              background: 'var(--tm-accent)',
             }}
-          >
-            {label}
-          </span>
-        </>
-      ) : (
-        <span
+          />
+        )
+      )}
+      <div style={{ position: 'absolute', left: 16, right: 16, bottom: 14 }}>
+        <div
           style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'var(--tm-font-heading)',
-            fontWeight: 700,
-            fontSize: 15,
-            letterSpacing: '.04em',
+            fontWeight: 900,
+            fontSize: 16,
+            lineHeight: 1.1,
+            letterSpacing: '.03em',
             textTransform: 'uppercase',
-            color: active
-              ? 'var(--tm-accent-100)'
-              : 'color-mix(in srgb, var(--tm-text) 66%, transparent)',
           }}
         >
           {label}
+        </div>
+        {count !== undefined && (
+          <div
+            style={{
+              marginTop: 4,
+              fontWeight: 700,
+              fontSize: 11.5,
+              letterSpacing: '.1em',
+              color: 'color-mix(in srgb, var(--tm-text) 60%, transparent)',
+            }}
+          >
+            {count} {count > 1 ? 'modèles' : 'modèle'}
+          </div>
+        )}
+      </div>
+    </button>
+  );
+}
+
+/** Filtre en pastille pour les circuits — plus léger que `CategoryTile`,
+ * pas de photo (un circuit n'a pas de "photo de catégorie" représentative
+ * au sens propre, contrairement à une famille de voitures). */
+function PillFilter({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count?: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        height: 52,
+        padding: '0 22px',
+        borderRadius: 999,
+        border: active ? '1px solid var(--tm-accent)' : '1px solid var(--tm-divider)',
+        background: active ? 'var(--tm-accent)' : 'var(--tm-panel)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        cursor: 'pointer',
+      }}
+    >
+      <span
+        style={{
+          fontWeight: 800,
+          fontSize: 14,
+          letterSpacing: '.12em',
+          textTransform: 'uppercase',
+        }}
+      >
+        {label}
+      </span>
+      {count !== undefined && (
+        <span
+          style={{
+            fontWeight: 700,
+            fontSize: 12,
+            color: active
+              ? 'color-mix(in srgb, var(--tm-text) 85%, transparent)'
+              : 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+          }}
+        >
+          {count}
         </span>
       )}
     </button>
@@ -593,7 +841,7 @@ function EmptyState({ label }: { label: string }) {
       style={{
         borderRadius: 14,
         border: '1px dashed var(--tm-divider)',
-        background: 'color-mix(in srgb, var(--tm-surface) 50%, transparent)',
+        background: 'color-mix(in srgb, var(--tm-panel) 60%, transparent)',
         padding: '64px 0',
         textAlign: 'center',
         color: 'color-mix(in srgb, var(--tm-text) 50%, transparent)',
@@ -604,30 +852,33 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-/** Petite statistique fiche technique (puissance/poids/rapport) — n'apparaît
- * que si la donnée a été renseignée sur `/content-names` pour une voiture
- * réellement identifiée, jamais une estimation générique par catégorie. */
+/** Statistique fiche technique (puissance/poids/rapport/vitesse max) — box
+ * de la grille 2x2, n'apparaît que si la donnée a été renseignée pour une
+ * voiture réellement identifiée sur `/content-names`, jamais une
+ * estimation générique par catégorie. */
 function SpecStat({ label, value }: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <div
+      style={{
+        background: 'var(--tm-panel-2)',
+        padding: '18px 20px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 7,
+      }}
+    >
       <span
         style={{
+          fontWeight: 800,
           fontSize: 10.5,
-          letterSpacing: '.12em',
+          letterSpacing: '.16em',
           textTransform: 'uppercase',
-          color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+          color: 'color-mix(in srgb, var(--tm-text) 48%, transparent)',
         }}
       >
         {label}
       </span>
-      <span
-        style={{
-          fontFamily: 'var(--tm-font-heading)',
-          fontSize: 18,
-          fontWeight: 700,
-          color: 'var(--tm-accent-200)',
-        }}
-      >
+      <span style={{ fontWeight: 900, fontSize: 22, fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </span>
     </div>
@@ -642,15 +893,15 @@ const DIFFICULTY_LABELS = ['Débutant', 'Facile', 'Moyen', 'Difficile', 'Expert'
 
 function DifficultyDots({ value, showLabel }: { value: number; showLabel?: boolean }) {
   return (
-    <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ display: 'flex', gap: 4 }}>
+    <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ display: 'flex', gap: 5 }}>
         {[1, 2, 3, 4, 5].map((n) => (
           <span
             key={n}
             style={{
-              width: 16,
-              height: 4,
-              borderRadius: 2,
+              width: 22,
+              height: 5,
+              borderRadius: 3,
               background:
                 n <= value
                   ? 'var(--tm-accent)'
@@ -662,8 +913,10 @@ function DifficultyDots({ value, showLabel }: { value: number; showLabel?: boole
       {showLabel && (
         <span
           style={{
-            fontSize: 12.5,
-            color: 'color-mix(in srgb, var(--tm-text) 60%, transparent)',
+            fontWeight: 800,
+            fontSize: 13,
+            letterSpacing: '.1em',
+            textTransform: 'uppercase',
           }}
         >
           {DIFFICULTY_LABELS[value - 1]}
@@ -673,132 +926,257 @@ function DifficultyDots({ value, showLabel }: { value: number; showLabel?: boole
   );
 }
 
-function CatalogCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }) {
+/** Carte catalogue — traitement différent voiture/circuit comme dans la
+ * maquette v2 : une voiture montre sa vraie photo en duotone (voile bleu +
+ * texture hachurée, contenu ancré en bas) ; un circuit montre son vrai
+ * tracé scanné sur un panneau noir à halo radial (jamais de tracé
+ * SVG inventé — voir `layoutImages`/`layoutImageUrl`, seule source réelle). */
+function CatalogCard({
+  item,
+  kind,
+  portrait,
+  onOpen,
+}: {
+  item: CatalogItem;
+  kind: 'car' | 'track';
+  portrait: boolean;
+  onOpen: () => void;
+}) {
   const flag = flagEmoji(item.countryCode);
   const subtitle = [flag ? `${flag} ${item.country ?? ''}`.trim() : item.country, item.year]
     .filter(Boolean)
     .join(' · ');
-  // Un circuit a un tracé (schéma propre, ligne blanche) en plus de sa photo
-  // de piste (souvent sombre/encombrée) — sur la tuile catalogue, le tracé
-  // se lit mieux qu'une photo réduite en 176px de haut.
-  const traceUrl = item.layoutImages[0]?.url ?? item.layoutImageUrl;
+
+  if (kind === 'track') {
+    const traceUrl = item.layoutImages[0]?.url ?? item.layoutImageUrl;
+    return (
+      <div
+        role="button"
+        onClick={onOpen}
+        className="tm-card"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 14,
+          overflow: 'hidden',
+          background: 'var(--tm-track-panel)',
+          border: '1px solid var(--tm-divider)',
+          cursor: 'pointer',
+        }}
+      >
+        <div
+          style={{
+            position: 'relative',
+            height: portrait ? 150 : 190,
+            background:
+              'radial-gradient(60% 60% at 50% 46%, color-mix(in srgb, var(--tm-accent) 22%, transparent), transparent 72%)',
+          }}
+        >
+          {traceUrl ? (
+            <img
+              src={traceUrl}
+              alt={item.name}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                padding: 22,
+                boxSizing: 'border-box',
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <ImageOff size={26} color="color-mix(in srgb, var(--tm-text) 30%, transparent)" />
+            </div>
+          )}
+          {item.layoutImages.length > 1 && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                padding: '5px 12px',
+                borderRadius: 999,
+                background: 'color-mix(in srgb, var(--tm-accent) 92%, transparent)',
+                fontWeight: 800,
+                fontSize: 11,
+                letterSpacing: '.1em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {item.layoutImages.length} tracés
+            </span>
+          )}
+        </div>
+        <div
+          style={{
+            flex: 'none',
+            padding: '16px 18px 18px',
+            background: 'var(--tm-panel)',
+            borderTop: '1px solid var(--tm-divider)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 900,
+              fontSize: 17,
+              lineHeight: 1.1,
+              letterSpacing: '.02em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {item.name}
+          </div>
+          {subtitle && (
+            <div
+              style={{
+                fontWeight: 700,
+                fontSize: 12,
+                letterSpacing: '.08em',
+                textTransform: 'uppercase',
+                color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
+              }}
+            >
+              {subtitle}
+            </div>
+          )}
+          {item.difficulty !== null && <DifficultyDots value={item.difficulty} />}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       role="button"
       onClick={onOpen}
       className="tm-card"
       style={{
-        display: 'flex',
-        flexDirection: 'column',
+        position: 'relative',
+        height: portrait ? 240 : 280,
         borderRadius: 14,
         overflow: 'hidden',
-        background: 'var(--tm-surface)',
-        boxShadow: '0 0 0 1px color-mix(in srgb, var(--tm-text) 10%, transparent)',
+        background: 'var(--tm-panel)',
+        border: '1px solid var(--tm-divider)',
         cursor: 'pointer',
-        transition: 'box-shadow .25s ease, transform .18s ease',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-end',
       }}
     >
+      {item.previewUrl ? (
+        <img
+          src={item.previewUrl}
+          alt={item.name}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            transform: item.mirrored ? 'scaleX(-1)' : undefined,
+            filter: 'var(--tm-duotone)',
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(150deg, var(--tm-panel-2) 0%, var(--tm-track-panel) 55%, #101010 100%)',
+          }}
+        />
+      )}
+      <div className="tm-hatch" style={{ position: 'absolute', inset: 0 }} />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background:
+            'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 45%, transparent) 0%, transparent 62%)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, transparent 32%, rgba(10,10,10,.9) 88%)',
+        }}
+      />
       <div
         style={{
           position: 'relative',
-          height: 176,
-          background: traceUrl ? '#000' : 'color-mix(in srgb, #000 70%, var(--tm-surface))',
+          padding: '18px 18px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 11,
         }}
       >
-        {traceUrl ? (
-          <div
-            style={{
-              display: 'flex',
-              height: '100%',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 18,
-              boxSizing: 'border-box',
-            }}
-          >
-            <img
-              src={traceUrl}
-              alt={item.name}
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            />
-          </div>
-        ) : item.previewUrl ? (
-          <img
-            src={item.previewUrl}
-            alt={item.name}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              transform: item.mirrored ? 'scaleX(-1)' : undefined,
-            }}
-          />
-        ) : (
-          <div
-            style={{
-              display: 'flex',
-              height: '100%',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <ImageOff size={28} color="color-mix(in srgb, var(--tm-text) 30%, transparent)" />
-          </div>
-        )}
-        {item.category && (
-          <span
-            style={{
-              position: 'absolute',
-              left: 12,
-              top: 12,
-              padding: '3px 10px',
-              borderRadius: 8,
-              fontSize: 11,
-              background: 'var(--tm-accent-800)',
-              color: 'var(--tm-accent-100)',
-            }}
-          >
-            {item.category}
-          </span>
-        )}
-        {item.powerHp && (
-          <span
-            style={{
-              position: 'absolute',
-              right: 12,
-              top: 12,
-              padding: '3px 10px',
-              borderRadius: 8,
-              fontSize: 11,
-              fontWeight: 700,
-              background: 'color-mix(in srgb, #05060c 55%, transparent)',
-              color: 'var(--tm-text)',
-            }}
-          >
-            {item.powerHp} ch
-          </span>
-        )}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '14px 16px 16px' }}>
-        <span style={{ fontFamily: 'var(--tm-font-heading)', fontSize: 17 }}>{item.name}</span>
-        {subtitle && (
-          <span
-            style={{ fontSize: 12.5, color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)' }}
-          >
-            {subtitle}
-          </span>
-        )}
-        {item.difficulty !== null && <DifficultyDots value={item.difficulty} />}
+        <div
+          style={{
+            fontWeight: 900,
+            fontSize: 19,
+            lineHeight: 1.12,
+            letterSpacing: '.02em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {item.name}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {item.category && (
+            <span
+              style={{
+                padding: '6px 13px',
+                borderRadius: 999,
+                background: 'var(--tm-accent)',
+                fontWeight: 800,
+                fontSize: 11.5,
+                letterSpacing: '.1em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {item.category}
+            </span>
+          )}
+          {item.powerHp && (
+            <span
+              style={{
+                padding: '6px 13px',
+                borderRadius: 999,
+                border: '1px solid color-mix(in srgb, var(--tm-text) 30%, transparent)',
+                fontWeight: 800,
+                fontSize: 11.5,
+                letterSpacing: '.1em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {item.powerHp} ch
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 /** Image inclinable au doigt/à la souris (effet "on tourne la voiture") —
- * pas un vrai modèle 3D (voir décision produit : seule une photo 2D existe
- * réellement en base, aucun modèle .kn5 n'est accessible côté serveur),
- * juste une bascule/parallaxe CSS pilotée par le glissement du pointeur,
- * bornée pour rester crédible sur une simple photo à plat. */
+ * pas un vrai modèle 3D (le scanner de contenu ne lit qu'une photo 2D
+ * unique par voiture, jamais le `.kn5`), juste une bascule/parallaxe CSS
+ * pilotée par le glissement du pointeur. */
 function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrored?: boolean }) {
   const [rot, setRot] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -827,7 +1205,7 @@ function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrore
   }
 
   return (
-    <div style={{ position: 'absolute', inset: 0, perspective: 900 }}>
+    <div style={{ position: 'absolute', inset: 0, perspective: 1400 }}>
       <div
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -839,7 +1217,7 @@ function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrore
           height: '100%',
           touchAction: 'none',
           cursor: dragging ? 'grabbing' : 'grab',
-          transform: `rotateX(${rot.x}deg) rotateY(${rot.y}deg) scale(${dragging ? 1.04 : 1})`,
+          transform: `rotateX(${rot.x}deg) rotateY(${rot.y}deg) scale(${dragging ? 1.03 : 1})`,
           transition: dragging ? 'none' : 'transform .6s cubic-bezier(.16,1,.3,1)',
           transformStyle: 'preserve-3d',
         }}
@@ -855,6 +1233,7 @@ function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrore
             display: 'block',
             pointerEvents: 'none',
             transform: mirrored ? 'scaleX(-1)' : undefined,
+            filter: 'var(--tm-duotone)',
           }}
         />
         <div
@@ -862,28 +1241,28 @@ function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrore
             position: 'absolute',
             inset: 0,
             pointerEvents: 'none',
-            background: `linear-gradient(${115 + rot.y}deg, color-mix(in srgb, #fff ${dragging ? 16 : 8}%, transparent), transparent 55%)`,
+            background: `linear-gradient(${115 + rot.y}deg, color-mix(in srgb, var(--tm-accent) 45%, transparent), transparent 60%)`,
           }}
         />
       </div>
       <div
         style={{
           position: 'absolute',
-          left: 14,
-          top: 14,
+          left: 20,
+          bottom: 16,
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '5px 10px',
-          borderRadius: 999,
-          fontSize: 11,
+          gap: 7,
+          fontWeight: 700,
+          fontSize: 12,
+          letterSpacing: '.14em',
+          textTransform: 'uppercase',
+          color: 'color-mix(in srgb, var(--tm-text) 35%, transparent)',
           pointerEvents: 'none',
-          background: 'color-mix(in srgb, #05060c 55%, transparent)',
-          color: 'color-mix(in srgb, var(--tm-text) 80%, transparent)',
         }}
       >
-        <Rotate3d size={13} />
-        Glissez pour incliner
+        <Rotate3d size={14} />
+        Glisser pour incliner
       </div>
     </div>
   );
@@ -891,81 +1270,91 @@ function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrore
 
 function MenuGroupCard({ group }: { group: MenuCategory }) {
   return (
-    <div
-      style={{
-        padding: '22px 24px 12px',
-        borderRadius: 14,
-        background: 'color-mix(in srgb, var(--tm-surface) 70%, transparent)',
-      }}
-    >
-      <div style={{ fontFamily: 'var(--tm-font-heading)', fontSize: 21 }}>{group.title}</div>
+    <div style={{ breakInside: 'avoid', marginBottom: 40 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+        <div
+          style={{
+            fontWeight: 900,
+            fontSize: 19,
+            letterSpacing: '.14em',
+            textTransform: 'uppercase',
+            color: 'var(--tm-accent-light)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {group.title}
+        </div>
+        <span
+          style={{
+            flex: 1,
+            height: 1,
+            background:
+              'linear-gradient(90deg, color-mix(in srgb, var(--tm-accent) 80%, transparent), transparent)',
+          }}
+        />
+      </div>
       {group.subtitle && (
         <div
           style={{
-            marginTop: 4,
+            marginTop: -10,
+            marginBottom: 16,
             fontSize: 13,
-            color: 'color-mix(in srgb, var(--tm-text) 50%, transparent)',
+            color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
           }}
         >
           {group.subtitle}
         </div>
       )}
-      <div
-        style={{
-          height: 1,
-          margin: '16px 0 6px',
-          background: 'linear-gradient(to right, var(--tm-divider), transparent)',
-        }}
-      />
       {group.items.length === 0 ? (
         <p
           style={{
             fontSize: 13,
             color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
-            padding: '11px 0',
+            padding: '6px 0 16px',
           }}
         >
           Rien pour le moment.
         </p>
       ) : (
-        group.items.map((item) => (
-          <div key={item.id} style={{ padding: '11px 0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{ fontFamily: 'var(--tm-font-heading)', fontSize: 17.5 }}>
-                {item.name}
-              </span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 6 }}>
+          {group.items.map((item) => (
+            <div key={item.id} style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <span
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 15.5,
+                    letterSpacing: '.02em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {item.name}
+                </span>
+                {item.description && (
+                  <span
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.4,
+                      color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
+                    }}
+                  >
+                    {item.description}
+                  </span>
+                )}
+              </div>
               <span
                 style={{
-                  flex: '1 1 auto',
-                  height: 1,
-                  background:
-                    'linear-gradient(to right, color-mix(in srgb, var(--tm-text) 14%, transparent), transparent)',
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: 'var(--tm-font-heading)',
-                  fontSize: 17.5,
-                  color: 'var(--tm-accent-300)',
+                  flex: 'none',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
                 {item.price}
               </span>
             </div>
-            {item.description && (
-              <div
-                style={{
-                  marginTop: 3,
-                  fontSize: 13,
-                  maxWidth: '48ch',
-                  color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
-                }}
-              >
-                {item.description}
-              </div>
-            )}
-          </div>
-        ))
+          ))}
+        </div>
       )}
     </div>
   );
@@ -973,26 +1362,32 @@ function MenuGroupCard({ group }: { group: MenuCategory }) {
 
 function DetailModal({
   item,
+  kind,
   onClose,
   portrait,
 }: {
   item: CatalogItem;
+  kind: 'car' | 'track';
   onClose: () => void;
   portrait: boolean;
 }) {
+  const flag = flagEmoji(item.countryCode);
+  const hasSpecs = kind === 'car' && (item.powerHp || item.weightKg || item.maxSpeedKmh);
+  const traceUrl = item.layoutImages[0]?.url ?? item.layoutImageUrl;
+
   return (
     <div
       onClick={onClose}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 20,
+        zIndex: 50,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: portrait ? 28 : 40,
-        background: 'color-mix(in srgb, #05060c 72%, transparent)',
-        backdropFilter: 'blur(6px)',
+        padding: portrait ? 20 : 40,
+        background: 'rgba(10,10,10,.82)',
+        backdropFilter: 'blur(8px)',
       }}
     >
       <div
@@ -1000,231 +1395,257 @@ function DetailModal({
         style={{
           position: 'relative',
           display: 'flex',
-          flexDirection: 'column',
-          width: 'min(680px, 100%)',
+          flexDirection: portrait ? 'column' : 'row',
+          width: 'min(1180px, 100%)',
           maxHeight: '100%',
-          borderRadius: 14,
+          borderRadius: 18,
           overflow: 'hidden',
-          background: 'var(--tm-surface)',
-          boxShadow: '0 16px 40px rgba(0,0,0,.65)',
+          background: 'var(--tm-modal)',
+          border: '1px solid var(--tm-divider)',
+          boxShadow: '0 40px 100px rgba(0,0,0,.6)',
         }}
       >
         <div
           style={{
             position: 'relative',
-            flex: 'none',
-            height: portrait ? 240 : 300,
-            background: 'color-mix(in srgb, #000 70%, var(--tm-surface))',
+            flex: portrait ? 'none' : '0 0 46%',
+            height: portrait ? 260 : 'auto',
+            background: 'var(--tm-modal-photo)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          {item.previewUrl ? (
-            <Tilt3DImage src={item.previewUrl} alt={item.name} mirrored={item.mirrored} />
-          ) : (
-            <div
-              style={{
-                display: 'flex',
-                height: '100%',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+          {kind === 'car' ? (
+            item.previewUrl ? (
+              <Tilt3DImage src={item.previewUrl} alt={item.name} mirrored={item.mirrored} />
+            ) : (
               <ImageOff size={40} color="color-mix(in srgb, var(--tm-text) 30%, transparent)" />
-            </div>
+            )
+          ) : (
+            <>
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background:
+                    'radial-gradient(55% 55% at 50% 46%, color-mix(in srgb, var(--tm-accent) 26%, transparent), transparent 72%)',
+                }}
+              />
+              {traceUrl ? (
+                <img
+                  src={traceUrl}
+                  alt={item.name}
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    padding: portrait ? 32 : 56,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              ) : (
+                <ImageOff
+                  size={40}
+                  color="color-mix(in srgb, var(--tm-text) 30%, transparent)"
+                  style={{ position: 'relative' }}
+                />
+              )}
+            </>
           )}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              pointerEvents: 'none',
-              background: 'linear-gradient(to top, var(--tm-surface), transparent 55%)',
-            }}
-          />
           <button
             type="button"
             onClick={onClose}
             style={{
               position: 'absolute',
-              right: 14,
-              top: 14,
-              width: 48,
-              height: 48,
+              right: 16,
+              top: 16,
+              width: 52,
+              height: 52,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: '50%',
               cursor: 'pointer',
-              border: '1px solid var(--tm-divider)',
-              background: 'color-mix(in srgb, #05060c 55%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--tm-text) 20%, transparent)',
+              background: 'var(--tm-panel)',
               color: 'var(--tm-text)',
+              zIndex: 2,
             }}
           >
-            <X size={20} />
+            <X size={22} />
           </button>
-          <div
-            style={{ position: 'absolute', left: 26, bottom: 18, right: 26, pointerEvents: 'none' }}
-          >
+        </div>
+
+        <div
+          style={{
+            flex: '1 1 auto',
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 22,
+            padding: portrait ? '26px 24px 30px' : '38px 40px 36px',
+            overflowY: 'auto',
+          }}
+        >
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             {item.category && (
               <span
                 style={{
-                  display: 'inline-flex',
-                  padding: '3px 10px',
-                  borderRadius: 8,
-                  fontSize: 11,
-                  background: 'var(--tm-accent-800)',
-                  color: 'var(--tm-accent-100)',
+                  padding: '8px 16px',
+                  borderRadius: 999,
+                  background: 'var(--tm-accent)',
+                  fontWeight: 800,
+                  fontSize: 12.5,
+                  letterSpacing: '.14em',
+                  textTransform: 'uppercase',
                 }}
               >
                 {item.category}
               </span>
             )}
-            <h2
-              style={{
-                margin: '10px 0 0',
-                fontSize: portrait ? 28 : 32,
-                letterSpacing: '-.02em',
-                fontFamily: 'var(--tm-font-heading)',
-              }}
-            >
-              {item.name}
-            </h2>
-          </div>
-        </div>
-        {(item.country ||
-          item.year ||
-          item.description ||
-          item.powerHp ||
-          item.weightKg ||
-          item.maxSpeedKmh ||
-          item.difficulty !== null ||
-          item.layoutImageUrl ||
-          item.layoutImages.length > 0) && (
-          <div
-            style={{ padding: '20px 26px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}
-          >
-            {(item.country || item.year) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14.5 }}>
-                {flagEmoji(item.countryCode) && <span>{flagEmoji(item.countryCode)}</span>}
-                <span>{[item.country, item.year].filter(Boolean).join(' · ')}</span>
-              </div>
-            )}
-            {(item.powerHp || item.weightKg || item.maxSpeedKmh) && (
-              <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
-                {item.powerHp && <SpecStat label="Puissance" value={`${item.powerHp} ch`} />}
-                {item.weightKg && <SpecStat label="Poids" value={`${item.weightKg} kg`} />}
-                {item.powerHp && item.weightKg && (
-                  <SpecStat
-                    label="Rapport poids/puissance"
-                    value={`${(item.weightKg / item.powerHp).toFixed(1)} kg/ch`}
-                  />
-                )}
-                {item.maxSpeedKmh && (
-                  <SpecStat label="Vitesse max" value={`${item.maxSpeedKmh} km/h`} />
-                )}
-              </div>
-            )}
-            {item.description && (
-              <p
+            {item.year && (
+              <span
                 style={{
-                  margin: 0,
-                  fontSize: 14,
-                  lineHeight: 1.5,
-                  color: 'color-mix(in srgb, var(--tm-text) 68%, transparent)',
+                  padding: '8px 16px',
+                  borderRadius: 999,
+                  border: '1px solid color-mix(in srgb, var(--tm-text) 24%, transparent)',
+                  fontWeight: 800,
+                  fontSize: 12.5,
+                  letterSpacing: '.14em',
                 }}
               >
-                {item.description}
-              </p>
-            )}
-            {item.difficulty !== null && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: '.14em',
-                    textTransform: 'uppercase',
-                    color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
-                  }}
-                >
-                  Difficulté
-                </span>
-                <DifficultyDots value={item.difficulty} showLabel />
-              </div>
-            )}
-            {(item.layoutImages.length > 0 || item.layoutImageUrl) && (
-              <div>
-                <span
-                  style={{
-                    fontSize: 11,
-                    letterSpacing: '.14em',
-                    textTransform: 'uppercase',
-                    color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
-                  }}
-                >
-                  {item.layoutImages.length > 1 ? `Tracés (${item.layoutImages.length})` : 'Tracé'}
-                </span>
-                {item.layoutImages.length > 0 ? (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 10,
-                    }}
-                  >
-                    {item.layoutImages.map((l) => (
-                      <div
-                        key={l.name}
-                        style={{
-                          flex: item.layoutImages.length > 1 ? '1 1 140px' : '1 1 100%',
-                          borderRadius: 10,
-                          padding: 14,
-                          background: '#000',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          gap: 8,
-                        }}
-                      >
-                        <img
-                          src={l.url}
-                          alt={`Tracé ${l.name} du circuit ${item.name}`}
-                          style={{ maxWidth: '100%', maxHeight: 160, objectFit: 'contain' }}
-                        />
-                        {item.layoutImages.length > 1 && (
-                          <span
-                            style={{
-                              fontSize: 12,
-                              color: 'color-mix(in srgb, #fff 70%, transparent)',
-                              textTransform: 'capitalize',
-                            }}
-                          >
-                            {l.name}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      marginTop: 10,
-                      borderRadius: 10,
-                      padding: 14,
-                      background: '#000',
-                      display: 'flex',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <img
-                      src={item.layoutImageUrl ?? undefined}
-                      alt={`Tracé du circuit ${item.name}`}
-                      style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain' }}
-                    />
-                  </div>
-                )}
-              </div>
+                {item.year}
+              </span>
             )}
           </div>
-        )}
+
+          <h2
+            style={{
+              margin: 0,
+              fontWeight: 900,
+              fontSize: portrait ? 30 : 38,
+              lineHeight: 1.05,
+              letterSpacing: '.01em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {item.name}
+          </h2>
+
+          {(flag || item.country) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {flag && <span style={{ fontSize: 30, lineHeight: 1 }}>{flag}</span>}
+              {item.country && (
+                <span
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 15,
+                    letterSpacing: '.14em',
+                    textTransform: 'uppercase',
+                    color: 'color-mix(in srgb, var(--tm-text) 72%, transparent)',
+                  }}
+                >
+                  {item.country}
+                </span>
+              )}
+            </div>
+          )}
+
+          {kind === 'track' && item.layoutImages.length > 1 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <span
+                style={{
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: '.2em',
+                  textTransform: 'uppercase',
+                  color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+                }}
+              >
+                Configurations ({item.layoutImages.length})
+              </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {item.layoutImages.map((l) => (
+                  <span
+                    key={l.name}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 999,
+                      border: '1px solid color-mix(in srgb, var(--tm-text) 20%, transparent)',
+                      fontWeight: 700,
+                      fontSize: 13,
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {l.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {item.description && (
+            <p
+              style={{
+                margin: 0,
+                fontSize: 15,
+                lineHeight: 1.6,
+                color: 'color-mix(in srgb, var(--tm-text) 68%, transparent)',
+              }}
+            >
+              {item.description}
+            </p>
+          )}
+
+          {item.difficulty !== null && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <span
+                style={{
+                  fontWeight: 800,
+                  fontSize: 12,
+                  letterSpacing: '.2em',
+                  textTransform: 'uppercase',
+                  color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
+                }}
+              >
+                Difficulté
+              </span>
+              <DifficultyDots value={item.difficulty} showLabel />
+            </div>
+          )}
+
+          {hasSpecs && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 2,
+                background: 'var(--tm-divider)',
+                border: '1px solid var(--tm-divider)',
+                borderRadius: 12,
+                overflow: 'hidden',
+              }}
+            >
+              {item.powerHp && <SpecStat label="Puissance" value={`${item.powerHp} ch`} />}
+              {item.weightKg && <SpecStat label="Poids" value={`${item.weightKg} kg`} />}
+              {item.powerHp && item.weightKg && (
+                <SpecStat
+                  label="Rapport poids-puissance"
+                  value={`${(item.weightKg / item.powerHp).toFixed(2)} kg/ch`}
+                />
+              )}
+              {item.maxSpeedKmh && (
+                <SpecStat label="Vitesse max" value={`${item.maxSpeedKmh} km/h`} />
+              )}
+            </div>
+          )}
+
+          {kind === 'track' && item.layoutImages.length <= 1 && !traceUrl && (
+            <EmptyState label="Tracé non disponible pour le moment." />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -1245,141 +1666,201 @@ function IdleScreen({
     <div
       onClick={onWake}
       style={{
-        position: 'absolute',
+        position: 'fixed',
         inset: 0,
-        zIndex: 40,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 20,
-        cursor: 'pointer',
+        zIndex: 60,
+        overflow: 'hidden',
         background: 'var(--tm-bg)',
-        padding: portrait ? '54px 34px' : '0 54px',
-        textAlign: 'center',
+        cursor: 'pointer',
       }}
     >
       <div
         style={{
           position: 'absolute',
-          inset: '-25%',
-          pointerEvents: 'none',
+          inset: 0,
           background:
-            'radial-gradient(38% 38% at 30% 45%, color-mix(in srgb, var(--tm-accent) 22%, transparent), transparent 70%)',
-          animation: 'tmGlow 16s ease-in-out infinite',
+            'radial-gradient(60% 55% at 50% 42%, color-mix(in srgb, var(--tm-accent) 30%, transparent), transparent 72%)',
         }}
       />
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 11 }}>
-        <span
+      <div className="tm-hatch" style={{ position: 'absolute', inset: 0, opacity: 0.5 }} />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <div
           style={{
-            width: 9,
-            height: 9,
-            borderRadius: '50%',
-            background: 'var(--tm-accent)',
-            boxShadow: '0 0 16px var(--tm-accent)',
+            fontWeight: 900,
+            fontSize: portrait ? 78 : 130,
+            lineHeight: 1,
+            fontVariantNumeric: 'tabular-nums',
+            textShadow: '0 8px 60px rgba(0,0,0,.6)',
+          }}
+        >
+          {now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+        <div
+          style={{
+            marginTop: 12,
+            fontWeight: 700,
+            fontSize: portrait ? 14 : 18,
+            letterSpacing: '.3em',
+            textTransform: 'uppercase',
+            color: 'color-mix(in srgb, var(--tm-text) 60%, transparent)',
+          }}
+        >
+          {now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </div>
+
+        <div
+          style={{
+            width: 140,
+            height: 1,
+            margin: portrait ? '36px 0' : '48px 0',
+            background:
+              'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tm-text) 50%, transparent), transparent)',
           }}
         />
-        <span
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: portrait ? 14 : 20,
+              fontWeight: 900,
+              fontSize: portrait ? 42 : 62,
+              lineHeight: 1,
+              letterSpacing: '.06em',
+            }}
+          >
+            <span style={{ color: 'var(--tm-text)' }}>{VENUE_WORD_1}</span>
+            <span style={{ color: 'var(--tm-accent-light)' }}>{VENUE_WORD_2}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, width: '100%' }}>
+            <span
+              style={{
+                flex: 1,
+                height: 1,
+                background:
+                  'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tm-text) 50%, transparent))',
+              }}
+            />
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: portrait ? 13 : 17,
+                letterSpacing: '.5em',
+                paddingLeft: '.5em',
+                color: 'color-mix(in srgb, var(--tm-text) 70%, transparent)',
+              }}
+            >
+              {VENUE_CITY}
+            </span>
+            <span
+              style={{
+                flex: 1,
+                height: 1,
+                background:
+                  'linear-gradient(90deg, color-mix(in srgb, var(--tm-text) 50%, transparent), transparent)',
+              }}
+            />
+          </div>
+        </div>
+
+        <div
           style={{
-            fontSize: 11.5,
-            letterSpacing: '.24em',
+            marginTop: portrait ? 34 : 48,
+            fontWeight: 800,
+            fontSize: portrait ? 17 : 22,
+            letterSpacing: '.14em',
             textTransform: 'uppercase',
-            color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
+            textAlign: 'center',
+            padding: '0 24px',
           }}
         >
-          Simracing · Bar · Cuisine
-        </span>
+          {tagline}
+        </div>
       </div>
-      <h1
-        style={{
-          position: 'relative',
-          margin: 0,
-          fontSize: portrait ? 46 : 72,
-          lineHeight: 0.98,
-          letterSpacing: '-.035em',
-          fontFamily: 'var(--tm-font-heading)',
-        }}
-      >
-        {VENUE_NAME}
-      </h1>
+
       <div
         style={{
-          position: 'relative',
-          fontFamily: 'var(--tm-font-heading)',
-          fontSize: portrait ? 17 : 21,
-          color: 'var(--tm-accent-300)',
-          minHeight: '1.3em',
-        }}
-      >
-        {tagline}
-      </div>
-      <div
-        style={{
-          position: 'relative',
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: portrait ? 56 : 84,
           display: 'flex',
-          alignItems: 'center',
-          gap: 14,
-          marginTop: 6,
+          justifyContent: 'center',
         }}
       >
-        <Hand size={26} color="var(--tm-accent)" />
-        <span
-          style={{ fontSize: 15.5, color: 'color-mix(in srgb, var(--tm-text) 70%, transparent)' }}
+        <div
+          className="tm-pulse"
+          style={{
+            padding: portrait ? '18px 38px' : '22px 48px',
+            borderRadius: 999,
+            background: 'var(--tm-accent)',
+            fontWeight: 900,
+            fontSize: portrait ? 16 : 20,
+            letterSpacing: '.2em',
+            textTransform: 'uppercase',
+          }}
         >
-          Touchez l'écran pour consulter la carte
-        </span>
-      </div>
-      <div
-        style={{
-          position: 'relative',
-          fontSize: 12,
-          color: 'color-mix(in srgb, var(--tm-text) 40%, transparent)',
-        }}
-      >
-        {now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          Touchez l'écran
+        </div>
       </div>
     </div>
   );
 }
 
-/** Thème "Nocturne" repris de la maquette Claude Design (styles.css du
- * projet importé) — scopé à `.tablet-menu` plutôt que posé sur `:root`
- * pour ne jamais teinter le reste du dashboard (Tailwind + thème
- * dark-orange existant). */
+/** Thème repris de l'identité réelle du site vitrine (elsass-simracing.fr)
+ * — fond anthracite #0E0E0E/#242424, accent bleu acier #245E97, Montserrat
+ * — scopé à `.tablet-menu` plutôt que posé sur `:root` pour ne jamais
+ * teinter le reste du dashboard (Tailwind + thème dark-orange existant). */
 function TabletMenuStyles() {
   return (
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
       .tablet-menu {
-        --tm-bg: #161826;
-        --tm-surface: #232532;
-        --tm-text: #e9e9ed;
-        --tm-accent: #9184d9;
-        --tm-accent-100: #f5f4ff;
-        --tm-accent-200: #e7e5fe;
-        --tm-accent-300: #d2cefd;
-        --tm-accent-800: #423a6a;
-        --tm-divider: color-mix(in srgb, #e9e9ed 16%, transparent);
-        --tm-font-heading: "Inter", system-ui, sans-serif;
-        --tm-font-body: "Inter", system-ui, sans-serif;
+        --tm-bg: #0E0E0E;
+        --tm-stage: #242424;
+        --tm-nav: #171717;
+        --tm-panel: #1B1B1B;
+        --tm-panel-2: #1F1F1F;
+        --tm-track-panel: #141414;
+        --tm-modal: #1A1A1A;
+        --tm-modal-photo: #101010;
+        --tm-text: #F8F8F8;
+        --tm-accent: #245E97;
+        --tm-accent-light: #5C9BD6;
+        --tm-divider: color-mix(in srgb, #F8F8F8 9%, transparent);
+        --tm-duotone: grayscale(1) contrast(1.05) brightness(.82) sepia(.35) hue-rotate(172deg) saturate(2.2);
+        --tm-font-heading: "Montserrat", "Helvetica Neue", Arial, sans-serif;
+        --tm-font-body: "Montserrat", "Helvetica Neue", Arial, sans-serif;
         -webkit-tap-highlight-color: transparent;
         overscroll-behavior: none;
         user-select: none;
       }
       .tablet-menu * { box-sizing: border-box; }
       .tablet-menu ::-webkit-scrollbar { width: 0; height: 0; }
-      .tablet-menu .tm-card { transform: perspective(900px) rotateX(0deg); }
+      .tablet-menu .tm-hatch {
+        background-image: repeating-linear-gradient(122deg, rgba(248,248,248,.045) 0 2px, transparent 2px 9px);
+        pointer-events: none;
+      }
+      .tablet-menu .tm-card, .tablet-menu .tm-tile { transition: transform .18s ease, box-shadow .18s ease; }
       @media (hover: hover) {
-        .tablet-menu .tm-card:hover {
-          transform: perspective(900px) rotateX(4deg) scale(1.015);
-          box-shadow: 0 14px 30px rgba(0,0,0,.35);
+        .tablet-menu .tm-card:hover, .tablet-menu .tm-tile:hover {
+          transform: scale(1.015);
+          box-shadow: 0 14px 30px rgba(0,0,0,.4);
         }
       }
       .tablet-menu .tm-tilt-hint { animation: tmTiltHint 5s ease-in-out 1; }
-      @keyframes tmGlow {
-        0%, 100% { opacity: .5; transform: translate(-3%, 1%) scale(1); }
-        50% { opacity: .95; transform: translate(5%, -4%) scale(1.14); }
-      }
+      .tablet-menu .tm-pulse { animation: tmPulse 2.6s ease-in-out infinite; }
+      @keyframes tmPulse { 0%, 100% { opacity: .78; } 50% { opacity: 1; } }
       @keyframes tmTiltHint {
         0%, 20%, 100% { transform: rotateX(0deg) rotateY(0deg); }
         35% { transform: rotateX(4deg) rotateY(-12deg); }

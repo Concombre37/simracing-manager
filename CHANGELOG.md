@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.2.134 — Refonte visuelle de /tablet-menu à l'identité du vrai site vitrine
+
+### Changé
+
+- **Demandé par l'utilisateur ("j'aimerais refaire la page du /tablet-menu... j'aimerais avoir le maximum de beauté [du vrai site elsass-simracing.fr]").** Le thème "Nocturne" hérité de la toute première maquette importée (v2.2.117, blurple `#9184d9`, police Inter) est remplacé par l'identité réelle du site vitrine du client : fond anthracite `#0E0E0E`/`#242424`, accent bleu acier `#245E97`, police Montserrat (900 pour les titres, tout en majuscules avec tracking large), wordmark "ELSASS/SIMRACING/HAGUENAU" repris tel quel.
+- **Nouvelle maquette Claude Design importée** (projet "Simracing tablet menu", fichier `Kiosque Elsass Simracing.dc.html`) après un premier prompt de conception écrit à partir d'un rendu Playwright du vrai site (couleurs/police/photos extraites du CSS calculé, cf. tour précédent). Réimplémentation React fidèle au design, comme pour chaque maquette précédente de ce projet — le runtime `x-dc`/`sc-for`/`sc-if`/`<image-slot>` n'est qu'un outil de prévisualisation, jamais exécuté en prod.
+- **Écarts assumés entre la maquette et l'implémentation, toujours pour ne rien inventer :**
+  - La maquette ajoutait deux onglets fictifs **"Arcade"** (borne à jetons, billard, baby-foot...) et **"Le centre"** (photos de la salle + événements à venir) — **non repris** : aucune donnée réelle ne les alimente (pas de modèle Arcade/Événements en base), contrairement aux 4 onglets réels (Voitures/Circuits/Cuisine/Bar) que le prompt de conception avait explicitement demandés. Peuvent être commissionnés comme vraies fonctionnalités (nouveaux modèles + admin CRUD) si l'utilisateur le souhaite.
+  - Les circuits de la maquette étaient dessinés en **tracés SVG inventés** avec longueur/nombre de virages/sens fictifs — remplacés par le **vrai schéma scanné** (`outline.png`, déjà en place depuis v2.2.128) affiché sur le même panneau noir à halo radial bleu ; aucune "Longueur"/"Virages"/"Sens" fabriqués dans la fiche détail (ces données n'existent pas réellement).
+  - Les drapeaux pays de la maquette étaient dessinés à la main en SVG pour 9 pays fixes — gardé l'emoji `flagEmoji()` déjà en place (fonctionne pour n'importe quel code pays réellement renseigné, pas seulement les 9 anticipés par la maquette).
+  - L'écran de veille de la maquette utilisait une photo plein écran du centre (`<image-slot>`) — aucun asset de ce type n'existe côté serveur (le scanner de contenu ne récupère que des photos de voitures/circuits) ; remplacé par un halo radial bleu + texture hachurée, sans photo inventée.
+  - Les cartes voiture de la maquette étaient volontairement sans photo (juste un dégradé + un texte-filigrane géant de la catégorie) — la vraie photo scannée (déjà curatée : 344 voitures revues et orientées, v2.2.123) a été **conservée** en fond de carte (filtre duotone bleu + voile dégradé) plutôt que supprimée, pour ne pas perdre ce travail de curation ni la reconnaissance visuelle.
+- **Nouveaux composants** : icônes de navigation dessinées au trait (`NavIconCars/Tracks/Kitchen/Bar`, reprises de la maquette) remplacent les icônes lucide génériques ; `CategoryTile` (tuile photo/pleine pour les filtres voitures) et `PillFilter` (pastille compacte pour les filtres circuits, sans photo) remplacent l'unique `FamilyTile` partagé.
+- **Toujours responsive portrait/paysage réel** (pas le canvas fixe 1920×1200 mis à l'échelle de la maquette, qui letterboxerait en portrait) — même détection `portrait = viewport.h > viewport.w * 1.05` qu'avant, toute la mise en page reste fluide. Navigation simplifiée en barre basse unique dans les deux orientations (au lieu d'un rail latéral en paysage).
+- Toute la logique de données reste inchangée (requêtes `/external/v1/content`/`/categories`/`/menu`, minuteur de veille 90 s, dérivation dynamique des familles de catégories v2.2.131, tracé réel des circuits, specs réelles des voitures).
+- Vérifié en conditions réelles (Playwright) : écran de veille, grille voitures (avec les 48 catégories nettoyées v2.2.132), fiche détail voiture (tilt + grille specs 2×2), grille et fiche détail circuits (vrai tracé + configurations), onglet cuisine (état vide honnête), portrait et paysage.
+
 ## v2.2.133 — Bouton "Voitures sans infos" sur /content-names
 
 ### Ajouté
