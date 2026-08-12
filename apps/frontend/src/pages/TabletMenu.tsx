@@ -187,8 +187,15 @@ export function TabletMenu() {
       CAR_FAMILIES.map((family) => {
         const matches = currentItems.filter((i) => i.category && family.match.test(i.category));
         if (matches.length === 0) return null;
-        return { ...family, previewUrl: matches.find((i) => i.previewUrl)?.previewUrl ?? null };
-      }).filter((f): f is CarFamily & { previewUrl: string | null } => f !== null),
+        const previewItem = matches.find((i) => i.previewUrl) ?? null;
+        return {
+          ...family,
+          previewUrl: previewItem?.previewUrl ?? null,
+          mirrored: previewItem?.mirrored ?? false,
+        };
+      }).filter(
+        (f): f is CarFamily & { previewUrl: string | null; mirrored: boolean } => f !== null,
+      ),
     [currentItems],
   );
   const activeFamily = families.find((f) => f.key === filter) ?? null;
@@ -430,6 +437,7 @@ export function TabletMenu() {
                       key={f.key}
                       label={f.label}
                       previewUrl={f.previewUrl}
+                      mirrored={f.mirrored}
                       active={filter === f.key}
                       onClick={() => setFilter(f.key)}
                     />
@@ -500,11 +508,13 @@ export function TabletMenu() {
 function FamilyTile({
   label,
   previewUrl,
+  mirrored,
   active,
   onClick,
 }: {
   label: string;
   previewUrl?: string | null;
+  mirrored?: boolean;
   active: boolean;
   onClick: () => void;
 }) {
@@ -538,6 +548,7 @@ function FamilyTile({
               width: '100%',
               height: '100%',
               objectFit: 'cover',
+              transform: mirrored ? 'scaleX(-1)' : undefined,
               filter: active
                 ? 'grayscale(0.15) contrast(1.1) brightness(0.8)'
                 : 'grayscale(0.85) contrast(1.15) brightness(0.55)',
@@ -695,7 +706,12 @@ function CatalogCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }
           <img
             src={item.previewUrl}
             alt={item.name}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: item.mirrored ? 'scaleX(-1)' : undefined,
+            }}
           />
         ) : (
           <div
@@ -763,7 +779,7 @@ function CatalogCard({ item, onOpen }: { item: CatalogItem; onOpen: () => void }
  * réellement en base, aucun modèle .kn5 n'est accessible côté serveur),
  * juste une bascule/parallaxe CSS pilotée par le glissement du pointeur,
  * bornée pour rester crédible sur une simple photo à plat. */
-function Tilt3DImage({ src, alt }: { src: string; alt: string }) {
+function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrored?: boolean }) {
   const [rot, setRot] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [interacted, setInteracted] = useState(false);
@@ -818,6 +834,7 @@ function Tilt3DImage({ src, alt }: { src: string; alt: string }) {
             objectFit: 'cover',
             display: 'block',
             pointerEvents: 'none',
+            transform: mirrored ? 'scaleX(-1)' : undefined,
           }}
         />
         <div
@@ -981,7 +998,7 @@ function DetailModal({
           }}
         >
           {item.previewUrl ? (
-            <Tilt3DImage src={item.previewUrl} alt={item.name} />
+            <Tilt3DImage src={item.previewUrl} alt={item.name} mirrored={item.mirrored} />
           ) : (
             <div
               style={{

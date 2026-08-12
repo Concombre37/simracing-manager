@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Tag, Search, Check, RotateCcw, Car as CarIcon, MapPin } from 'lucide-react';
+import {
+  Tag,
+  Search,
+  Check,
+  RotateCcw,
+  Car as CarIcon,
+  MapPin,
+  FlipHorizontal,
+} from 'lucide-react';
 import { contentLabelsApi, type KnownContentItem } from '../services/contentLabels';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
@@ -116,6 +124,7 @@ interface RowPayload {
   description?: string;
   powerHp?: number;
   weightKg?: number;
+  mirrored?: boolean;
 }
 
 /** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
@@ -138,6 +147,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
   const [description, setDescription] = useState(item.description ?? '');
   const [powerHp, setPowerHp] = useState(item.powerHp ? String(item.powerHp) : '');
   const [weightKg, setWeightKg] = useState(item.weightKg ? String(item.weightKg) : '');
+  const [mirrored, setMirrored] = useState(item.mirrored);
 
   useEffect(() => {
     setName(item.displayName ?? '');
@@ -149,6 +159,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     setDescription(item.description ?? '');
     setPowerHp(item.powerHp ? String(item.powerHp) : '');
     setWeightKg(item.weightKg ? String(item.weightKg) : '');
+    setMirrored(item.mirrored);
   }, [
     item.displayName,
     item.category,
@@ -159,6 +170,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     item.description,
     item.powerHp,
     item.weightKg,
+    item.mirrored,
   ]);
 
   const mutation = useMutation({
@@ -187,7 +199,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     trimmedCountryCode !== (item.countryCode ?? '') ||
     trimmedDescription !== (item.description ?? '') ||
     parsedPowerHp !== item.powerHp ||
-    parsedWeightKg !== item.weightKg;
+    parsedWeightKg !== item.weightKg ||
+    mirrored !== item.mirrored;
   const hasOverride = Boolean(
     item.displayName ||
     item.category ||
@@ -197,7 +210,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     item.countryCode ||
     item.description ||
     item.powerHp ||
-    item.weightKg,
+    item.weightKg ||
+    item.mirrored,
   );
 
   function save(overrides: Partial<RowPayload> = {}) {
@@ -211,6 +225,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
       description: trimmedDescription || undefined,
       powerHp: parsedPowerHp ?? undefined,
       weightKg: parsedWeightKg ?? undefined,
+      mirrored: mirrored || undefined,
       ...overrides,
     });
   }
@@ -258,6 +273,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
                 setDescription('');
                 setPowerHp('');
                 setWeightKg('');
+                setMirrored(false);
                 save({
                   displayName: '',
                   category: undefined,
@@ -268,6 +284,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
                   description: undefined,
                   powerHp: undefined,
                   weightKg: undefined,
+                  mirrored: undefined,
                 });
               }}
               title="Tout réinitialiser"
@@ -302,6 +319,24 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
         <Field label="Difficulté">
           <DifficultyPicker value={difficulty} onChange={setDifficulty} />
         </Field>
+
+        {item.type === 'car' && (
+          <Field label="Photo">
+            <button
+              type="button"
+              onClick={() => setMirrored((v) => !v)}
+              title="Retourner la photo horizontalement sur /tablet-menu (capot à droite)"
+              className={`flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border px-2 text-xs transition-colors ${
+                mirrored
+                  ? 'border-accent-orange bg-accent-orange/15 text-accent-orange'
+                  : 'border-dark-600 bg-dark-900 text-gray-400 hover:bg-dark-700'
+              }`}
+            >
+              <FlipHorizontal className="w-3.5 h-3.5" />
+              Miroir
+            </button>
+          </Field>
+        )}
 
         <Field label="Année">
           <Input

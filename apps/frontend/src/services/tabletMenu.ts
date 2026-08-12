@@ -13,6 +13,7 @@ export interface CatalogItem {
   description: string | null;
   powerHp: number | null;
   weightKg: number | null;
+  mirrored: boolean;
 }
 
 export interface Catalog {

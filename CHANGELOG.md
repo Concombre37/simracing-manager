@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.123 — Photos de voitures orientées capot à droite sur /tablet-menu
+
+### Ajouté
+
+- **Demandé par l'utilisateur ("j'aimerais changer tout les image pour qu'elle soit tous tournéer capot vers la droite"), scope confirmé à `/tablet-menu` uniquement (via AskUserQuestion).** `ContentLabel` gagne `mirrored` (booléen, défaut `false`) — appliqué en CSS (`transform: scaleX(-1)`) sur la photo, jamais un retournement des pixels stockés en base (une resynchronisation de contenu depuis un poste aurait sinon silencieusement annulé le retournement, `ContentPreview.data` étant réécrit à chaque scan).
+- **Les 344 photos de voitures scannées ont été examinées une par une** (extraction en base64 → fichiers, planches-contact pour une revue rapide, puis vérification individuelle à pleine résolution pour toute photo ambiguë ou à fond non standard) pour repérer le sens du capot. Résultat : la quasi-totalité (307/344) est orientée capot à gauche (convention par défaut de l'outil de génération d'aperçus le plus utilisé pour ce contenu) et a été marquée `mirrored: true`. Exclusions délibérées (aucun retournement) : les 24 karts (`psc_*`/`ack_otk_*`, déjà capot à droite avec une convention différente), les 8 voitures du pack `rw_*` (déjà capot à droite), 4 voitures isolées déjà capot à droite (`rms_peugeot_908hdi_lm07`, `porsche_919_hybrid_evo_2018`, `rss_formula_hybrid_2025_alpine`, `urd_detroit_egt_2018_LM`), et 1 photo prise de l'arrière du véhicule où l'orientation du capot n'est pas déterminable (`rl_ford_fiesta_wrc_s1`).
+- **`/content-names`** : nouveau bouton bascule "Miroir" par voiture (icône `FlipHorizontal`), pour que l'admin puisse corriger une voiture reclassée plus tard sans repasser par un script.
+- **`/tablet-menu`** : le retournement s'applique sur la vignette (`CatalogCard`), la tuile de famille (`FamilyTile`, photo représentative) et la fiche détail (`Tilt3DImage`, combiné à l'effet de bascule existant sans conflit). Effet de bord attendu et accepté : les numéros de course/logos sponsors imprimés sur la carrosserie apparaissent inversés sur les photos retournées, propre à tout miroir d'image — pas un défaut.
+- Changement purement frontend/backend, aucun code agent modifié.
+
 ## v2.2.122 — Page /content-names plus lisible (champs étiquetés)
 
 ### Changé

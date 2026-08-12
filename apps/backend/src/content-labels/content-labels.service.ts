@@ -28,6 +28,7 @@ export interface KnownContentItem {
   description: string | null;
   powerHp: number | null;
   weightKg: number | null;
+  mirrored: boolean;
 }
 
 export interface CatalogItem {
@@ -42,6 +43,7 @@ export interface CatalogItem {
   description: string | null;
   powerHp: number | null;
   weightKg: number | null;
+  mirrored: boolean;
 }
 
 @Injectable()
@@ -101,6 +103,7 @@ export class ContentLabelsService {
           description: label?.description ?? null,
           powerHp: label?.powerHp ?? null,
           weightKg: label?.weightKg ?? null,
+          mirrored: label?.mirrored ?? false,
         };
       })
       .sort((a, b) => {
@@ -158,6 +161,7 @@ export class ContentLabelsService {
         description: label?.description ?? null,
         powerHp: label?.powerHp ?? null,
         weightKg: label?.weightKg ?? null,
+        mirrored: label?.mirrored ?? false,
       };
       (item.type === 'car' ? cars : tracks).push(entry);
     }
@@ -199,6 +203,7 @@ export class ContentLabelsService {
     const description = dto.description?.trim() || null;
     const powerHp = dto.powerHp ?? null;
     const weightKg = dto.weightKg ?? null;
+    const mirrored = dto.mirrored ?? false;
 
     if (
       !displayName &&
@@ -209,7 +214,8 @@ export class ContentLabelsService {
       !countryCode &&
       !description &&
       !powerHp &&
-      !weightKg
+      !weightKg &&
+      !mirrored
     ) {
       await this.prisma.contentLabel.deleteMany({
         where: { type: dto.type, acId: dto.acId },
@@ -231,6 +237,7 @@ export class ContentLabelsService {
         description,
         powerHp,
         weightKg,
+        mirrored,
       },
       update: {
         displayName,
@@ -242,6 +249,7 @@ export class ContentLabelsService {
         description,
         powerHp,
         weightKg,
+        mirrored,
       },
     });
   }

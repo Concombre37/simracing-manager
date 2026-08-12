@@ -220,6 +220,11 @@ model ContentLabel {
   // ambigu/déguisé.
   powerHp     Int?     @map("power_hp")
   weightKg    Int?     @map("weight_kg")
+  // Miroir horizontal appliqué à la photo sur /tablet-menu (capot à droite,
+  // photo brute inchangée en base) — décidé au cas par cas, jamais un
+  // retournement systématique (certaines photos sont déjà orientées à
+  // droite ou dans un angle où le sens n'a pas de sens à corriger).
+  mirrored    Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
