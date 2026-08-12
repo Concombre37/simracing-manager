@@ -18,6 +18,7 @@ export interface CatalogItem {
   description: string | null;
   powerHp: number | null;
   weightKg: number | null;
+  maxSpeedKmh: number | null;
   mirrored: boolean;
   layoutImageUrl: string | null;
   layoutImages: LayoutImage[];

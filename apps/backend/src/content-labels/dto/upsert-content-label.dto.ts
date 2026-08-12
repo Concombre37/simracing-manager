@@ -18,6 +18,7 @@ export const upsertContentLabelSchema = z.object({
   description: z.string().trim().max(500).optional(),
   powerHp: z.number().int().min(1).max(20000).optional(),
   weightKg: z.number().int().min(1).max(20000).optional(),
+  maxSpeedKmh: z.number().int().min(1).max(2000).optional(),
   mirrored: z.boolean().optional(),
   visible: z.boolean().optional(),
 });

@@ -1092,6 +1092,7 @@ function DetailModal({
           item.description ||
           item.powerHp ||
           item.weightKg ||
+          item.maxSpeedKmh ||
           item.difficulty !== null ||
           item.layoutImageUrl ||
           item.layoutImages.length > 0) && (
@@ -1104,8 +1105,8 @@ function DetailModal({
                 <span>{[item.country, item.year].filter(Boolean).join(' · ')}</span>
               </div>
             )}
-            {(item.powerHp || item.weightKg) && (
-              <div style={{ display: 'flex', gap: 28 }}>
+            {(item.powerHp || item.weightKg || item.maxSpeedKmh) && (
+              <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap' }}>
                 {item.powerHp && <SpecStat label="Puissance" value={`${item.powerHp} ch`} />}
                 {item.weightKg && <SpecStat label="Poids" value={`${item.weightKg} kg`} />}
                 {item.powerHp && item.weightKg && (
@@ -1113,6 +1114,9 @@ function DetailModal({
                     label="Rapport poids/puissance"
                     value={`${(item.weightKg / item.powerHp).toFixed(1)} kg/ch`}
                   />
+                )}
+                {item.maxSpeedKmh && (
+                  <SpecStat label="Vitesse max" value={`${item.maxSpeedKmh} km/h`} />
                 )}
               </div>
             )}

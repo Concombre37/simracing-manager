@@ -125,6 +125,7 @@ interface RowPayload {
   description?: string;
   powerHp?: number;
   weightKg?: number;
+  maxSpeedKmh?: number;
   mirrored?: boolean;
   visible?: boolean;
 }
@@ -149,6 +150,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
   const [description, setDescription] = useState(item.description ?? '');
   const [powerHp, setPowerHp] = useState(item.powerHp ? String(item.powerHp) : '');
   const [weightKg, setWeightKg] = useState(item.weightKg ? String(item.weightKg) : '');
+  const [maxSpeedKmh, setMaxSpeedKmh] = useState(item.maxSpeedKmh ? String(item.maxSpeedKmh) : '');
   const [mirrored, setMirrored] = useState(item.mirrored);
   const [visible, setVisible] = useState(item.visible);
 
@@ -162,6 +164,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     setDescription(item.description ?? '');
     setPowerHp(item.powerHp ? String(item.powerHp) : '');
     setWeightKg(item.weightKg ? String(item.weightKg) : '');
+    setMaxSpeedKmh(item.maxSpeedKmh ? String(item.maxSpeedKmh) : '');
     setMirrored(item.mirrored);
     setVisible(item.visible);
   }, [
@@ -174,6 +177,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     item.description,
     item.powerHp,
     item.weightKg,
+    item.maxSpeedKmh,
     item.mirrored,
     item.visible,
   ]);
@@ -195,6 +199,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
   const parsedYear = year.trim() ? Number(year.trim()) : null;
   const parsedPowerHp = powerHp.trim() ? Number(powerHp.trim()) : null;
   const parsedWeightKg = weightKg.trim() ? Number(weightKg.trim()) : null;
+  const parsedMaxSpeedKmh = maxSpeedKmh.trim() ? Number(maxSpeedKmh.trim()) : null;
   const hasChanged =
     trimmedName !== (item.displayName ?? '') ||
     trimmedCategory !== (item.category ?? '') ||
@@ -205,6 +210,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     trimmedDescription !== (item.description ?? '') ||
     parsedPowerHp !== item.powerHp ||
     parsedWeightKg !== item.weightKg ||
+    parsedMaxSpeedKmh !== item.maxSpeedKmh ||
     mirrored !== item.mirrored ||
     visible !== item.visible;
   const hasOverride = Boolean(
@@ -217,6 +223,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     item.description ||
     item.powerHp ||
     item.weightKg ||
+    item.maxSpeedKmh ||
     item.mirrored ||
     !item.visible,
   );
@@ -232,6 +239,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
       description: trimmedDescription || undefined,
       powerHp: parsedPowerHp ?? undefined,
       weightKg: parsedWeightKg ?? undefined,
+      maxSpeedKmh: parsedMaxSpeedKmh ?? undefined,
       mirrored: mirrored || undefined,
       visible,
       ...overrides,
@@ -305,6 +313,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
                 setDescription('');
                 setPowerHp('');
                 setWeightKg('');
+                setMaxSpeedKmh('');
                 setMirrored(false);
                 setVisible(true);
                 save({
@@ -317,6 +326,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
                   description: undefined,
                   powerHp: undefined,
                   weightKg: undefined,
+                  maxSpeedKmh: undefined,
                   mirrored: undefined,
                   visible: true,
                 });
@@ -463,6 +473,16 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
             value={weightKg}
             onChange={(e) => setWeightKg(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
             placeholder="ex: 1200"
+            inputMode="numeric"
+            className="w-full"
+          />
+        </Field>
+
+        <Field label="Vitesse max (km/h)">
+          <Input
+            value={maxSpeedKmh}
+            onChange={(e) => setMaxSpeedKmh(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+            placeholder="ex: 300"
             inputMode="numeric"
             className="w-full"
           />

@@ -18,6 +18,7 @@ export interface KnownContentItem {
   description: string | null;
   powerHp: number | null;
   weightKg: number | null;
+  maxSpeedKmh: number | null;
   mirrored: boolean;
   visible: boolean;
   previewUrl: string | null;
@@ -42,6 +43,7 @@ export const contentLabelsApi = {
     description?: string;
     powerHp?: number;
     weightKg?: number;
+    maxSpeedKmh?: number;
     mirrored?: boolean;
     visible?: boolean;
   }) => api.put('/content/labels', params).then((res) => res.data),

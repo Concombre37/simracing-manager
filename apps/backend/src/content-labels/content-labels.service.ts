@@ -34,6 +34,7 @@ export interface KnownContentItem {
   description: string | null;
   powerHp: number | null;
   weightKg: number | null;
+  maxSpeedKmh: number | null;
   mirrored: boolean;
   visible: boolean;
   previewUrl: string | null;
@@ -53,6 +54,7 @@ export interface CatalogItem {
   description: string | null;
   powerHp: number | null;
   weightKg: number | null;
+  maxSpeedKmh: number | null;
   mirrored: boolean;
   layoutImageUrl: string | null;
   layoutImages: LayoutImage[];
@@ -157,6 +159,7 @@ export class ContentLabelsService {
           description: label?.description ?? null,
           powerHp: label?.powerHp ?? null,
           weightKg: label?.weightKg ?? null,
+          maxSpeedKmh: label?.maxSpeedKmh ?? null,
           mirrored: label?.mirrored ?? false,
           visible: label?.visible ?? true,
           previewUrl: previewByKey.get(`${item.type}:${item.acId}`) ?? null,
@@ -221,6 +224,7 @@ export class ContentLabelsService {
         description: label?.description ?? null,
         powerHp: label?.powerHp ?? null,
         weightKg: label?.weightKg ?? null,
+        maxSpeedKmh: label?.maxSpeedKmh ?? null,
         mirrored: label?.mirrored ?? false,
         // Vrai schéma scanné (outline.png réel du circuit installé) préféré
         // au schéma web (Wikimedia) peuplé manuellement en v2.2.126 — celui-ci
@@ -280,6 +284,7 @@ export class ContentLabelsService {
     const description = dto.description?.trim() || null;
     const powerHp = dto.powerHp ?? null;
     const weightKg = dto.weightKg ?? null;
+    const maxSpeedKmh = dto.maxSpeedKmh ?? null;
     const mirrored = dto.mirrored ?? false;
     const visible = dto.visible ?? true;
 
@@ -293,6 +298,7 @@ export class ContentLabelsService {
       !description &&
       !powerHp &&
       !weightKg &&
+      !maxSpeedKmh &&
       !mirrored &&
       visible
     ) {
@@ -316,6 +322,7 @@ export class ContentLabelsService {
         description,
         powerHp,
         weightKg,
+        maxSpeedKmh,
         mirrored,
         visible,
       },
@@ -329,6 +336,7 @@ export class ContentLabelsService {
         description,
         powerHp,
         weightKg,
+        maxSpeedKmh,
         mirrored,
         visible,
       },
