@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.133 — Bouton "Voitures sans infos" sur /content-names
+
+### Ajouté
+
+- **Demandé par l'utilisateur ("Tu peux faire un bouton pour les voitures qui manque les informations").** Bouton bascule dans l'en-tête de `/content-names`, affiche le nombre de voitures sans aucune information technique/descriptive (`isMissingInfo()` : ni catégorie, ni difficulté, ni année, ni pays/code pays, ni description, ni puissance/poids/vitesse max — le nom affiché seul ne compte pas comme "info"). Un clic filtre la liste sur ces voitures uniquement (force aussi le filtre Type sur "Voitures") ; un second clic revient à la liste complète.
+- Message d'état vide dédié ("Tout est déjà renseigné !") quand le filtre est actif et qu'il ne reste plus rien à compléter.
+- Vérifié en conditions réelles : 20 voitures actuellement sans infos sur 346, bouton et filtre fonctionnels sur `/content-names` (Playwright).
+
 ## v2.2.132 — Catégories configurables en admin (remplace le texte libre)
 
 ### Ajouté

@@ -9,6 +9,7 @@ import {
   MapPin,
   FlipHorizontal,
   ImageOff,
+  AlertTriangle,
 } from 'lucide-react';
 import { contentLabelsApi, type KnownContentItem } from '../services/contentLabels';
 import { contentCategoriesApi, type ContentCategory } from '../services/contentCategories';
@@ -19,9 +20,29 @@ import { Badge } from '../components/ui/Badge';
 import { Input, Select } from '../components/ui/Input';
 import { Link } from 'react-router-dom';
 
+/** Un item "sans infos" n'a aucune des données descriptives/techniques
+ * renseignées — le nom affiché seul ne compte pas (juste plus joli, pas
+ * une information sur la voiture/le circuit). Sert au bouton de filtre
+ * rapide, pour retrouver les entrées encore à compléter sur une liste de
+ * plusieurs centaines de lignes. */
+function isMissingInfo(item: KnownContentItem): boolean {
+  return !(
+    item.category ||
+    item.difficulty !== null ||
+    item.year ||
+    item.country ||
+    item.countryCode ||
+    item.description ||
+    item.powerHp ||
+    item.weightKg ||
+    item.maxSpeedKmh
+  );
+}
+
 export function ContentNames() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('');
+  const [onlyMissing, setOnlyMissing] = useState(false);
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['content-labels-known'],
@@ -38,6 +59,7 @@ export function ContentNames() {
     const term = search.trim().toLowerCase();
     return items.filter((item) => {
       if (typeFilter && item.type !== typeFilter) return false;
+      if (onlyMissing && !isMissingInfo(item)) return false;
       if (!term) return true;
       return (
         item.rawName.toLowerCase().includes(term) ||
@@ -45,13 +67,15 @@ export function ContentNames() {
         (item.displayName ?? '').toLowerCase().includes(term)
       );
     });
-  }, [items, search, typeFilter]);
+  }, [items, search, typeFilter, onlyMissing]);
 
   const stats = useMemo(() => {
     const cars = items.filter((i) => i.type === 'car').length;
     const tracks = items.filter((i) => i.type === 'track').length;
     const renamed = items.filter((i) => i.displayName).length;
-    return { total: items.length, cars, tracks, renamed };
+    const missingCars = items.filter((i) => i.type === 'car' && isMissingInfo(i)).length;
+    const missingTracks = items.filter((i) => i.type === 'track' && isMissingInfo(i)).length;
+    return { total: items.length, cars, tracks, renamed, missingCars, missingTracks };
   }, [items]);
 
   return (
@@ -65,6 +89,18 @@ export function ContentNames() {
           <Badge variant="blue">Voitures {stats.cars}</Badge>
           <Badge variant="green">Circuits {stats.tracks}</Badge>
           <Badge variant="purple">Renommés {stats.renamed}</Badge>
+          <Button
+            size="sm"
+            variant={onlyMissing ? 'primary' : 'secondary'}
+            onClick={() => {
+              const next = !onlyMissing;
+              setOnlyMissing(next);
+              setTypeFilter(next ? 'car' : '');
+            }}
+          >
+            <AlertTriangle className="h-3.5 w-3.5" />
+            {onlyMissing ? 'Toutes les voitures' : `Voitures sans infos (${stats.missingCars})`}
+          </Button>
           <Link to="/content-categories">
             <Button size="sm" variant="secondary">
               Gérer les catégories
@@ -112,7 +148,9 @@ export function ContentNames() {
           <p className="text-gray-400">
             {items.length === 0
               ? "Aucun contenu connu pour le moment — attends qu'un poste envoie son contenu."
-              : 'Aucun résultat pour cette recherche.'}
+              : onlyMissing
+                ? 'Tout est déjà renseigné !'
+                : 'Aucun résultat pour cette recherche.'}
           </p>
         </Card>
       ) : (
