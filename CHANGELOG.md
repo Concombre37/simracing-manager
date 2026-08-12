@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.122 — Page /content-names plus lisible (champs étiquetés)
+
+### Changé
+
+- **Demandé par l'utilisateur ("Tu peux le rendre plus lisible alors"), après lui avoir indiqué où éditer les infos voitures/circuits (`/content-names`).** Chaque champ (Nom affiché, Catégorie, Difficulté, Année, Pays, Code pays, Puissance, Poids, Description) a désormais une étiquette visible en permanence au-dessus (`Field`), au lieu de compter uniquement sur le texte de `placeholder` — qui disparaît dès qu'une valeur est saisie, rendant les lignes déjà remplies illisibles sur une liste de 346 voitures.
+- Passage d'un flex-wrap improvisé à une vraie grille (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-6`) : les champs s'alignent proprement en colonnes, "Nom affiché" et "Description" prennent plus de largeur (texte plus long), le reste (Catégorie/Difficulté/Année/Pays/Code/Puissance/Poids) tient sur une seule ligne compacte. Boutons Enregistrer/Réinitialiser déplacés en haut à droite de chaque ligne, à côté de l'identité (badge + nom technique/acId), pour rester visibles sans dépendre du nombre de champs remplis en dessous.
+- Aucun changement de comportement (mêmes champs, même sauvegarde groupée par ligne) — uniquement la lisibilité.
+
 ## v2.2.121 — Tuiles voitures GT2/GT3/GT4/Hypercar/DTM/Cup/Historique/Autres/Formula 1/2/4
 
 ### Changé

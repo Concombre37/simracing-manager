@@ -216,14 +216,15 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 px-4 py-3 hover:bg-dark-700/30 transition-colors">
+    <div className="flex flex-col gap-3 px-4 py-4 hover:bg-dark-700/30 transition-colors">
+      {/* Identité (lecture seule) + actions */}
       <div className="flex flex-wrap items-center gap-3">
         <Badge variant={item.type === 'car' ? 'blue' : 'green'}>
           {item.type === 'car' ? <CarIcon className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}
           {item.type === 'car' ? 'Voiture' : 'Circuit'}
         </Badge>
 
-        <div className="min-w-0 flex-1 basis-48">
+        <div className="min-w-0">
           <p className="truncate text-sm text-white" title={item.rawName}>
             {item.rawName}
           </p>
@@ -232,27 +233,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
           </p>
         </div>
 
-        <div className="min-w-0 flex-[2] basis-56">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={item.rawName}
-            className="w-full"
-          />
-        </div>
-
-        <div className="min-w-0 flex-1 basis-36">
-          <Input
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="Catégorie (ex: GT3)"
-            className="w-full"
-          />
-        </div>
-
-        <DifficultyPicker value={difficulty} onChange={setDifficulty} />
-
-        <div className="flex items-center gap-2">
+        <div className="ml-auto flex flex-none items-center gap-2">
           <Button
             size="sm"
             variant="primary"
@@ -297,71 +278,121 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 pl-[3.75rem]">
-        <div className="w-24">
+      {/* Champs éditables, groupés et étiquetés pour rester lisibles même une
+          fois remplis (le placeholder seul disparaît dès qu'on tape). */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <Field label="Nom affiché" className="col-span-2">
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={item.rawName}
+            className="w-full"
+          />
+        </Field>
+
+        <Field label="Catégorie">
+          <Input
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="ex: GT3"
+            className="w-full"
+          />
+        </Field>
+
+        <Field label="Difficulté">
+          <DifficultyPicker value={difficulty} onChange={setDifficulty} />
+        </Field>
+
+        <Field label="Année">
           <Input
             value={year}
             onChange={(e) => setYear(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
-            placeholder="Année"
+            placeholder="ex: 2024"
             inputMode="numeric"
             className="w-full"
           />
-        </div>
-        <div className="min-w-0 flex-1 basis-40">
+        </Field>
+
+        <Field label="Pays">
           <Input
             value={country}
             onChange={(e) => setCountry(e.target.value)}
-            placeholder="Pays (ex: Italie)"
+            placeholder="ex: Italie"
             className="w-full"
           />
-        </div>
-        <div className="flex w-24 items-center gap-1.5">
-          <Input
-            value={countryCode}
-            onChange={(e) =>
-              setCountryCode(
-                e.target.value
-                  .replace(/[^a-zA-Z]/g, '')
-                  .slice(0, 2)
-                  .toUpperCase(),
-              )
-            }
-            placeholder="FR"
-            className="w-full"
-          />
-          {trimmedCountryCode.length === 2 && (
-            <span className="text-lg" title={trimmedCountryCode}>
-              {flagEmoji(trimmedCountryCode)}
-            </span>
-          )}
-        </div>
-        <div className="min-w-0 flex-[3] basis-64">
-          <Input
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Courte description (optionnel)"
-            className="w-full"
-          />
-        </div>
-        <div className="w-28">
+        </Field>
+
+        <Field label="Code pays">
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={countryCode}
+              onChange={(e) =>
+                setCountryCode(
+                  e.target.value
+                    .replace(/[^a-zA-Z]/g, '')
+                    .slice(0, 2)
+                    .toUpperCase(),
+                )
+              }
+              placeholder="FR"
+              className="w-full"
+            />
+            {trimmedCountryCode.length === 2 && (
+              <span className="text-lg" title={trimmedCountryCode}>
+                {flagEmoji(trimmedCountryCode)}
+              </span>
+            )}
+          </div>
+        </Field>
+
+        <Field label="Puissance (ch)">
           <Input
             value={powerHp}
             onChange={(e) => setPowerHp(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
-            placeholder="Puissance (ch)"
+            placeholder="ex: 450"
             inputMode="numeric"
             className="w-full"
           />
-        </div>
-        <div className="w-28">
+        </Field>
+
+        <Field label="Poids (kg)">
           <Input
             value={weightKg}
             onChange={(e) => setWeightKg(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))}
-            placeholder="Poids (kg)"
+            placeholder="ex: 1200"
             inputMode="numeric"
             className="w-full"
           />
-        </div>
+        </Field>
+
+        <Field label="Description" className="col-span-2 sm:col-span-3 lg:col-span-6">
+          <Input
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Optionnel"
+            className="w-full"
+          />
+        </Field>
       </div>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+  className = '',
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <label className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-gray-500">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }
