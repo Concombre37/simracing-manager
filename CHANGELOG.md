@@ -1,5 +1,17 @@
 # Changelog
 
+## v2.2.128 — Vrais schémas de circuits scannés depuis Content Manager (agent)
+
+### Ajouté
+
+- **Demandé par l'utilisateur, à partir d'une capture d'écran de Content Manager sur le poste admin ("récupérer toute les image de circuit... les layer etc... et les placer... sur les images de circuit sur le catalogue").** Clarifié : la source est le vrai fichier `outline.png` livré avec chaque circuit installé (fichier standard AC, à côté de `preview.png`/`ui_track.json` dans `content/tracks/<circuit>/ui/<layout>/` — c'est ce que Content Manager affiche dans sa fiche circuit), récupéré **par le même mécanisme que les photos** (scan agent + upload), pas par un transfert manuel de fichiers.
+- **Agent (`contentScanner.ts`)** : nouvelles fonctions `findLayoutSchema`/`findTrackLayoutSchema` (mêmes conventions de recherche que `findLayoutPreview`/`findTrackPreview` — racine du circuit, dossier `ui/`, puis repli sur la première image trouvée parmi les layouts). `Track`/`TrackLayout` gagnent un champ `layoutImage`. `CACHE_VERSION` passé à 9 (un cache v8 n'a pas ce champ du tout, doit être invalidé plutôt que traité comme "scanné, rien trouvé").
+- **Backend (`stations.service.ts`)** : `track.layoutImage` (et celui de chaque layout) routé à travers `upsertPreview()` sous un nouveau type `'layout'` (même table `ContentPreview` que les photos, `acId` = celui du circuit) — jamais laissé en base64 brut dans la colonne `content` (même précaution anti-bloat que pour les previews de layout, voir v2.2.56/gotcha `stations.service.ts`).
+- **`ContentLabelsService`** : `loadPreviewMap()` généralisé pour accepter une liste de types (`car`/`track`/`layout`) au lieu d'être figé sur `car`/`track`. `getCatalog()` (donc `/tablet-menu`) et `getKnown()` (donc `/content-names`) préfèrent désormais ce vrai schéma scanné ; le schéma web (Wikimedia, peuplé manuellement en v2.2.126) ne reste utilisé qu'en repli pour les circuits pas encore (re-)scannés par un poste avec ce nouvel agent.
+- **`/content-names`** : nouveau champ "Layout" (lecture seule, vignette sur fond blanc) sur chaque ligne circuit, symétrique au champ "Photo"/Miroir des voitures — visible dès qu'un poste a resynchronisé son contenu avec le nouvel agent.
+- **Nécessite une nouvelle release de l'agent + mise à jour sur les postes pour avoir un effet réel** (contrairement à v2.2.120/124, qui étaient backend/frontend seul) : le champ `layoutImage` n'existe qu'à partir de cette version de l'agent — un poste qui n'a pas encore été mis à jour continue de scanner sans lui, sans erreur, juste sans image de layout tant qu'il n'est pas mis à jour puis resynchronisé (`content:sync`).
+- Aucune image inventée : un circuit sans `outline.png` sur le disque garde `layoutImageUrl: null` (ou son repli web s'il en a un depuis v2.2.126) — même principe "pas de valeur devinée" que tout le reste de `ContentLabel`.
+
 ## v2.2.127 — Miniature photo sur /content-names
 
 ### Ajouté

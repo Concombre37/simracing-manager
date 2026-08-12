@@ -221,6 +221,19 @@ export class StationsService {
           String(track.name ?? ''),
           track.preview,
         );
+        // Circuit schema (`outline.png`, the real track shape from above —
+        // see `contentScanner.ts`'s `findTrackLayoutSchema`), distinct from
+        // the photo `preview` above. Same type-string convention as
+        // 'track'/'car'/'track-layout' below — read by
+        // `ContentLabelsService` to populate `layoutImageUrl` on the
+        // catalog, preferred over the manually-seeded `ContentLabel.layoutImage`.
+        const layoutImageUrl = await this.upsertPreview(
+          stationDbId,
+          'layout',
+          trackAcId,
+          `${String(track.name ?? trackAcId)} - Layout`,
+          track.layoutImage,
+        );
         // A multi-layout track's own preview is only ever the top-level
         // one — each layout carries its own separate preview image, which
         // was never routed through upsertPreview here. Left as raw
@@ -241,11 +254,27 @@ export class StationsService {
               `${trackAcId} ${layoutName}`,
               layout.preview,
             );
-            return { ...layout, preview: layoutPreviewUrl };
+            const layoutSchemaUrl = await this.upsertPreview(
+              stationDbId,
+              'layout',
+              `${trackAcId}:${layoutName}`,
+              `${trackAcId} ${layoutName} - Layout`,
+              layout.layoutImage,
+            );
+            return {
+              ...layout,
+              preview: layoutPreviewUrl,
+              layoutImage: layoutSchemaUrl,
+            };
           },
           25,
         );
-        return { ...track, preview: previewUrl, layouts: processedLayouts };
+        return {
+          ...track,
+          preview: previewUrl,
+          layoutImage: layoutImageUrl,
+          layouts: processedLayouts,
+        };
       },
       25,
     );

@@ -372,6 +372,23 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
           </Field>
         )}
 
+        {item.type === 'track' && (
+          <Field label="Layout">
+            {item.layoutImageUrl ? (
+              <div
+                className="flex h-9 w-full items-center justify-center rounded-lg border border-dark-600 bg-white p-0.5"
+                title="Schéma du circuit, récupéré automatiquement (voir /tablet-menu)"
+              >
+                <img src={item.layoutImageUrl} alt="" className="h-full w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-9 w-full items-center justify-center rounded-lg border border-dashed border-dark-600 text-[10px] text-gray-600">
+                Aucun
+              </div>
+            )}
+          </Field>
+        )}
+
         <Field label="Année">
           <Input
             value={year}

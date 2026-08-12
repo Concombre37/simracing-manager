@@ -20,6 +20,7 @@ export interface Car {
 export interface TrackLayout {
   name: string;
   preview?: string;
+  layoutImage?: string;
 }
 
 export interface Track {
@@ -27,6 +28,7 @@ export interface Track {
   name: string;
   layouts: TrackLayout[];
   preview?: string;
+  layoutImage?: string;
 }
 
 export interface AcContent {
@@ -138,6 +140,14 @@ async function findFirstImage(
 }
 
 const PREVIEW_NAMES = ['preview.png', 'preview.jpg', 'preview.jpeg', 'preview.dds'];
+
+// `outline.png` is the standard AC track file used by the in-game track
+// selection UI to draw the circuit shape from above (white line, transparent
+// background) — present alongside preview.png/ui_track.json in the same `ui`
+// folder for the vast majority of stock and community tracks. This is the
+// "real" schema Content Manager shows in its track detail view, as opposed
+// to `preview.png` which is an aerial/photo-style shot of the circuit.
+const LAYOUT_IMAGE_NAMES = ['outline.png', 'outline.jpg', 'outline.jpeg'];
 
 async function findCarPreview(
   logger: Logger,
@@ -307,6 +317,43 @@ async function findTrackPreview(
   return undefined;
 }
 
+/** Same lookup shape as `findLayoutPreview`, for `outline.png` instead of
+ * `preview.png` — a per-layout circuit schema rather than a photo. */
+async function findLayoutSchema(
+  logger: Logger,
+  trackDir: string,
+  layout: string,
+): Promise<string | undefined> {
+  const candidateDirs = [
+    path.join(trackDir, 'ui', layout),
+    path.join(trackDir, layout, 'ui'),
+    path.join(trackDir, layout),
+  ];
+  for (const dir of candidateDirs) {
+    const image = await findFirstImage(dir, LAYOUT_IMAGE_NAMES, logger);
+    if (image) return image;
+  }
+  return undefined;
+}
+
+/** Same fallback shape as `findTrackPreview`, for the circuit schema. Not
+ * every track ships an `outline.png` — no warning logged here (unlike the
+ * photo preview), since a missing schema is a normal, common outcome rather
+ * than a sign of a broken lookup. */
+async function findTrackLayoutSchema(
+  trackDir: string,
+  layouts: TrackLayout[],
+  logger: Logger,
+): Promise<string | undefined> {
+  const rootImage = await findFirstImage(trackDir, LAYOUT_IMAGE_NAMES, logger);
+  if (rootImage) return rootImage;
+
+  const uiImage = await findFirstImage(path.join(trackDir, 'ui'), LAYOUT_IMAGE_NAMES, logger);
+  if (uiImage) return uiImage;
+
+  return layouts.find((l) => l.layoutImage)?.layoutImage;
+}
+
 export class ContentScanner {
   private readonly cache: ContentCache;
   private lastScanWarning: string | undefined;
@@ -427,18 +474,27 @@ export class ContentScanner {
         if (!stat?.isDirectory()) continue;
 
         const uiPath = path.join(trackDir, 'ui_track.json');
-        const previewPaths = ['preview.png', 'preview.jpg', 'preview.jpeg'].map((n) =>
-          path.join(trackDir, n),
-        );
+        const previewPaths = [
+          'preview.png',
+          'preview.jpg',
+          'preview.jpeg',
+          ...LAYOUT_IMAGE_NAMES,
+        ].map((n) => path.join(trackDir, n));
         const updatedAt = await maxMtime(uiPath, ...previewPaths);
         const cached = this.cache.getTrack(entry);
 
-        if (cached && cached.updatedAt === updatedAt && cached.preview !== undefined) {
+        if (
+          cached &&
+          cached.updatedAt === updatedAt &&
+          cached.preview !== undefined &&
+          cached.layoutImage !== undefined
+        ) {
           content.tracks.push({
             acId: cached.acId,
             name: cached.name,
             layouts: cached.layouts,
             preview: cached.preview,
+            layoutImage: cached.layoutImage,
           });
           continue;
         }
@@ -455,6 +511,7 @@ export class ContentScanner {
           layoutNames.map(async (name) => ({
             name,
             preview: await findLayoutPreview(this.logger, trackDir, name),
+            layoutImage: await findLayoutSchema(this.logger, trackDir, name),
           })),
         );
 
@@ -463,6 +520,7 @@ export class ContentScanner {
           name: uiJson?.name || entry,
           layouts,
           preview: await findTrackPreview(this.logger, trackDir, layouts, entry),
+          layoutImage: await findTrackLayoutSchema(trackDir, layouts, this.logger),
         };
         track.name = track.name
           .replace(/\s+-\s*layout\s*$/i, '')
@@ -525,6 +583,7 @@ export class ContentScanner {
 
     const carsWithoutPreview = content.cars.filter((c) => !c.preview).map((c) => c.acId);
     const tracksWithoutPreview = content.tracks.filter((t) => !t.preview).map((t) => t.acId);
+    const tracksWithLayoutImage = content.tracks.filter((t) => t.layoutImage).length;
 
     this.logger.info(
       {
@@ -532,6 +591,7 @@ export class ContentScanner {
         tracks: content.tracks.length,
         carsWithPreview: content.cars.length - carsWithoutPreview.length,
         tracksWithPreview: content.tracks.length - tracksWithoutPreview.length,
+        tracksWithLayoutImage,
         carsWithoutPreview: carsWithoutPreview.slice(0, 10),
         tracksWithoutPreview: tracksWithoutPreview.slice(0, 10),
         acPath,

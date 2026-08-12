@@ -15,7 +15,10 @@ interface CachedTrack extends Track {
 // the standard `ui/` subfolder — every car's name/brand/category was wrong).
 // File mtimes on disk are unchanged, so without a version bump the old,
 // incorrect cached values would never get rescanned with the fixed logic.
-const CACHE_VERSION = 8;
+// v9: Track/TrackLayout gained `layoutImage` (outline.png circuit schema) —
+// a v8 cache entry has no such field at all (not just unset), so it must be
+// invalidated rather than silently treated as "scanned, no schema found".
+const CACHE_VERSION = 9;
 
 interface CacheData {
   version?: number;

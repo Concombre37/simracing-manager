@@ -31,6 +31,7 @@ export interface KnownContentItem {
   mirrored: boolean;
   visible: boolean;
   previewUrl: string | null;
+  layoutImageUrl: string | null;
 }
 
 export interface CatalogItem {
@@ -84,11 +85,14 @@ export class ContentLabelsService {
     return rawByKey;
   }
 
-  /** Une preview par acId — n'importe quel poste l'ayant scannée fait
-   * l'affaire, même principe que `LeaderboardService.loadPreviewMap()`. */
-  private async loadPreviewMap(): Promise<Map<string, string>> {
+  /** Une preview par (type, acId) — n'importe quel poste l'ayant scannée
+   * fait l'affaire, même principe que `LeaderboardService.loadPreviewMap()`.
+   * `types` inclut 'layout' pour récupérer aussi le vrai schéma de circuit
+   * (`outline.png`, voir `stations.service.ts#extractPreviews()`), stocké
+   * sous ce même mécanisme `ContentPreview` avec `acId` = celui du circuit. */
+  private async loadPreviewMap(types: string[]): Promise<Map<string, string>> {
     const previews = await this.prisma.contentPreview.findMany({
-      where: { type: { in: ['car', 'track'] } },
+      where: { type: { in: types } },
       select: { id: true, type: true, acId: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -106,7 +110,7 @@ export class ContentLabelsService {
     const [rawByKey, labels, previewByKey] = await Promise.all([
       this.gatherRawContent(),
       this.prisma.contentLabel.findMany(),
-      this.loadPreviewMap(),
+      this.loadPreviewMap(['car', 'track', 'layout']),
     ]);
     const labelByKey = new Map(labels.map((l) => [`${l.type}:${l.acId}`, l]));
 
@@ -130,6 +134,13 @@ export class ContentLabelsService {
           mirrored: label?.mirrored ?? false,
           visible: label?.visible ?? true,
           previewUrl: previewByKey.get(`${item.type}:${item.acId}`) ?? null,
+          layoutImageUrl:
+            item.type === 'track'
+              ? (previewByKey.get(`layout:${item.acId}`) ??
+                (label?.layoutImage
+                  ? `/api/content/labels/layout-image/${label.id}`
+                  : null))
+              : null,
         };
       })
       .sort((a, b) => {
@@ -145,7 +156,7 @@ export class ContentLabelsService {
     const [rawByKey, labels, previewByKey] = await Promise.all([
       this.gatherRawContent(),
       this.prisma.contentLabel.findMany(),
-      this.loadPreviewMap(),
+      this.loadPreviewMap(['car', 'track', 'layout']),
     ]);
     const labelByKey = new Map(labels.map((l) => [`${l.type}:${l.acId}`, l]));
 
@@ -177,9 +188,15 @@ export class ContentLabelsService {
         powerHp: label?.powerHp ?? null,
         weightKg: label?.weightKg ?? null,
         mirrored: label?.mirrored ?? false,
-        layoutImageUrl: label?.layoutImage
-          ? `/api/content/labels/layout-image/${label.id}`
-          : null,
+        // Vrai schéma scanné (outline.png réel du circuit installé) préféré
+        // au schéma web (Wikimedia) peuplé manuellement en v2.2.126 — celui-ci
+        // ne reste utilisé qu'en repli, pour les circuits pas encore
+        // (re-)scannés par un poste avec la nouvelle version de l'agent.
+        layoutImageUrl:
+          previewByKey.get(`layout:${item.acId}`) ??
+          (label?.layoutImage
+            ? `/api/content/labels/layout-image/${label.id}`
+            : null),
       };
       (item.type === 'car' ? cars : tracks).push(entry);
     }

@@ -21,6 +21,7 @@ export interface KnownContentItem {
   mirrored: boolean;
   visible: boolean;
   previewUrl: string | null;
+  layoutImageUrl: string | null;
 }
 
 export const contentLabelsApi = {
