@@ -19,6 +19,7 @@ export interface KnownContentItem {
   powerHp: number | null;
   weightKg: number | null;
   mirrored: boolean;
+  visible: boolean;
 }
 
 export const contentLabelsApi = {
@@ -39,6 +40,7 @@ export const contentLabelsApi = {
     powerHp?: number;
     weightKg?: number;
     mirrored?: boolean;
+    visible?: boolean;
   }) => api.put('/content/labels', params).then((res) => res.data),
 };
 

@@ -225,6 +225,10 @@ model ContentLabel {
   // retournement systématique (certaines photos sont déjà orientées à
   // droite ou dans un angle où le sens n'a pas de sens à corriger).
   mirrored    Boolean  @default(false)
+  // Visibilité sur le catalogue public (/tablet-menu) — coché par défaut
+  // (true) pour tout contenu, décoché retire l'item du catalogue sans
+  // toucher au reste de son contenu scanné/renseigné.
+  visible     Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

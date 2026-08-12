@@ -125,6 +125,7 @@ interface RowPayload {
   powerHp?: number;
   weightKg?: number;
   mirrored?: boolean;
+  visible?: boolean;
 }
 
 /** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
@@ -148,6 +149,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
   const [powerHp, setPowerHp] = useState(item.powerHp ? String(item.powerHp) : '');
   const [weightKg, setWeightKg] = useState(item.weightKg ? String(item.weightKg) : '');
   const [mirrored, setMirrored] = useState(item.mirrored);
+  const [visible, setVisible] = useState(item.visible);
 
   useEffect(() => {
     setName(item.displayName ?? '');
@@ -160,6 +162,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     setPowerHp(item.powerHp ? String(item.powerHp) : '');
     setWeightKg(item.weightKg ? String(item.weightKg) : '');
     setMirrored(item.mirrored);
+    setVisible(item.visible);
   }, [
     item.displayName,
     item.category,
@@ -171,6 +174,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     item.powerHp,
     item.weightKg,
     item.mirrored,
+    item.visible,
   ]);
 
   const mutation = useMutation({
@@ -200,7 +204,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     trimmedDescription !== (item.description ?? '') ||
     parsedPowerHp !== item.powerHp ||
     parsedWeightKg !== item.weightKg ||
-    mirrored !== item.mirrored;
+    mirrored !== item.mirrored ||
+    visible !== item.visible;
   const hasOverride = Boolean(
     item.displayName ||
     item.category ||
@@ -211,7 +216,8 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
     item.description ||
     item.powerHp ||
     item.weightKg ||
-    item.mirrored,
+    item.mirrored ||
+    !item.visible,
   );
 
   function save(overrides: Partial<RowPayload> = {}) {
@@ -226,12 +232,15 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
       powerHp: parsedPowerHp ?? undefined,
       weightKg: parsedWeightKg ?? undefined,
       mirrored: mirrored || undefined,
+      visible,
       ...overrides,
     });
   }
 
   return (
-    <div className="flex flex-col gap-3 px-4 py-4 hover:bg-dark-700/30 transition-colors">
+    <div
+      className={`flex flex-col gap-3 px-4 py-4 transition-colors hover:bg-dark-700/30 ${!visible ? 'opacity-50' : ''}`}
+    >
       {/* Identité (lecture seule) + actions */}
       <div className="flex flex-wrap items-center gap-3">
         <Badge variant={item.type === 'car' ? 'blue' : 'green'}>
@@ -247,6 +256,16 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
             {item.acId}
           </p>
         </div>
+
+        <label className="flex flex-none cursor-pointer items-center gap-2 text-xs text-gray-400">
+          <input
+            type="checkbox"
+            checked={visible}
+            onChange={(e) => setVisible(e.target.checked)}
+            className="h-4 w-4 rounded border-dark-500 bg-dark-800 text-accent-orange focus:ring-accent-orange"
+          />
+          Afficher sur le catalogue
+        </label>
 
         <div className="ml-auto flex flex-none items-center gap-2">
           <Button
@@ -274,6 +293,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
                 setPowerHp('');
                 setWeightKg('');
                 setMirrored(false);
+                setVisible(true);
                 save({
                   displayName: '',
                   category: undefined,
@@ -285,6 +305,7 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
                   powerHp: undefined,
                   weightKg: undefined,
                   mirrored: undefined,
+                  visible: true,
                 });
               }}
               title="Tout réinitialiser"

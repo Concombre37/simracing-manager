@@ -29,6 +29,7 @@ export interface KnownContentItem {
   powerHp: number | null;
   weightKg: number | null;
   mirrored: boolean;
+  visible: boolean;
 }
 
 export interface CatalogItem {
@@ -104,6 +105,7 @@ export class ContentLabelsService {
           powerHp: label?.powerHp ?? null,
           weightKg: label?.weightKg ?? null,
           mirrored: label?.mirrored ?? false,
+          visible: label?.visible ?? true,
         };
       })
       .sort((a, b) => {
@@ -139,6 +141,7 @@ export class ContentLabelsService {
     const tracks: CatalogItem[] = [];
     for (const item of rawByKey.values()) {
       const label = labelByKey.get(`${item.type}:${item.acId}`);
+      if (label?.visible === false) continue;
       const override = label?.displayName
         ? { [item.acId]: label.displayName }
         : {};
@@ -204,6 +207,7 @@ export class ContentLabelsService {
     const powerHp = dto.powerHp ?? null;
     const weightKg = dto.weightKg ?? null;
     const mirrored = dto.mirrored ?? false;
+    const visible = dto.visible ?? true;
 
     if (
       !displayName &&
@@ -215,7 +219,8 @@ export class ContentLabelsService {
       !description &&
       !powerHp &&
       !weightKg &&
-      !mirrored
+      !mirrored &&
+      visible
     ) {
       await this.prisma.contentLabel.deleteMany({
         where: { type: dto.type, acId: dto.acId },
@@ -238,6 +243,7 @@ export class ContentLabelsService {
         powerHp,
         weightKg,
         mirrored,
+        visible,
       },
       update: {
         displayName,
@@ -250,6 +256,7 @@ export class ContentLabelsService {
         powerHp,
         weightKg,
         mirrored,
+        visible,
       },
     });
   }

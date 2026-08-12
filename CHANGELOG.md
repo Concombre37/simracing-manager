@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.2.124 — Case à cocher "Afficher sur le catalogue" (/content-names)
+
+### Ajouté
+
+- **Demandé par l'utilisateur ("Fait moi une coche afficher sur la catalogue... coché il est visible sur catalogue et pas coché pas visible").** `ContentLabel` gagne `visible` (booléen, défaut `true` — rien ne disparaît par défaut). Case à cocher "Afficher sur le catalogue" ajoutée sur chaque ligne de `/content-names` (voitures **et** circuits), à côté du badge de type ; la ligne se grise légèrement (`opacity-50`) quand elle est décochée pour repérer d'un coup d'œil ce qui est masqué.
+- **`ContentLabelsService.getCatalog()`** exclut désormais les items avec `visible: false` du résultat renvoyé à `/tablet-menu` (via `GET /external/v1/content`) — l'item disparaît complètement du catalogue public, pas juste grisé. `getKnown()` (utilisé par `/content-names`) continue de lister tout, masqué ou non, pour que l'admin puisse le retrouver et le réafficher.
+- Scope volontairement limité au catalogue public (`/tablet-menu`) — un item masqué reste sélectionnable normalement partout ailleurs dans le dashboard (assistant de création de serveur, envoi de POD...), le staff a toujours besoin d'accéder à tout le contenu scanné.
+- `upsert()` ne supprime la ligne que si tous les champs sont vides **et** `visible` est resté à sa valeur par défaut (`true`) — décocher seul doit suffire à garder la ligne en base (sinon le masquage serait perdu au prochain chargement).
+- Vérifié en conditions réelles : décocher une voiture la fait passer de 346 à 345 entrées sur `GET /external/v1/content`, recochée elle revient à 346.
+- Changement purement frontend/backend, aucun code agent modifié.
+
 ## v2.2.123 — Photos de voitures orientées capot à droite sur /tablet-menu
 
 ### Ajouté

@@ -19,6 +19,7 @@ export const upsertContentLabelSchema = z.object({
   powerHp: z.number().int().min(1).max(20000).optional(),
   weightKg: z.number().int().min(1).max(20000).optional(),
   mirrored: z.boolean().optional(),
+  visible: z.boolean().optional(),
 });
 
 export type UpsertContentLabelDto = z.infer<typeof upsertContentLabelSchema>;
