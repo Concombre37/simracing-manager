@@ -43,8 +43,20 @@ export interface CategoryTags {
   tracks: CategoryTag[];
 }
 
+/** Attraction arcade configurée via /arcade (admin) — voir ArcadeService.
+ * Photo optionnelle (aucune source de scan automatique pour ce contenu,
+ * contrairement aux voitures/circuits). */
+export interface ArcadeAttraction {
+  id: string;
+  name: string;
+  players: string | null;
+  kind: string | null;
+  photoUrl: string | null;
+}
+
 export const tabletMenuApi = {
   getContent: () => externalApi.get<Catalog>('/content').then((res) => res.data),
   getCategories: () => externalApi.get<CategoryTags>('/categories').then((res) => res.data),
   getMenu: () => externalApi.get<MenuCategory[]>('/menu').then((res) => res.data),
+  getArcade: () => externalApi.get<ArcadeAttraction[]>('/arcade').then((res) => res.data),
 };

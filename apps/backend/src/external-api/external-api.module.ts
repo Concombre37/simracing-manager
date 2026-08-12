@@ -6,6 +6,7 @@ import { SessionsModule } from '../sessions/sessions.module';
 import { ContentLabelsModule } from '../content-labels/content-labels.module';
 import { ContentCategoriesModule } from '../content-categories/content-categories.module';
 import { MenuModule } from '../menu/menu.module';
+import { ArcadeModule } from '../arcade/arcade.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { MenuModule } from '../menu/menu.module';
     ContentLabelsModule,
     ContentCategoriesModule,
     MenuModule,
+    ArcadeModule,
   ],
   controllers: [ExternalApiController],
 })

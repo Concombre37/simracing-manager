@@ -2,7 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, ImageOff, Rotate3d } from 'lucide-react';
-import { tabletMenuApi, type CatalogItem, type CategoryTag } from '../services/tabletMenu';
+import {
+  tabletMenuApi,
+  type CatalogItem,
+  type CategoryTag,
+  type ArcadeAttraction,
+} from '../services/tabletMenu';
 import type { MenuCategory } from '../services/menu';
 
 /** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
@@ -34,13 +39,14 @@ const VENUE_CITY = 'HAGUENAU';
 const IDLE_MS = 90_000;
 const TAGLINE_INTERVAL_MS = 4600;
 
-type TabKey = 'cars' | 'tracks' | 'food' | 'drinks';
+type TabKey = 'cars' | 'tracks' | 'food' | 'drinks' | 'arcade';
 
 const TAB_TITLES: Record<TabKey, string> = {
   cars: 'Le garage',
   tracks: 'Les circuits',
   food: 'La cuisine',
   drinks: 'Le bar',
+  arcade: "L'arcade",
 };
 
 /** Icônes de navigation dessinées au trait, reprises de la maquette v2
@@ -114,12 +120,33 @@ function NavIconBar({ size = 26 }: { size?: number }) {
     </svg>
   );
 }
+function NavIconArcade({ size = 26 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.7}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="2.6" y="8.4" width="18.8" height="11.4" rx="3.4" />
+      <path d="M6.6 12.2v3.8M8.5 14.1H4.7" />
+      <circle cx="16" cy="13.4" r="1.15" fill="currentColor" stroke="none" />
+      <circle cx="18.4" cy="16" r="1.15" fill="currentColor" stroke="none" />
+      <path d="M12 8.4V6.2a2 2 0 0 1 2-2h1.4" />
+    </svg>
+  );
+}
 
 const TABS: { key: TabKey; label: string; Icon: (p: { size?: number }) => JSX.Element }[] = [
   { key: 'cars', label: 'Voitures', Icon: NavIconCars },
   { key: 'tracks', label: 'Circuits', Icon: NavIconTracks },
   { key: 'food', label: 'Cuisine', Icon: NavIconKitchen },
   { key: 'drinks', label: 'Bar', Icon: NavIconBar },
+  { key: 'arcade', label: 'Arcade', Icon: NavIconArcade },
 ];
 
 export function TabletMenu() {
@@ -151,6 +178,12 @@ export function TabletMenu() {
   const { data: categoryTags } = useQuery({
     queryKey: ['tablet-categories'],
     queryFn: tabletMenuApi.getCategories,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  const { data: arcade = [] } = useQuery({
+    queryKey: ['tablet-arcade'],
+    queryFn: tabletMenuApi.getArcade,
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
   });
@@ -251,9 +284,12 @@ export function TabletMenu() {
 
   const isCatalogTab = tab === 'cars' || tab === 'tracks';
   const isMenuTab = tab === 'food' || tab === 'drinks';
+  const isArcadeTab = tab === 'arcade';
   const countLabel = isCatalogTab
     ? `${filteredItems.length} ${tab === 'cars' ? (filteredItems.length > 1 ? 'véhicules' : 'véhicule') : filteredItems.length > 1 ? 'circuits' : 'circuit'}`
-    : null;
+    : isArcadeTab
+      ? `${arcade.length} ${arcade.length > 1 ? 'attractions' : 'attraction'}`
+      : null;
 
   return (
     <div
@@ -430,7 +466,7 @@ export function TabletMenu() {
           flexDirection: 'column',
         }}
       >
-        {(isCatalogTab || isMenuTab) && (
+        {(isCatalogTab || isMenuTab || isArcadeTab) && (
           <div
             style={{
               flex: 'none',
@@ -576,6 +612,26 @@ export function TabletMenu() {
                 >
                   {menuGroups.map((group) => (
                     <MenuGroupCard key={group.id} group={group} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {isArcadeTab && (
+            <>
+              {arcade.length === 0 ? (
+                <EmptyState label="Aucune attraction pour le moment." />
+              ) : (
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${portrait ? 2 : 3}, minmax(0,1fr))`,
+                    gap: portrait ? 14 : 20,
+                  }}
+                >
+                  {arcade.map((a) => (
+                    <ArcadeCard key={a.id} attraction={a} />
                   ))}
                 </div>
               )}
@@ -1166,6 +1222,104 @@ function CatalogCard({
             </span>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Carte attraction arcade — pas de fiche détail au clic (contrairement aux
+ * voitures/circuits) : simple grille de présentation, comme dans la
+ * maquette. Photo optionnelle (uploadée à la main par l'admin via
+ * `/arcade`, aucune source de scan automatique pour ce contenu). */
+function ArcadeCard({ attraction }: { attraction: ArcadeAttraction }) {
+  return (
+    <div
+      className="tm-card"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: 14,
+        overflow: 'hidden',
+        background: 'var(--tm-panel)',
+        border: '1px solid var(--tm-divider)',
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          height: 170,
+          background: 'var(--tm-track-panel)',
+        }}
+      >
+        {attraction.photoUrl ? (
+          <>
+            <img
+              src={attraction.photoUrl}
+              alt={attraction.name}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                filter: 'var(--tm-photo)',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background:
+                  'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 18%, transparent) 0%, transparent 40%)',
+              }}
+            />
+          </>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              height: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ImageOff size={26} color="color-mix(in srgb, var(--tm-text) 30%, transparent)" />
+          </div>
+        )}
+      </div>
+      <div
+        style={{
+          flex: 'none',
+          padding: '16px 18px 18px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 900,
+            fontSize: 17,
+            lineHeight: 1.1,
+            letterSpacing: '.02em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {attraction.name}
+        </div>
+        {(attraction.players || attraction.kind) && (
+          <div
+            style={{
+              fontWeight: 700,
+              fontSize: 12,
+              letterSpacing: '.08em',
+              textTransform: 'uppercase',
+              color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
+            }}
+          >
+            {[attraction.players, attraction.kind].filter(Boolean).join(' · ')}
+          </div>
+        )}
       </div>
     </div>
   );

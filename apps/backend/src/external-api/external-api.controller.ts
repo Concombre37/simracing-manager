@@ -5,6 +5,7 @@ import { SessionsService } from '../sessions/sessions.service';
 import { ContentLabelsService } from '../content-labels/content-labels.service';
 import { ContentCategoriesService } from '../content-categories/content-categories.service';
 import { MenuService } from '../menu/menu.service';
+import { ArcadeService } from '../arcade/arcade.service';
 
 /** Surface en lecture seule pensée pour un consommateur externe (site web,
  * bot Discord, la tablette client `/tablet-menu`, etc.) — authentifiée par
@@ -21,6 +22,7 @@ export class ExternalApiController {
     private readonly contentLabelsService: ContentLabelsService,
     private readonly contentCategoriesService: ContentCategoriesService,
     private readonly menuService: MenuService,
+    private readonly arcadeService: ArcadeService,
   ) {}
 
   @Get('leaderboard')
@@ -61,5 +63,12 @@ export class ExternalApiController {
   @Get('menu')
   getMenu() {
     return this.menuService.listGrouped();
+  }
+
+  // Attractions arcade (/arcade, admin) affichées sur l'onglet "Arcade" de
+  // /tablet-menu.
+  @Get('arcade')
+  getArcade() {
+    return this.arcadeService.list();
   }
 }

@@ -22,6 +22,7 @@ import { ContentNames } from './pages/ContentNames';
 import { ContentCategories } from './pages/ContentCategories';
 import { RaceFormats } from './pages/RaceFormats';
 import { Menu } from './pages/Menu';
+import { Arcade } from './pages/Arcade';
 import { TabletMenu } from './pages/TabletMenu';
 import { BlankingMedia } from './pages/BlankingMedia';
 import { Settings } from './pages/Settings';
@@ -219,6 +220,14 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute adminOnly>
               <Menu />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/arcade"
+          element={
+            <ProtectedRoute adminOnly>
+              <Arcade />
             </ProtectedRoute>
           }
         />

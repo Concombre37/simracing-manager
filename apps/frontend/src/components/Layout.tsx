@@ -22,6 +22,7 @@ import {
   Tags,
   UtensilsCrossed,
   Tablet,
+  Gamepad2,
 } from 'lucide-react';
 
 // L'essentiel du quotidien : toujours en pleine évidence, jamais replié.
@@ -46,6 +47,7 @@ const adminNavItems = [
   { path: '/content-categories', label: 'Catégories', icon: Tags },
   { path: '/race-formats', label: 'Formats de course', icon: Flag },
   { path: '/restaurant-menu', label: 'Carte resto/bar', icon: UtensilsCrossed },
+  { path: '/arcade', label: 'Arcade', icon: Gamepad2 },
   { path: '/blanking-media', label: 'Écrans', icon: MonitorPlay },
   { path: '/settings', label: 'Paramètres', icon: Settings },
 ];
@@ -64,6 +66,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/content-categories': ['Catégories'],
   '/race-formats': ['Formats de course'],
   '/restaurant-menu': ['Carte resto/bar'],
+  '/arcade': ['Arcade'],
   '/blanking-media': ['Écrans'],
   '/settings': ['Paramètres'],
 };

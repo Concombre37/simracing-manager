@@ -26,6 +26,7 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
 import { ExternalApiModule } from './external-api/external-api.module';
 import { RaceFormatsModule } from './race-formats/race-formats.module';
 import { MenuModule } from './menu/menu.module';
+import { ArcadeModule } from './arcade/arcade.module';
 import { envSchema } from './config/env.validation';
 
 @Module({
@@ -62,6 +63,7 @@ import { envSchema } from './config/env.validation';
     ExternalApiModule,
     RaceFormatsModule,
     MenuModule,
+    ArcadeModule,
   ],
 })
 export class AppModule {}

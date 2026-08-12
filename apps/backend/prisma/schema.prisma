@@ -290,6 +290,29 @@ model MenuItem {
   @@map("menu_items")
 }
 
+// Attractions arcade (billard, baby-foot, bornes...) affichées sur la page
+// tablette publique (/tablet-menu, onglet "Arcade"), gérées par les admins
+// via /arcade — voir ExternalApiController. Rien n'est seedé, vide jusqu'à
+// ce que l'admin remplisse la liste lui-même (même principe que MenuCategory).
+model ArcadeAttraction {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  // Texte libre ("1 à 2 joueurs", "Borne à jetons") — pas de format imposé,
+  // même principe que MenuItem.price.
+  players       String?
+  kind          String?
+  // Photo optionnelle, uploadée à la main par l'admin (aucune source de scan
+  // automatique pour ce contenu, contrairement aux voitures/circuits) —
+  // stockée en base comme BlankingMedia.data, jamais sur le filesystem.
+  photo         Bytes?   @db.ByteA
+  photoMimeType String?  @map("photo_mime_type")
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("arcade_attractions")
+}
+
 model BlankingMedia {
   id        String   @id @default(uuid()) @db.Uuid
   /// Null = global media (shared by every pod — used by "launching" and

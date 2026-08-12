@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.2.136 — Onglet Arcade sur /tablet-menu (commissionné pour de vrai)
+
+### Ajouté
+
+- **Demandé par l'utilisateur ("Tu as oublié arcade")**, après que l'onglet "Arcade" de la maquette v2 (billard, baby-foot, bornes à jetons...) ait été volontairement laissé de côté en v2.2.134 faute de vraie donnée — commissionné cette fois comme une vraie fonctionnalité, pas juste réaffiché avec du contenu inventé.
+- **Nouveau modèle `ArcadeAttraction`** (`id, name, players?, kind?, photo? (bytea), photoMimeType?, sortOrder`) — texte libre pour `players`/`kind` (ex: "2 à 4 joueurs", "Borne à jetons"), même principe que `MenuItem.price`. Rien n'est seedé, vide jusqu'à ce que l'admin remplisse la liste.
+- **Photo optionnelle uploadée à la main** — contrairement aux voitures/circuits (scannées automatiquement par l'agent), une attraction arcade n'a aucune source de scan : l'admin dépose une photo par attraction, stockée directement en base (`bytea`, jamais sur le filesystem) avec redimensionnement automatique si besoin (`sharp`, max 1600px), même principe que `BlankingMedia` (voir 3.2/gotcha "binaire stocké en base").
+- **Nouveau module backend `arcade`** (`GET/POST/PATCH/DELETE /api/arcade`, admin/technicien en lecture, admin en écriture ; `POST/DELETE /api/arcade/:id/photo` pour la photo) — `GET /api/arcade/:id/photo` est **public, sans auth**, comme `ContentPreviewsController#findOne`, pour rester consommable par la page tablette publique.
+- **Nouvel endpoint externe `GET /external/v1/arcade`** — consommé par `/tablet-menu`.
+- **Nouvelle page admin `/arcade`** (`Arcade.tsx`) — grille de cartes (photo + nom + joueurs/type), bouton d'upload/remplacement/suppression de photo directement sur la carte, modale de formulaire pour nom/joueurs/type. Pas de champ de tri exposé (même convention que `Menu.tsx` — l'ordre de création suffit pour v1).
+- **`/tablet-menu`** : 5ᵉ onglet "Arcade" réintégré (icône joystick reprise de la maquette), grille de cartes sans fiche détail au clic (pas de modale, contrairement aux voitures/circuits — simple grille de présentation comme dans la maquette). Photo en couleur (même filtre `--tm-photo` que le reste depuis v2.2.135), état vide honnête tant qu'aucune attraction n'est configurée.
+- Vérifié en conditions réelles : création + upload de photo via `/arcade`, apparition immédiate sur `/tablet-menu` (onglet + nav), endpoint externe testé à la clé API, nettoyage complet après test.
+
 ## v2.2.135 — Photos en couleur sur /tablet-menu (retrait du duotone bleu)
 
 ### Corrigé
