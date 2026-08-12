@@ -713,24 +713,23 @@ function CategoryTile({
               height: '100%',
               objectFit: 'cover',
               transform: mirrored ? 'scaleX(-1)' : undefined,
-              filter: 'var(--tm-duotone)',
+              filter: 'var(--tm-photo)',
             }}
           />
-          <div className="tm-hatch" style={{ position: 'absolute', inset: 0 }} />
           <div
             style={{
               position: 'absolute',
               inset: 0,
               background: active
-                ? 'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 90%, transparent) 0%, color-mix(in srgb, var(--tm-accent) 40%, transparent) 42%, transparent 78%)'
-                : 'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 55%, transparent) 0%, transparent 68%)',
+                ? 'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 45%, transparent) 0%, transparent 55%)'
+                : 'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 22%, transparent) 0%, transparent 45%)',
             }}
           />
           <div
             style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(180deg, transparent 30%, rgba(10,10,10,.86) 100%)',
+              background: 'linear-gradient(180deg, transparent 42%, rgba(10,10,10,.86) 100%)',
             }}
           />
         </>
@@ -1087,7 +1086,7 @@ function CatalogCard({
             height: '100%',
             objectFit: 'cover',
             transform: item.mirrored ? 'scaleX(-1)' : undefined,
-            filter: 'var(--tm-duotone)',
+            filter: 'var(--tm-photo)',
           }}
         />
       ) : (
@@ -1100,13 +1099,12 @@ function CatalogCard({
           }}
         />
       )}
-      <div className="tm-hatch" style={{ position: 'absolute', inset: 0 }} />
       <div
         style={{
           position: 'absolute',
           inset: 0,
           background:
-            'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 45%, transparent) 0%, transparent 62%)',
+            'linear-gradient(104deg, color-mix(in srgb, var(--tm-accent) 18%, transparent) 0%, transparent 40%)',
         }}
       />
       <div
@@ -1233,7 +1231,7 @@ function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrore
             display: 'block',
             pointerEvents: 'none',
             transform: mirrored ? 'scaleX(-1)' : undefined,
-            filter: 'var(--tm-duotone)',
+            filter: 'var(--tm-photo)',
           }}
         />
         <div
@@ -1241,7 +1239,7 @@ function Tilt3DImage({ src, alt, mirrored }: { src: string; alt: string; mirrore
             position: 'absolute',
             inset: 0,
             pointerEvents: 'none',
-            background: `linear-gradient(${115 + rot.y}deg, color-mix(in srgb, var(--tm-accent) 45%, transparent), transparent 60%)`,
+            background: `linear-gradient(${115 + rot.y}deg, color-mix(in srgb, #fff 14%, transparent), transparent 55%)`,
           }}
         />
       </div>
@@ -1838,7 +1836,7 @@ function TabletMenuStyles() {
         --tm-accent: #245E97;
         --tm-accent-light: #5C9BD6;
         --tm-divider: color-mix(in srgb, #F8F8F8 9%, transparent);
-        --tm-duotone: grayscale(1) contrast(1.05) brightness(.82) sepia(.35) hue-rotate(172deg) saturate(2.2);
+        --tm-photo: contrast(1.05) brightness(.96) saturate(1.08);
         --tm-font-heading: "Montserrat", "Helvetica Neue", Arial, sans-serif;
         --tm-font-body: "Montserrat", "Helvetica Neue", Arial, sans-serif;
         -webkit-tap-highlight-color: transparent;

@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.135 — Photos en couleur sur /tablet-menu (retrait du duotone bleu)
+
+### Corrigé
+
+- **Demandé par l'utilisateur immédiatement après v2.2.134 ("il faut la couleur sur le image pas noir et blanc sur fond bleu").** Les photos de voitures (tuiles de filtre, cartes catalogue, fiche détail) passaient par un filtre "duotone bleu" (`grayscale + sepia + hue-rotate`) repris de l'option par défaut de la maquette — trop proche du noir & blanc teinté. Filtre remplacé par un simple `contrast/brightness/saturate` qui garde la photo en vraies couleurs (`--tm-photo` remplace `--tm-duotone`).
+- Voiles bleus de marque au-dessus des photos (tuiles, cartes, reflet de la fiche détail) nettement réduits en opacité pour laisser les couleurs réelles ressortir — gardés seulement comme légère cohérence de marque, plus comme teinte dominante. Le reflet dynamique de la photo inclinable (`Tilt3DImage`) passe de bleu à un reflet blanc neutre (effet verre), plus fidèle à une vraie photo.
+- Aucun changement de données ni de structure — uniquement les filtres CSS. Vérifié en conditions réelles (Playwright) sur la grille voitures et la fiche détail.
+
 ## v2.2.134 — Refonte visuelle de /tablet-menu à l'identité du vrai site vitrine
 
 ### Changé
