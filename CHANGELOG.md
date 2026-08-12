@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.2.129 — Fond noir + tous les layouts d'un circuit sur les schémas de tracé
+
+### Changé
+
+- **Demandé par l'utilisateur après avoir vu le résultat réel de v2.2.128 ("il faudrait mieux le voir circuit et blanc donc il faudrait fond noir, et ensuite il faudrait tout les layout possible de chaque circuit").** Le vrai `outline.png` scanné (v2.2.128) est un tracé **blanc sur fond transparent** — affiché dans l'encart blanc utilisé jusqu'ici (hérité des schémas Wikimedia, eux composités sur fond blanc opaque), le trait blanc devenait invisible. Encart passé au fond noir (`#000`) sur `/tablet-menu` (`DetailModal`, section "Tracé") et `/content-names` (champ "Layout") — les schémas Wikimedia (déjà opaques) restent lisibles aussi bien sur fond noir que blanc, donc aucune régression pour ceux-là.
+- **`ContentLabelsService`** : nouveau champ `layoutImages: { name, url }[]` sur `KnownContentItem`/`CatalogItem` (nouvelle méthode privée `resolveLayoutImages()`) — une entrée par layout nommé du circuit ayant son propre `outline.png` scanné (`ContentPreview` type `'layout'`, acId `${trackAcId}:${layoutName}`, déjà uploadés par l'agent depuis v2.2.128 mais jusqu'ici jamais exposés par l'API). `gatherRawContent()` capture désormais aussi les noms de layout par circuit (`StationContentShape.tracks[].layouts`). `layoutImageUrl` (racine, sans nom de layout) reste le repli utilisé quand aucun layout nommé n'a de schéma propre (cas des circuits Wikimedia et des circuits à convention plate sans dossier de layout).
+- **`/tablet-menu`** : la fiche détail d'un circuit multi-layout affiche désormais chaque tracé côte à côte, étiqueté par son nom de layout (ex: Bahrain → 6 tracés : `bahrain_wec_2024`, `endurance`, `gp`, `oasis`, `outer`, `paddock`), au lieu d'un seul tracé arbitrairement choisi. Un circuit à layout unique garde l'affichage simple (un seul encart, pas d'étiquette).
+- **`/content-names`** : le champ "Layout" d'une ligne circuit devient une petite galerie (une vignette 48×36 par layout, infobulle = nom du layout) quand il y en a plusieurs, sinon inchangé (une seule vignette).
+- Vérifié en conditions réelles sur `/tablet-menu` (Playwright) : le circuit de Bahreïn affiche ses 6 tracés distincts, traits blancs bien visibles sur fond noir.
+- Changement purement frontend/backend, aucun code agent modifié (pas de nouvelle release GitHub nécessaire) — uniquement build + redéploiement du conteneur `backend`.
+
 ## v2.2.128 — Vrais schémas de circuits scannés depuis Content Manager (agent)
 
 ### Ajouté

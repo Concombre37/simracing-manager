@@ -1,6 +1,11 @@
 import { externalApi } from './externalApi';
 import type { MenuCategory } from './menu';
 
+export interface LayoutImage {
+  name: string;
+  url: string;
+}
+
 export interface CatalogItem {
   acId: string;
   name: string;
@@ -15,6 +20,7 @@ export interface CatalogItem {
   weightKg: number | null;
   mirrored: boolean;
   layoutImageUrl: string | null;
+  layoutImages: LayoutImage[];
 }
 
 export interface Catalog {

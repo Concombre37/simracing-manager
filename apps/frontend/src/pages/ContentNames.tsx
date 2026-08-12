@@ -373,10 +373,27 @@ function ContentNameRow({ item }: { item: KnownContentItem }) {
         )}
 
         {item.type === 'track' && (
-          <Field label="Layout">
-            {item.layoutImageUrl ? (
+          <Field
+            label={
+              item.layoutImages.length > 1 ? `Layouts (${item.layoutImages.length})` : 'Layout'
+            }
+            className={item.layoutImages.length > 1 ? 'col-span-2' : undefined}
+          >
+            {item.layoutImages.length > 0 ? (
+              <div className="flex flex-wrap gap-1">
+                {item.layoutImages.map((l) => (
+                  <div
+                    key={l.name}
+                    className="flex h-9 w-12 flex-none items-center justify-center rounded-lg border border-dark-600 bg-black p-0.5"
+                    title={l.name}
+                  >
+                    <img src={l.url} alt={l.name} className="h-full w-full object-contain" />
+                  </div>
+                ))}
+              </div>
+            ) : item.layoutImageUrl ? (
               <div
-                className="flex h-9 w-full items-center justify-center rounded-lg border border-dark-600 bg-white p-0.5"
+                className="flex h-9 w-full items-center justify-center rounded-lg border border-dark-600 bg-black p-0.5"
                 title="Schéma du circuit, récupéré automatiquement (voir /tablet-menu)"
               >
                 <img src={item.layoutImageUrl} alt="" className="h-full w-full object-contain" />

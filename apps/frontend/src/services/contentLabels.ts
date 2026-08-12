@@ -22,6 +22,7 @@ export interface KnownContentItem {
   visible: boolean;
   previewUrl: string | null;
   layoutImageUrl: string | null;
+  layoutImages: { name: string; url: string }[];
 }
 
 export const contentLabelsApi = {

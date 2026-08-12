@@ -7,11 +7,17 @@ interface RawContentItem {
   type: 'car' | 'track';
   acId: string;
   rawName: string;
+  layoutNames?: string[];
 }
 
 interface StationContentShape {
   cars?: { acId: string; name?: string }[];
-  tracks?: { acId: string; name?: string }[];
+  tracks?: { acId: string; name?: string; layouts?: { name: string }[] }[];
+}
+
+export interface LayoutImage {
+  name: string;
+  url: string;
 }
 
 export interface KnownContentItem {
@@ -32,6 +38,7 @@ export interface KnownContentItem {
   visible: boolean;
   previewUrl: string | null;
   layoutImageUrl: string | null;
+  layoutImages: LayoutImage[];
 }
 
 export interface CatalogItem {
@@ -48,6 +55,7 @@ export interface CatalogItem {
   weightKg: number | null;
   mirrored: boolean;
   layoutImageUrl: string | null;
+  layoutImages: LayoutImage[];
 }
 
 @Injectable()
@@ -79,6 +87,7 @@ export class ContentLabelsService {
           type: 'track',
           acId: track.acId,
           rawName: track.name?.trim() || track.acId,
+          layoutNames: (track.layouts ?? []).map((l) => l.name).filter(Boolean),
         });
       }
     }
@@ -104,6 +113,23 @@ export class ContentLabelsService {
       }
     }
     return previewByKey;
+  }
+
+  /** Une entrée par layout nommé du circuit ayant un vrai schéma scanné
+   * (`ContentPreview` type 'layout', acId `${trackAcId}:${layoutName}` — voir
+   * `stations.service.ts#extractPreviews()`) — pas le repli `layoutImageUrl`
+   * racine, qui n'a pas de nom de layout associé. */
+  private resolveLayoutImages(
+    acId: string,
+    layoutNames: string[] | undefined,
+    previewByKey: Map<string, string>,
+  ): LayoutImage[] {
+    return (layoutNames ?? [])
+      .map((name) => ({
+        name,
+        url: previewByKey.get(`layout:${acId}:${name}`),
+      }))
+      .filter((l): l is LayoutImage => Boolean(l.url));
   }
 
   async getKnown(): Promise<KnownContentItem[]> {
@@ -141,6 +167,14 @@ export class ContentLabelsService {
                   ? `/api/content/labels/layout-image/${label.id}`
                   : null))
               : null,
+          layoutImages:
+            item.type === 'track'
+              ? this.resolveLayoutImages(
+                  item.acId,
+                  item.layoutNames,
+                  previewByKey,
+                )
+              : [],
         };
       })
       .sort((a, b) => {
@@ -197,6 +231,14 @@ export class ContentLabelsService {
           (label?.layoutImage
             ? `/api/content/labels/layout-image/${label.id}`
             : null),
+        layoutImages:
+          item.type === 'track'
+            ? this.resolveLayoutImages(
+                item.acId,
+                item.layoutNames,
+                previewByKey,
+              )
+            : [],
       };
       (item.type === 'car' ? cars : tracks).push(entry);
     }

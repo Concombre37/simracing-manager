@@ -1093,7 +1093,8 @@ function DetailModal({
           item.powerHp ||
           item.weightKg ||
           item.difficulty !== null ||
-          item.layoutImageUrl) && (
+          item.layoutImageUrl ||
+          item.layoutImages.length > 0) && (
           <div
             style={{ padding: '20px 26px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}
           >
@@ -1142,7 +1143,7 @@ function DetailModal({
                 <DifficultyDots value={item.difficulty} showLabel />
               </div>
             )}
-            {item.layoutImageUrl && (
+            {(item.layoutImages.length > 0 || item.layoutImageUrl) && (
               <div>
                 <span
                   style={{
@@ -1152,24 +1153,68 @@ function DetailModal({
                     color: 'color-mix(in srgb, var(--tm-text) 45%, transparent)',
                   }}
                 >
-                  Tracé
+                  {item.layoutImages.length > 1 ? `Tracés (${item.layoutImages.length})` : 'Tracé'}
                 </span>
-                <div
-                  style={{
-                    marginTop: 10,
-                    borderRadius: 10,
-                    padding: 14,
-                    background: '#fff',
-                    display: 'flex',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <img
-                    src={item.layoutImageUrl}
-                    alt={`Tracé du circuit ${item.name}`}
-                    style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain' }}
-                  />
-                </div>
+                {item.layoutImages.length > 0 ? (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                    }}
+                  >
+                    {item.layoutImages.map((l) => (
+                      <div
+                        key={l.name}
+                        style={{
+                          flex: item.layoutImages.length > 1 ? '1 1 140px' : '1 1 100%',
+                          borderRadius: 10,
+                          padding: 14,
+                          background: '#000',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <img
+                          src={l.url}
+                          alt={`Tracé ${l.name} du circuit ${item.name}`}
+                          style={{ maxWidth: '100%', maxHeight: 160, objectFit: 'contain' }}
+                        />
+                        {item.layoutImages.length > 1 && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: 'color-mix(in srgb, #fff 70%, transparent)',
+                              textTransform: 'capitalize',
+                            }}
+                          >
+                            {l.name}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      marginTop: 10,
+                      borderRadius: 10,
+                      padding: 14,
+                      background: '#000',
+                      display: 'flex',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <img
+                      src={item.layoutImageUrl ?? undefined}
+                      alt={`Tracé du circuit ${item.name}`}
+                      style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain' }}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
