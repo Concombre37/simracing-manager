@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.137 — Vrai logo ES sur l'écran de veille de /tablet-menu
+
+### Changé
+
+- **Demandé par l'utilisateur**, qui a fourni le vrai fichier logo (PDF vectoriel Illustrator "ES.pdf" — le monogramme "ES" + le wordmark "ELSASS SIMRACING HAGUENAU") pour remplacer le wordmark texte codé en dur sur l'écran de veille de `/tablet-menu`.
+- Fichier reçu via une URL directe (pas de pièce jointe accessible sur le disque du serveur) après clarification avec l'utilisateur sur la source du fichier — converti en SVG vectoriel (`pdftocairo -svg`, aucune perte, transparence native) plutôt que rasterisé, pour rester net à n'importe quelle taille d'écran tablette. Servi en asset statique (`apps/frontend/public/logo-elsass-simracing.svg`), même convention que `vite.svg` (favicon) déjà présent dans ce dossier.
+- `IdleScreen` (écran de veille uniquement, pas l'en-tête permanent des autres onglets — hors scope de la demande) : le bloc "ELSASS/SIMRACING" + ligne "HAGUENAU" (texte + traits CSS) est remplacé par une balise `<img>` pointant vers ce SVG, qui contient déjà le monogramme et les trois mots dans une seule composition — plus fidèle au vrai fichier de marque que la reconstruction texte précédente. Couleurs conservées telles quelles dans le fichier fourni (bleu de marque légèrement plus saturé que `--tm-accent`, non forcé sur les tokens CSS existants — c'est la vraie couleur du logo).
+- Vérifié en conditions réelles (Playwright, portrait et paysage) avant déploiement, hash du bundle comparé au build local, asset confirmé servi en production (`https://simracing.hytlabs.com/logo-elsass-simracing.svg`).
+
 ## v2.2.136 — Onglet Arcade sur /tablet-menu (commissionné pour de vrai)
 
 ### Ajouté

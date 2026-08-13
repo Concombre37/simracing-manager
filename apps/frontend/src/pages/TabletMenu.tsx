@@ -1879,51 +1879,15 @@ function IdleScreen({
           }}
         />
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: portrait ? 14 : 20,
-              fontWeight: 900,
-              fontSize: portrait ? 42 : 62,
-              lineHeight: 1,
-              letterSpacing: '.06em',
-            }}
-          >
-            <span style={{ color: 'var(--tm-text)' }}>{VENUE_WORD_1}</span>
-            <span style={{ color: 'var(--tm-accent-light)' }}>{VENUE_WORD_2}</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, width: '100%' }}>
-            <span
-              style={{
-                flex: 1,
-                height: 1,
-                background:
-                  'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tm-text) 50%, transparent))',
-              }}
-            />
-            <span
-              style={{
-                fontWeight: 700,
-                fontSize: portrait ? 13 : 17,
-                letterSpacing: '.5em',
-                paddingLeft: '.5em',
-                color: 'color-mix(in srgb, var(--tm-text) 70%, transparent)',
-              }}
-            >
-              {VENUE_CITY}
-            </span>
-            <span
-              style={{
-                flex: 1,
-                height: 1,
-                background:
-                  'linear-gradient(90deg, color-mix(in srgb, var(--tm-text) 50%, transparent), transparent)',
-              }}
-            />
-          </div>
-        </div>
+        <img
+          src="/logo-elsass-simracing.svg"
+          alt={`${VENUE_WORD_1} ${VENUE_WORD_2} ${VENUE_CITY}`}
+          style={{
+            width: portrait ? 300 : 460,
+            height: 'auto',
+            filter: 'drop-shadow(0 8px 40px rgba(0,0,0,.5))',
+          }}
+        />
 
         <div
           style={{
