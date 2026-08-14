@@ -333,53 +333,11 @@ export function TabletMenu() {
           borderBottom: '1px solid var(--tm-divider)',
         }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: portrait ? 8 : 12,
-              fontWeight: 900,
-              fontSize: portrait ? 22 : 30,
-              lineHeight: 1,
-              letterSpacing: '.08em',
-            }}
-          >
-            <span style={{ color: 'var(--tm-text)' }}>{VENUE_WORD_1}</span>
-            <span style={{ color: 'var(--tm-accent)' }}>{VENUE_WORD_2}</span>
-          </div>
-          {!portrait && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-              <span
-                style={{
-                  flex: 1,
-                  height: 1,
-                  background:
-                    'linear-gradient(90deg, transparent, color-mix(in srgb, var(--tm-text) 45%, transparent))',
-                }}
-              />
-              <span
-                style={{
-                  fontWeight: 700,
-                  fontSize: 11,
-                  letterSpacing: '.4em',
-                  paddingLeft: '.4em',
-                  color: 'color-mix(in srgb, var(--tm-text) 60%, transparent)',
-                }}
-              >
-                {VENUE_CITY}
-              </span>
-              <span
-                style={{
-                  flex: 1,
-                  height: 1,
-                  background:
-                    'linear-gradient(90deg, color-mix(in srgb, var(--tm-text) 45%, transparent), transparent)',
-                }}
-              />
-            </div>
-          )}
-        </div>
+        <img
+          src="/logo-elsass-simracing.svg"
+          alt={`${VENUE_WORD_1} ${VENUE_WORD_2} ${VENUE_CITY}`}
+          style={{ height: portrait ? 32 : 44, width: 'auto' }}
+        />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: portrait ? 16 : 26 }}>
           <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -1058,7 +1016,7 @@ function CatalogCard({
               style={{
                 position: 'absolute',
                 top: 12,
-                right: 12,
+                left: 12,
                 padding: '5px 12px',
                 borderRadius: 999,
                 background: 'color-mix(in srgb, var(--tm-accent) 92%, transparent)',
@@ -1069,6 +1027,24 @@ function CatalogCard({
               }}
             >
               {item.layoutImages.length} tracés
+            </span>
+          )}
+          {item.difficulty !== null && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 12,
+                right: 12,
+                padding: '5px 12px',
+                borderRadius: 999,
+                background: 'color-mix(in srgb, #000 55%, transparent)',
+                fontWeight: 800,
+                fontSize: 11,
+                letterSpacing: '.1em',
+                textTransform: 'uppercase',
+              }}
+            >
+              {DIFFICULTY_LABELS[item.difficulty - 1]}
             </span>
           )}
         </div>
@@ -1107,7 +1083,6 @@ function CatalogCard({
               {subtitle}
             </div>
           )}
-          {item.difficulty !== null && <DifficultyDots value={item.difficulty} />}
         </div>
       </div>
     );
@@ -1170,6 +1145,24 @@ function CatalogCard({
           background: 'linear-gradient(180deg, transparent 32%, rgba(10,10,10,.9) 88%)',
         }}
       />
+      {item.difficulty !== null && (
+        <span
+          style={{
+            position: 'absolute',
+            top: 12,
+            right: 12,
+            padding: '5px 12px',
+            borderRadius: 999,
+            background: 'color-mix(in srgb, #000 55%, transparent)',
+            fontWeight: 800,
+            fontSize: 11,
+            letterSpacing: '.1em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {DIFFICULTY_LABELS[item.difficulty - 1]}
+        </span>
+      )}
       <div
         style={{
           position: 'relative',

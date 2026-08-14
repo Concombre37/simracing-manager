@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.138 — Vrai logo dans l'en-tête + difficulté en badge sur les images du catalogue
+
+### Changé
+
+- **Demandé par l'utilisateur ("Utilise le bon logo pour les catalogue menu")** : l'en-tête persistant de `/tablet-menu` (visible sur les 5 onglets Voitures/Circuits/Cuisine/Bar/Arcade, pas seulement l'écran de veille) affichait encore le wordmark texte/CSS "ELSASS SIMRACING HAGUENAU" — remplacé par le même vrai logo SVG que l'écran de veille (v2.2.137), redimensionné pour tenir dans l'en-tête (32px portrait / 44px paysage, largeur automatique).
+- **Demandé par l'utilisateur ("faut juste écrire la difficulté en haut à droite des images")** : `CatalogCard` (voitures et circuits) affiche désormais la difficulté en texte (`DIFFICULTY_LABELS`, ex. "Facile"/"Difficile") en badge haut-droite de l'image, quand elle est renseignée — jamais affiché pour un contenu non tagué. Remplace l'ancien indicateur à points (`DifficultyDots`) qui n'apparaissait qu'en bas des cartes circuit (les cartes voiture n'avaient auparavant aucun indicateur de difficulté sur la tuile, seulement dans la fiche détail). Le badge "N tracés" des circuits multi-layout, qui occupait déjà ce coin, est déplacé en haut-gauche pour ne pas se chevaucher avec la difficulté. La fiche détail (`DetailModal`) garde `DifficultyDots` avec ses points + libellé, inchangée.
+- Aucun changement de données. Vérifié en conditions réelles (Playwright) sur l'en-tête et les grilles voitures/circuits avant déploiement.
+
 ## v2.2.137 — Vrai logo ES sur l'écran de veille de /tablet-menu
 
 ### Changé
