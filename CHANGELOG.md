@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.139 — Logo de l'en-tête agrandi
+
+### Changé
+
+- **Demandé par l'utilisateur ("A PEINE PLUS GRAND LE LOGO pour que la tablette le voie bien")** juste après v2.2.138. Le logo de l'en-tête de `/tablet-menu` (32px portrait / 44px paysage) était trop petit pour bien se voir sur un écran tablette — passé à 42px/58px. Vérifié en conditions réelles (Playwright, portrait et paysage) : reste net, ne perturbe pas le reste de l'en-tête (horloge/statut à droite).
+
 ## v2.2.138 — Vrai logo dans l'en-tête + difficulté en badge sur les images du catalogue
 
 ### Changé

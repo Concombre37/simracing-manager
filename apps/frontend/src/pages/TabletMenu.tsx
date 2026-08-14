@@ -336,7 +336,7 @@ export function TabletMenu() {
         <img
           src="/logo-elsass-simracing.svg"
           alt={`${VENUE_WORD_1} ${VENUE_WORD_2} ${VENUE_CITY}`}
-          style={{ height: portrait ? 32 : 44, width: 'auto' }}
+          style={{ height: portrait ? 42 : 58, width: 'auto' }}
         />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: portrait ? 16 : 26 }}>
