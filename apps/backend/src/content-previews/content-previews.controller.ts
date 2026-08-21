@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '@simracing/shared';
+import { inferMimeFromBase64 } from '../common/infer-mime';
 
 @Controller('content/previews')
 export class ContentPreviewsController {
@@ -63,7 +64,7 @@ export class ContentPreviewsController {
     }
 
     const buffer = Buffer.from(preview.data, 'base64');
-    res.setHeader('Content-Type', this.inferMime(preview.data));
+    res.setHeader('Content-Type', inferMimeFromBase64(preview.data));
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.send(buffer);
   }
@@ -74,13 +75,5 @@ export class ContentPreviewsController {
   async remove(@Param('id') id: string) {
     await this.prisma.contentPreview.delete({ where: { id } });
     return { success: true };
-  }
-
-  private inferMime(data: string): string {
-    // PNG files start with iVBORw0KGgo
-    if (data.startsWith('iVBOR')) return 'image/png';
-    // JPEG files start with /9j/
-    if (data.startsWith('/9j/')) return 'image/jpeg';
-    return 'application/octet-stream';
   }
 }

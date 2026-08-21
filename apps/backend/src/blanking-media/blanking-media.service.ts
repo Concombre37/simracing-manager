@@ -5,7 +5,32 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import sharp from 'sharp';
+// Bug réel trouvé en 2026-08-22 en déboguant la conversion WebP de
+// /tablet-menu : `sharp` exporte via `export =`, pas de default export ESM
+// — sans esModuleInterop (absent de tsconfig.json ici), `import sharp from
+// 'sharp'` compile en un appel `sharp_1.default(...)` qui vaut `undefined`
+// à l'exécution. Le try/catch de resizeImageIfNeeded() avalait ce
+// TypeError en silence depuis l'introduction de cette méthode (v2.2.95) :
+// le redimensionnement des images de blanking surdimensionnées ne s'est
+// donc jamais exécuté, sans aucun symptôme visible (juste jamais optimisé).
+// `import sharp = require(...)` corrige l'exécution, mais TS résout quand
+// même les mauvaises déclarations (ESM) faute de moduleResolution
+// "node16"/"bundler" dans tsconfig.json (voir commentaire détaillé dans
+// image-optimizer.ts) — d'où le retypage local minimal ci-dessous plutôt
+// qu'un changement de config TS global hors du cadre de cette tâche.
+import sharpRuntime = require('sharp');
+
+interface MinimalSharp {
+  metadata(): Promise<{ width?: number; height?: number }>;
+  resize(
+    width: number,
+    height: number,
+    options: { fit: 'inside'; withoutEnlargement: boolean },
+  ): MinimalSharp;
+  toBuffer(): Promise<Buffer>;
+}
+
+const sharp = sharpRuntime as unknown as (buffer: Buffer) => MinimalSharp;
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BlankingMediaCategory } from '@simracing/shared';

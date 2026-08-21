@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 import { CreateStationDto, UpdateStationDto } from './dto';
 import { HeartbeatPayload, StationStatus } from '@simracing/shared';
+import { optimizeToWebp } from '../common/image-optimizer';
 
 export interface StationWithApiKey {
   id: string;
@@ -310,6 +311,15 @@ export class StationsService {
     const parsed = parseDataUrl(preview);
     if (!parsed) return undefined;
 
+    // Converti en WebP dès l'ingestion (gain réseau sur /tablet-menu, seul
+    // consommateur public de ces images) — 'layout' est le seul type avec
+    // transparence (tracé blanc sur fond transparent, voir contentScanner.ts
+    // côté agent), les autres sont des photos opaques classiques.
+    const optimized = await optimizeToWebp(Buffer.from(parsed.data, 'base64'), {
+      preserveTransparency: type === 'layout',
+    });
+    const data = optimized.toString('base64');
+
     const existing = await this.prisma.contentPreview.findUnique({
       where: {
         stationId_type_acId: {
@@ -329,15 +339,15 @@ export class StationsService {
             type,
             acId,
             name,
-            data: parsed.data,
+            data,
           },
         })
       ).id;
 
-    if (existing && existing.data !== parsed.data) {
+    if (existing && existing.data !== data) {
       await this.prisma.contentPreview.update({
         where: { id: existing.id },
-        data: { data: parsed.data, name },
+        data: { data, name },
       });
     }
 

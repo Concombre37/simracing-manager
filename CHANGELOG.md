@@ -1,5 +1,16 @@
 # Changelog
 
+## v2.2.140 — Toutes les images de /tablet-menu converties en WebP (-85% réseau)
+
+### Changé
+
+- **Demandé par l'utilisateur ("il faudrait passer tout en webp bien optimiser propre dans la bdd pour du gain réseau")**. Nouvel utilitaire partagé `optimizeToWebp()` (`apps/backend/src/common/image-optimizer.ts`) : convertit n'importe quelle image raster (PNG/JPEG) en WebP — qualité 82 avec perte pour les photos (voitures/circuits/arcade), quasi sans perte pour les schémas de tracé (ligne blanche sur fond transparent, une compression avec perte les aurait floutés). Jamais appliqué aux SVG (aucun actuellement en base, mais `ContentLabel.layoutImage` peut historiquement en contenir — un vectoriel déjà minuscule n'a rien à gagner à être rastérisé).
+- **Chemin d'ingestion mis à jour** (pas seulement les données déjà en base) : `StationsService.upsertPreview()` (scan agent → `ContentPreview`, tous types) et `ArcadeService.setPhoto()` (upload admin) convertissent désormais systématiquement en WebP à l'écriture — toute nouvelle voiture/circuit resynchronisé ou photo arcade uploadée arrive déjà optimisée, pas seulement les 1792 images existantes.
+- `inferMimeFromBase64()` (déplacé dans `common/`, dédoublonné entre `ContentPreviewsController` et `ContentLabelsController`) détecte maintenant aussi la signature WebP (`UklGR`).
+- **Migration one-off des données déjà en base** (script non commité, comme les précédents scripts Prisma ponctuels de ce projet) : les 1733 `ContentPreview` + 59 `ContentLabel.layoutImage` existants reconvertis en place. **449 Mo → 65 Mo en base (-85,6%)** pour les photos, **7,6 Mo → 3,0 Mo (-60,7%)** pour les schémas de tracé (mode quasi sans perte, gain plus modeste mais attendu). 0 échec sur les 1792 images traitées. Sauvegarde complète de la base (`pg_dump`) prise avant toute écriture, vérifiée restaurable.
+- **Bug réel découvert en déboguant cette conversion, corrigé au passage** : `import sharp from 'sharp'` compile (sans `esModuleInterop`, absent de `tsconfig.json`) en un appel `sharp_1.default(...)` qui vaut `undefined` à l'exécution — `BlankingMediaService.resizeImageIfNeeded()` avalait ce `TypeError` en silence depuis son introduction (v2.2.95) : **le redimensionnement des images de blanking surdimensionnées ne s'est donc jamais exécuté**, sans aucun symptôme visible (juste jamais optimisé, jamais un blocage). Corrigé via `import sharp = require('sharp')` (syntaxe correcte pour l'export `export =` de ce module) + un retypage local minimal (TS résout par erreur les déclarations ESM du paquet faute de `moduleResolution` moderne dans ce projet — corriger ça globalement dépasse le cadre de cette tâche, voir commentaire dans `image-optimizer.ts`).
+- Vérifié en conditions réelles (Playwright sur la vraie prod) : 386 images chargées sur les onglets Voitures/Circuits, toutes servies en `image/webp` (`Content-Type` confirmé), rendu visuel identique à l'œil (photos et tracés comparés côte à côte avant/après).
+
 ## v2.2.139 — Logo de l'en-tête agrandi
 
 ### Changé

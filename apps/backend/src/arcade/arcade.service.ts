@@ -1,11 +1,10 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import sharp from 'sharp';
 import { PrismaService } from '../prisma/prisma.service';
+import { optimizeToWebp } from '../common/image-optimizer';
 import { CreateArcadeAttractionDto } from './dto/create-arcade-attraction.dto';
 import { UpdateArcadeAttractionDto } from './dto/update-arcade-attraction.dto';
 
@@ -29,8 +28,6 @@ export interface ArcadeAttractionSummary {
 
 @Injectable()
 export class ArcadeService {
-  private readonly logger = new Logger(ArcadeService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   private toSummary(row: {
@@ -133,10 +130,14 @@ export class ArcadeService {
   ): Promise<ArcadeAttractionSummary> {
     await this.findOrThrow(id);
     this.validateFile(file);
-    const data = await this.resizeIfNeeded(file.buffer, file.mimetype);
+    // Toujours reconverti en WebP à l'upload (gain réseau sur /tablet-menu),
+    // quel que soit le format d'origine autorisé (PNG/JPEG/WebP déjà).
+    const data = await optimizeToWebp(file.buffer, {
+      maxDimension: MAX_IMAGE_DIMENSION,
+    });
     const row = await this.prisma.arcadeAttraction.update({
       where: { id },
-      data: { photo: data, photoMimeType: file.mimetype },
+      data: { photo: data, photoMimeType: 'image/webp' },
     });
     return this.toSummary(row);
   }
@@ -160,34 +161,6 @@ export class ArcadeService {
       throw new BadRequestException(
         `Fichier trop volumineux : ${file.size} octets (max ${MAX_FILE_SIZE_BYTES})`,
       );
-    }
-  }
-
-  private async resizeIfNeeded(
-    buffer: Buffer,
-    mimeType: string,
-  ): Promise<Buffer> {
-    try {
-      const image = sharp(buffer);
-      const { width, height } = await image.metadata();
-      if (
-        !width ||
-        !height ||
-        (width <= MAX_IMAGE_DIMENSION && height <= MAX_IMAGE_DIMENSION)
-      ) {
-        return buffer;
-      }
-      return await image
-        .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
-          fit: 'inside',
-          withoutEnlargement: true,
-        })
-        .toBuffer();
-    } catch (err) {
-      this.logger.warn(
-        `Failed to resize arcade photo (${mimeType}), storing original: ${err}`,
-      );
-      return buffer;
     }
   }
 }
