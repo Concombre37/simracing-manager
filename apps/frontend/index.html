@@ -5,6 +5,11 @@
     <link rel="icon" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SimRacing Manager</title>
+    <!-- Logo de l'écran de veille /tablet-menu : c'est l'élément LCP de
+         cette page (Lighthouse mobile). Précharger ici le rend discoverable
+         avant même le parsing du bundle JS, sans coût réel sur les autres
+         routes (SVG de quelques Ko). -->
+    <link rel="preload" as="image" href="/logo-elsass-simracing.svg" fetchpriority="high" />
     <!-- Rajdhani/JetBrains Mono: used by the kiosk HUD redesign (Kiosk.tsx)
          to match the agent's in-game blanking screens; other pages keep
          their default font stack untouched. -->

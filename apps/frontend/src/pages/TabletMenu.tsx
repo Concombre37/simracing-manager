@@ -720,6 +720,7 @@ function CategoryTile({
           <img
             src={previewUrl}
             alt=""
+            loading="lazy"
             style={{
               position: 'absolute',
               inset: 0,
@@ -989,6 +990,7 @@ function CatalogCard({
             <img
               src={traceUrl}
               alt={item.name}
+              loading="lazy"
               style={{
                 position: 'absolute',
                 inset: 0,
@@ -1110,6 +1112,7 @@ function CatalogCard({
         <img
           src={item.previewUrl}
           alt={item.name}
+          loading="lazy"
           style={{
             position: 'absolute',
             inset: 0,
@@ -1249,6 +1252,7 @@ function ArcadeCard({ attraction }: { attraction: ArcadeAttraction }) {
             <img
               src={attraction.photoUrl}
               alt={attraction.name}
+              loading="lazy"
               style={{
                 position: 'absolute',
                 inset: 0,
@@ -1875,6 +1879,7 @@ function IdleScreen({
         <img
           src="/logo-elsass-simracing.svg"
           alt={`${VENUE_WORD_1} ${VENUE_WORD_2} ${VENUE_CITY}`}
+          fetchPriority="high"
           style={{
             width: portrait ? 300 : 460,
             height: 'auto',

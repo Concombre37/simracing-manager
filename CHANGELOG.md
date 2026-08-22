@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.141 — Score PageSpeed mobile de /tablet-menu : 55 → 89
+
+### Changé
+
+- **Demandé par l'utilisateur, rapport PageSpeed Insights mobile à l'appui ("j'ai pas encore 100%")**. Trois causes distinctes trouvées et corrigées :
+  1. **Images cataloguées jamais redimensionnées** — la conversion WebP de v2.2.140 recompressait le format mais ne touchait pas aux dimensions : des captures voiture jusqu'à **4088×2300px** (9,4 Mpx) étaient servies telles quelles pour un affichage catalogue qui ne dépasse jamais ~1180px CSS (modale détail). `StationsService.upsertPreview()` passe désormais `maxDimension: 2000` à `optimizeToWebp()` (`ArcadeService.setPhoto()` l'avait déjà). **Deuxième migration one-off** (script non commité) : relit les octets **pré-WebP originaux** depuis la sauvegarde `pg_dump` prise avant la migration v2.2.140 (restaurée dans une base scratch le temps du script, supprimée ensuite) plutôt que de repartir du WebP déjà compressé, pour éviter une double perte de qualité. 1733 `ContentPreview` + 59 `ContentLabel.layoutImage` retraités, 0 échec — `content_previews` passe de 65 Mo à 60 Mo en base, mais surtout plus aucune image au-delà de 2000px (contre 66 images voiture qui dépassaient 2000px avant, la pire à 4088×2300 → 2000×1125, 329 Ko → 130 Ko sur le réseau).
+  2. **`/tablet-menu` chargeait tout le bundle JS du dashboard admin** — `App.tsx` important chaque page en statique, une tablette cliente publique sans compte téléchargeait/parsait/évaluait le code de Dashboard, Stations, Users, Arcade, etc. en plus du sien (148 Ko de JS jamais utilisé sur cette page, gros contributeur au Total Blocking Time). Toutes les routes passées en `React.lazy()` + `<Suspense>` (`RouteFallback` minimal) — chaque page devient son propre chunk Vite ; `/tablet-menu` ne charge plus que ~9 Ko de code propre à la page (plus le socle React/React Query/Router partagé, incompressible).
+  3. **Logo de l'écran de veille (élément LCP) non préchargeable** — `<img>` React, invisible pour le navigateur tant que le bundle JS n'a pas été parsé/exécuté. `<link rel="preload" as="image" fetchpriority="high">` ajouté dans `index.html` + `fetchPriority="high"` sur l'`<img>` lui-même ; les 4 images de grille (photos voitures/circuits, schémas de tracé, photos arcade) passent en `loading="lazy"` (hors écran au premier rendu, contrairement au logo).
+- **Résultat mesuré** (Lighthouse mobile réel contre `https://simracing.hytlabs.com/tablet-menu`, script CI absent de ce projet — audité manuellement via le Chromium de Playwright faute de `lighthouse`/`chrome` installés) : score de performance **55 → 89** (LCP 5,0s→3,0s, Total Blocking Time 970ms→190ms, JS transporté 220 Ko→~150 Ko dont plus de la moitié est le socle React partagé). Les 100% ne sont pas atteints — le reliquat (~73 Ko de JS "inutilisé" selon Lighthouse) est le socle React/React Query/Framer Motion lui-même, chaque page n'en exploitant jamais la surface complète ; le retirer demanderait de sortir ces librairies pour cette seule page, jugé hors de proportion avec le gain restant.
+
 ## v2.2.140 — Toutes les images de /tablet-menu converties en WebP (-85% réseau)
 
 ### Changé

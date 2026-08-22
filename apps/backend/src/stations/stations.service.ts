@@ -314,9 +314,14 @@ export class StationsService {
     // Converti en WebP dès l'ingestion (gain réseau sur /tablet-menu, seul
     // consommateur public de ces images) — 'layout' est le seul type avec
     // transparence (tracé blanc sur fond transparent, voir contentScanner.ts
-    // côté agent), les autres sont des photos opaques classiques.
+    // côté agent), les autres sont des photos opaques classiques. maxDimension
+    // cappe les captures d'écran surdimensionnées (constaté jusqu'à 4088x2300
+    // pour des screenshots voiture) — /tablet-menu n'affiche jamais ces images
+    // au-delà de ~1180px CSS (modale détail), 2000px couvre large un écran
+    // retina sans repasser par la taille native inutilement.
     const optimized = await optimizeToWebp(Buffer.from(parsed.data, 'base64'), {
       preserveTransparency: type === 'layout',
+      maxDimension: 2000,
     });
     const data = optimized.toString('base64');
 
