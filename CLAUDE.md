@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.142`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.143`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -45,6 +45,7 @@ sim-center-manager/
 - **Auth**: JWT (`accessToken`) pour les utilisateurs ; clés API hashées SHA-256 pour les agents.
 - **Modules**: `Auth`, `Users`, `Stations`, `Sessions`, `DedicatedServers`, `Agent`, `Dashboard`, `Content`, `ContentPreviews`, `BlankingMedia`, `PowerManagement`, `Telemetry`, `Settings`, `Clients`, `TabletMenuHtml` (v2.2.142, voir gotcha "Fichiers statiques" ci-dessous).
 - **Prisma**: schéma dans `apps/backend/prisma/schema.prisma`. **Migrations manuelles** — jamais lancées par Docker. Toujours `npx prisma migrate deploy --schema=apps/backend/prisma/schema.prisma` après un changement de schéma.
+- **`apps/frontend/public/robots.txt`** (v2.2.143, `User-agent: * / Disallow: /` — ce domaine est un outil de gestion interne, pas de contenu à indexer) : copié tel quel dans `dist/` par Vite (même convention que `vite.svg`/`logo-elsass-simracing.svg`), servi directement par le serveur statique **avant** d'atteindre le fallback SPA — sans ce fichier, `GET /robots.txt` retombait sur `index.html`. **Cloudflare injecte automatiquement un bloc de règles pour les robots IA en tête de toute réponse `/robots.txt`** (`# BEGIN/END Cloudflare Managed Content`, hors de notre contrôle, propre à Cloudflare) et **concatène la réponse de l'origine juste après** — sans un vrai fichier ici, le HTML de la SPA fallback se serait retrouvé collé à la suite, invalidant tout le fichier pour les validateurs (trouvé via Google Search Console, 28 erreurs).
 - **Fichiers statiques**: le backend sert le frontend buildé (`apps/frontend/dist`) via `@nestjs/serve-static`. **Exception depuis v2.2.142** : `/tablet-menu` est exclue de `ServeStaticModule` (et du préfixe global `/api`, `main.ts`) et servie par `TabletMenuHtmlController` (`tablet-menu-html/`), qui lit `index.html` et y injecte un `<link rel="modulepreload">` vers le chunk JS de la page (nom hashé résolu par lecture de `dist/assets/`, mis en cache au premier accès) — évite que le navigateur ne découvre ce chunk qu'après avoir exécuté le bundle principal (chaîne de requêtes en série, signalée par un audit PageSpeed mobile). Toute autre route reste servie normalement par le serveur statique générique.
 - **Buffer WebSocket agent**: `AgentGateway` utilise `maxHttpBufferSize: 1 * 1024 * 1024 * 1024` pour accepter les gros payloads de contenu (previews en base64).
 

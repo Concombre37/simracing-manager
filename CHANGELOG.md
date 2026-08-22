@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.143 — robots.txt valide (28 erreurs signalées par Google Search Console)
+
+### Changé
+
+- **Demandé par l'utilisateur ("Le fichier robots.txt n'est pas valide 28 erreurs détectées")**. Aucun fichier `robots.txt` n'existait dans le projet — `GET /robots.txt` retombait sur le fallback SPA générique (`@nestjs/serve-static`) et renvoyait `index.html`. Cloudflare **injecte automatiquement** un bloc de règles pour les robots IA en tête de toute réponse `/robots.txt` (`# BEGIN/END Cloudflare Managed Content`, hors de notre contrôle) puis **concatène la réponse de l'origine juste après** — le HTML de la SPA se retrouvait donc collé à la suite d'un robots.txt par ailleurs valide, d'où les 28 lignes en erreur côté Search Console (chaque balise HTML lue comme une directive invalide).
+- Nouveau `apps/frontend/public/robots.txt` (même convention que `vite.svg`/`logo-elsass-simracing.svg` — copié tel quel dans `dist/` par Vite, servi par le serveur statique générique avant même d'atteindre le fallback SPA) : `User-agent: *` / `Disallow: /`. **Choix assumé** : ce domaine est un outil de gestion interne (dashboard admin + tablette kiosque sur site pour `/tablet-menu`), aucun intérêt à être indexé par un moteur de recherche — confirmé avec l'utilisateur plutôt que supposé.
+- Vérifié : `GET /robots.txt` sur l'origine renvoie désormais du texte brut (`Content-Type: text/plain`) au lieu de tomber sur le fallback HTML ; via Cloudflare, le fichier public se termine proprement par nos directives valides après le bloc géré par Cloudflare.
+
 ## v2.2.142 — Préchargement du chunk JS de /tablet-menu
 
 ### Changé
