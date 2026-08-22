@@ -27,6 +27,7 @@ import { ExternalApiModule } from './external-api/external-api.module';
 import { RaceFormatsModule } from './race-formats/race-formats.module';
 import { MenuModule } from './menu/menu.module';
 import { ArcadeModule } from './arcade/arcade.module';
+import { TabletMenuHtmlModule } from './tablet-menu-html/tablet-menu-html.module';
 import { envSchema } from './config/env.validation';
 
 @Module({
@@ -38,7 +39,9 @@ import { envSchema } from './config/env.validation';
     EventEmitterModule.forRoot(),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '../../..', 'apps/frontend/dist'),
-      exclude: ['/api/(.*)', '/socket.io/(.*)', '/docs'],
+      // /tablet-menu servie par TabletMenuHtmlModule (injecte un
+      // modulepreload vers son propre chunk JS, voir ce module).
+      exclude: ['/api/(.*)', '/socket.io/(.*)', '/docs', '/tablet-menu'],
     }),
     LoggerModule,
     PrismaModule,
@@ -64,6 +67,7 @@ import { envSchema } from './config/env.validation';
     RaceFormatsModule,
     MenuModule,
     ArcadeModule,
+    TabletMenuHtmlModule,
   ],
 })
 export class AppModule {}

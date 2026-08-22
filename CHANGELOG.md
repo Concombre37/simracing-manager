@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.142 — Préchargement du chunk JS de /tablet-menu
+
+### Changé
+
+- **Demandé par l'utilisateur, après un deuxième rapport PageSpeed** ("network-dependency-tree-insight" toujours signalé) : la chaîne HTML → bundle principal → chunk `TabletMenu` (chargé à la demande depuis v2.2.141) → appels API s'exécutait entièrement en série — le chunk de la page n'était découvert par le navigateur qu'une fois le bundle principal téléchargé, parsé **et exécuté** (React monté, route résolue, `import()` dynamique déclenché).
+- **`TabletMenuHtmlController`** (nouveau module `tablet-menu-html/`) sert désormais `/tablet-menu` à la place du serveur statique générique (exclu explicitement de `ServeStaticModule` et du préfixe global `/api`, voir `app.module.ts`/`main.ts`) : injecte un `<link rel="modulepreload" href="/assets/TabletMenu-<hash>.js">` dans le `<head>` avant de renvoyer `index.html`. Le nom de fichier hashé (change à chaque build Vite) est résolu par lecture du dossier `assets/` au premier accès, pas en dur. **Scopé à cette seule route** plutôt qu'ajouté à `index.html` globalement — sinon chaque page admin aurait aussi préchargé ~9 Ko de JS qu'elle n'utilise jamais, à l'exact inverse du découpage de bundle fait en v2.2.141.
+- **Bug de chemin corrigé en cours de route** : le contrôleur vivant dans son propre sous-dossier de module (un niveau de plus que `app.module.ts`, à la racine de `dist/`), le calcul `join(__dirname, '../../..', ...)` copié tel quel pointait vers `/app/apps/apps/frontend/dist` (inexistant) au lieu de `/app/apps/frontend/dist` — corrigé en `../../../..` (un niveau de remontée supplémentaire).
+- **Vérifié au niveau réseau** (Lighthouse mobile réel, champ `networkRequestTime` de chaque requête) : `TabletMenu-*.js` démarre désormais son téléchargement au même instant que le bundle principal (~128ms tous les deux) au lieu d'attendre son exécution complète — un aller-retour réseau supprimé du chemin critique. Le score global (89 en v2.2.141) ne bouge pas de façon significative sur cette seule mesure (bruit de simulation de débit mobile ±4-5 points d'un run à l'autre) ; l'audit "network-dependency-tree-insight" reste signalé (les appels API dépendent toujours de l'exécution du chunk pour se déclencher — inhérent à une SPA sans rendu serveur, pas contournable sans réécrire l'architecture de la page).
+
 ## v2.2.141 — Score PageSpeed mobile de /tablet-menu : 55 → 89
 
 ### Changé

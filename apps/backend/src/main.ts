@@ -16,7 +16,9 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-  app.setGlobalPrefix('api');
+  // 'tablet-menu' exclue : servie par TabletMenuHtmlController, en dehors
+  // du préfixe /api comme le reste du frontend statique.
+  app.setGlobalPrefix('api', { exclude: ['tablet-menu'] });
 
   app.useGlobalPipes(
     new ValidationPipe({
