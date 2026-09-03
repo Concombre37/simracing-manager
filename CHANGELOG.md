@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.144 — Wake-on-LAN envoyé en unicast au lieu de broadcast, jamais reçu
+
+### Corrigé
+
+- **Demandé par l'utilisateur ("il envoi le packet je n'ai rien qui s'allume, le eteindre marche bien")**. `sendWakeOnLan()` (`apps/agent/src/wol.ts`) envoyait le magic packet en **unicast direct vers l'IP de la station cible** dès qu'elle était connue (`address = targetIp || broadcast`) — et `PowerManagementService.wake()` la fournit systématiquement (`target.localIp`, obligatoire pour calculer le sous-réseau du relais un peu plus haut dans la même fonction), donc le repli broadcast n'était en pratique jamais emprunté.
+- **Pourquoi ça ne pouvait pas marcher** : une machine éteinte n'a plus de pile réseau active — envoyer un paquet UDP en unicast vers son IP oblige l'OS du relais à résoudre son adresse MAC par ARP, ce qui échoue silencieusement dès que l'entrée ARP du relais expire (la cible ne répondra jamais, elle est éteinte). Le paquet est alors abandonné par la pile réseau **sans qu'aucune erreur ne remonte à l'application** — d'où le symptôme exact rapporté : le packet est "envoyé" avec succès côté logs, mais rien ne se réveille. Un broadcast dirigé du sous-réseau (ex. `192.168.1.255`) ne dépend d'aucune résolution ARP : la trame atteint directement toutes les cartes réseau du segment au niveau liaison, et seule celle dont le magic packet contient la bonne adresse MAC réagit (rien d'autre n'est réveillé par erreur).
+- Fix : `sendWakeOnLan()` envoie désormais toujours sur `getBroadcastAddress()` (déjà calculé, mais relégué au rang de repli mort en pratique) — `targetIp` n'est plus utilisé que pour le contexte du log, jamais comme adresse de destination du paquet.
+- **Nécessite une mise à jour de l'agent sur les postes concernés** (voir 7.5/7.6 CLAUDE.md — "MAJ agent" ou réinstallation manuelle) pour prendre effet ; le correctif backend seul (aucun ici) ne suffirait pas, c'est purement une correction côté agent.
+
 ## v2.2.143 — robots.txt valide (28 erreurs signalées par Google Search Console)
 
 ### Changé

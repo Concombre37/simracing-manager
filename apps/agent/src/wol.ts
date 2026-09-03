@@ -11,13 +11,19 @@ export async function sendWakeOnLan(
   targetIp?: string,
 ): Promise<void> {
   const normalized = macAddress.toLowerCase().replace(/-/g, ':');
-  const broadcast = getBroadcastAddress() ?? '255.255.255.255';
-  const address = targetIp || broadcast;
+  // Toujours en broadcast dirigé du sous-réseau, jamais en unicast vers
+  // targetIp (gardé seulement pour le log ci-dessous) : un magic packet
+  // envoyé en unicast IP vers une machine éteinte dépend de la résolution
+  // ARP, qui échoue dès que le cache ARP du relais expire (la cible ne
+  // répond jamais, étant éteinte) — le paquet est alors silencieusement
+  // perdu par la pile réseau de l'OS, sans erreur remontée à l'application.
+  // Le broadcast ne dépend d'aucune résolution ARP et atteint directement
+  // la carte réseau de la cible au niveau liaison ; seule la carte dont le
+  // magic packet contient la bonne MAC réagit, donc rien de plus n'est
+  // réveillé par erreur.
+  const address = getBroadcastAddress() ?? '255.255.255.255';
 
-  logger.info(
-    { macAddress: normalized, address, broadcast, targetIp },
-    'Sending Wake-on-LAN magic packet',
-  );
+  logger.info({ macAddress: normalized, address, targetIp }, 'Sending Wake-on-LAN magic packet');
 
   const errors: Error[] = [];
 

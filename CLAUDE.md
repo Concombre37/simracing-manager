@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.143`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.144`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -490,7 +490,8 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 - **Icône barre système + console locale (v2.2.47)** : `TRAY_ICON=1` (défaut pour les nouveaux `.env`) — menu contextuel (basculer blanking, quitter, sync contenu, vérifier MAJ, redémarrer l'agent, ouvrir la console). Console = fenêtre WPF normale (pas kiosque), même pattern `WebBrowser` que `blanking.ps1`, affiche statut live + ~100 dernières lignes de log + les mêmes actions en boutons. Communication via le même mécanisme de fichiers-drapeaux (poll 500ms) + snapshot `console-status.json` écrit à chaque tick de heartbeat.
 - **Meilleur tour invalide (cut)** (v2.2.44) : détecté par comparaison seule — si un tour vient d'être complété plus vite que le meilleur valide connu mais n'est pas devenu le nouveau `bestLapMs` officiel, AC l'a rejeté.
 - **Auto-start Windows** : `AUTO_START=1` dans `.env` enregistre l'agent dans `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
-- Heartbeat inclut `macAddress`. WoL envoyé sur les ports 9 et 7, unicast si IP cible connue sinon broadcast.
+- Heartbeat inclut `macAddress`. WoL envoyé sur les ports 9 et 7. **Toujours en broadcast dirigé du sous-réseau du relais (`getBroadcastAddress()`), jamais en unicast vers l'IP de la cible** (corrigé en v2.2.144 — voir gotcha dédié juste en dessous ; avant ce fix la doc disait "unicast si IP cible connue sinon broadcast", ce qui décrivait un vrai bug, pas un choix voulu).
+- **Le Wake-on-LAN ne réveillait jamais rien, packet "envoyé" avec succès dans les logs (v2.2.144)** — signalé par l'utilisateur ("il envoi le packet je n'ai rien qui s'allume, le eteindre marche bien"). `sendWakeOnLan()` envoyait le magic packet en **unicast direct vers l'IP de la station cible** dès qu'elle était connue, et `PowerManagementService.wake()` la fournit systématiquement (`target.localIp`, déjà obligatoire un peu plus haut dans la même fonction pour calculer le sous-réseau du relais) — le repli broadcast du code n'était donc en pratique jamais emprunté. Une machine éteinte n'a plus de pile réseau active : un paquet UDP unicast vers son IP oblige l'OS du relais à résoudre son adresse MAC par ARP, ce qui échoue silencieusement dès que l'entrée ARP du relais expire (la cible ne répondra jamais) — le paquet est alors abandonné par la pile réseau **sans aucune erreur remontée à l'application**, exactement le symptôme rapporté. Fix : toujours broadcast (aucune résolution ARP nécessaire, la trame atteint directement toutes les cartes réseau du segment au niveau liaison ; seule celle dont le magic packet contient la bonne MAC réagit).
 - `system:shutdown` lance `shutdown /s /t 0` sur Windows, no-op ailleurs.
 
 ### 5.11 Logs distants (v2.2.63)
