@@ -505,6 +505,7 @@ export class SimRacingAgent {
     );
     this.socket.on('station:role', (payload) => this.handleStationRole(payload));
     this.socket.on('system:shutdown', () => this.handleShutdown());
+    this.socket.on('system:restart', () => this.handleRestart());
     this.socket.on('wol:send', (payload) => this.handleWakeOnLan(payload));
     this.socket.on('logs:request', () => this.handleLogsRequest());
   }
@@ -1121,6 +1122,19 @@ export class SimRacingAgent {
       }
     } catch (err) {
       this.logger.error({ err }, 'Failed to execute shutdown command');
+    }
+  }
+
+  private async handleRestart(): Promise<void> {
+    this.logger.info('Received restart command');
+    try {
+      if (process.platform === 'win32') {
+        execFile('shutdown', ['/r', '/t', '0']);
+      } else {
+        this.logger.warn('Restart command is only implemented on Windows');
+      }
+    } catch (err) {
+      this.logger.error({ err }, 'Failed to execute restart command');
     }
   }
 

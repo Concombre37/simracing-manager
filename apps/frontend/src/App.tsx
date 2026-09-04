@@ -60,6 +60,9 @@ const BlankingMedia = lazy(() =>
   import('./pages/BlankingMedia').then((m) => ({ default: m.BlankingMedia })),
 );
 const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m.Settings })));
+const PodsControl = lazy(() =>
+  import('./pages/PodsControl').then((m) => ({ default: m.PodsControl })),
+);
 
 const queryClient = new QueryClient();
 
@@ -283,6 +286,14 @@ function AnimatedRoutes() {
             element={
               <ProtectedRoute adminOnly>
                 <BlankingMedia />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pods-control"
+            element={
+              <ProtectedRoute adminOnly>
+                <PodsControl />
               </ProtectedRoute>
             }
           />

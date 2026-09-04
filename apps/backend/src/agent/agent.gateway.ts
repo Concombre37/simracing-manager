@@ -527,6 +527,10 @@ export class AgentGateway
     this.server.to(`station:${stationId}`).emit('system:shutdown');
   }
 
+  async emitRestart(stationId: string): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('system:restart');
+  }
+
   async emitWakeOnLan(
     stationId: string,
     payload: { targetMac: string; targetIp?: string },

@@ -28,6 +28,7 @@ import { RaceFormatsModule } from './race-formats/race-formats.module';
 import { MenuModule } from './menu/menu.module';
 import { ArcadeModule } from './arcade/arcade.module';
 import { TabletMenuHtmlModule } from './tablet-menu-html/tablet-menu-html.module';
+import { BulkActionsModule } from './bulk-actions/bulk-actions.module';
 import { envSchema } from './config/env.validation';
 
 @Module({
@@ -68,6 +69,7 @@ import { envSchema } from './config/env.validation';
     MenuModule,
     ArcadeModule,
     TabletMenuHtmlModule,
+    BulkActionsModule,
   ],
 })
 export class AppModule {}

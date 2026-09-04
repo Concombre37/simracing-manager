@@ -14,6 +14,7 @@ import {
   Network,
   Power,
   PowerOff,
+  RotateCw,
   AlertCircle,
   Clock,
   KeyRound,
@@ -65,6 +66,20 @@ export function Settings() {
       setFeedback({
         type: 'error',
         message: err.response?.data?.message ?? err.message ?? "Erreur lors de l'arrêt",
+      });
+    },
+  });
+
+  const restartMutation = useMutation({
+    mutationFn: stationsApi.restart,
+    onSuccess: () => {
+      setFeedback({ type: 'success', message: 'Commande de redémarrage envoyée.' });
+      void queryClient.invalidateQueries({ queryKey: ['stations'] });
+    },
+    onError: (err: { response?: { data?: { message?: string } }; message?: string }) => {
+      setFeedback({
+        type: 'error',
+        message: err.response?.data?.message ?? err.message ?? 'Erreur lors du redémarrage',
       });
     },
   });
@@ -181,10 +196,16 @@ export function Settings() {
             station={station}
             onWake={() => wakeMutation.mutate(station.id)}
             onShutdown={() => shutdownMutation.mutate(station.id)}
+            onRestart={() => {
+              if (confirm(`Redémarrer ${station.name} ? La session en cours sera interrompue.`)) {
+                restartMutation.mutate(station.id);
+              }
+            }}
             isWakeLoading={wakeMutation.isPending && wakeMutation.variables === station.id}
             isShutdownLoading={
               shutdownMutation.isPending && shutdownMutation.variables === station.id
             }
+            isRestartLoading={restartMutation.isPending && restartMutation.variables === station.id}
           />
         ))}
       </div>
@@ -196,18 +217,23 @@ function StationCard({
   station,
   onWake,
   onShutdown,
+  onRestart,
   isWakeLoading,
   isShutdownLoading,
+  isRestartLoading,
 }: {
   station: Station;
   onWake: () => void;
   onShutdown: () => void;
+  onRestart: () => void;
   isWakeLoading: boolean;
   isShutdownLoading: boolean;
+  isRestartLoading: boolean;
 }) {
   const isOnline = station.status === 'online' || station.status === 'in_game';
   const canWake = !isOnline && Boolean(station.macAddress);
   const canShutdown = isOnline;
+  const canRestart = isOnline;
 
   return (
     <Card className="flex flex-col">
@@ -229,7 +255,7 @@ function StationCard({
         <InfoItem icon={Network} label="Adresse MAC" value={station.macAddress ?? '—'} />
       </div>
 
-      <div className="mt-auto pt-4 border-t border-dark-600 grid grid-cols-2 gap-2">
+      <div className="mt-auto pt-4 border-t border-dark-600 grid grid-cols-3 gap-2">
         <Button
           variant="success"
           size="sm"
@@ -239,6 +265,16 @@ function StationCard({
         >
           <Power className="w-4 h-4" />
           Allumer
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onRestart}
+          disabled={!canRestart || isRestartLoading}
+          isLoading={isRestartLoading}
+        >
+          <RotateCw className="w-4 h-4" />
+          Redémarrer
         </Button>
         <Button
           variant="danger"

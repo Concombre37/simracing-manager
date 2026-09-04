@@ -149,6 +149,8 @@ export const stationsApi = {
       .then((res) => res.data),
   shutdown: (id: string) =>
     api.post<{ success: boolean }>(`/stations/${id}/shutdown`).then((res) => res.data),
+  restart: (id: string) =>
+    api.post<{ success: boolean }>(`/stations/${id}/restart`).then((res) => res.data),
 };
 
 /** The "results" global blanking media is a single logo shared by every pod

@@ -70,6 +70,18 @@ export class PowerManagementService {
     return { success: true };
   }
 
+  async restart(stationId: string): Promise<{ success: boolean }> {
+    const station = await this.prisma.station.findUnique({
+      where: { id: stationId },
+    });
+    if (!station) {
+      throw new NotFoundException('Station not found');
+    }
+
+    await this.agentGateway.emitRestart(station.stationId);
+    return { success: true };
+  }
+
   private async findRelay(
     targetId: string,
     targetSubnet: string,

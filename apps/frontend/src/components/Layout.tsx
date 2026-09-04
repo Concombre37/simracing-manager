@@ -23,6 +23,7 @@ import {
   UtensilsCrossed,
   Tablet,
   Gamepad2,
+  Zap,
 } from 'lucide-react';
 
 // L'essentiel du quotidien : toujours en pleine évidence, jamais replié.
@@ -49,6 +50,7 @@ const adminNavItems = [
   { path: '/restaurant-menu', label: 'Carte resto/bar', icon: UtensilsCrossed },
   { path: '/arcade', label: 'Arcade', icon: Gamepad2 },
   { path: '/blanking-media', label: 'Écrans', icon: MonitorPlay },
+  { path: '/pods-control', label: 'Contrôle flotte', icon: Zap },
   { path: '/settings', label: 'Paramètres', icon: Settings },
 ];
 

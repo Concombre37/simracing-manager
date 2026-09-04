@@ -8,5 +8,6 @@ import { AgentModule } from '../agent/agent.module';
   imports: [PrismaModule, AgentModule],
   controllers: [PowerManagementController],
   providers: [PowerManagementService],
+  exports: [PowerManagementService],
 })
 export class PowerManagementModule {}

@@ -23,4 +23,10 @@ export class PowerManagementController {
   async shutdown(@Param('id') id: string) {
     return this.powerManagementService.shutdown(id);
   }
+
+  @Post(':id/restart')
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
+  async restart(@Param('id') id: string) {
+    return this.powerManagementService.restart(id);
+  }
 }

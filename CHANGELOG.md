@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.2.145 — Page « Contrôle de la flotte » (actions groupées sur tous les POD) + redémarrage à distance
+
+### Ajouté
+
+- **Demandé par l'utilisateur** ("une session qui a pour but de faciliter la QOL avec tous les POD... tout les allumer tous les éteindre les redémarrer... retirer tout les blankings screen... maj tout le monde... ajoute tout ce qu'il te semble bon"). Nouvelle page `/pods-control` ("Contrôle flotte" dans la nav admin) : grille de tous les postes avec case à cocher (tout coché par défaut, désélection possible poste par poste — utile pour exclure un poste en session ou en maintenance physique avant une action groupée), puis boutons d'action groupée réutilisant tel quel le chemin existant de chaque action à l'unité (aucune nouvelle logique de commande, juste l'orchestration) :
+  - **Alimentation** : Allumer tout (Wake-on-LAN), Redémarrer tout, Éteindre tout — les deux derniers demandent confirmation (arrêtent une session en cours).
+  - **Écrans d'attente** : Masquer tout / Réafficher tout (blanking hide/show).
+  - **Maintenance** : Mettre à jour tout (agent), Synchroniser tout (contenu voitures/circuits).
+  - Chaque action est **best-effort par poste** (`Promise.allSettled`, un poste en échec ne bloque jamais les autres) et affiche un résumé clair (succès/échecs avec le nom du poste et la raison).
+- Nouveau module backend `bulk-actions/` (`POST /api/bulk-actions/{wake,shutdown,restart,blanking-hide,blanking-show,update-agent,sync-content}`, body `{ stationIds: string[] }`, admin/technicien) — préfixe `bulk-actions` choisi délibérément (pas `stations/bulk/...`) pour ne jamais risquer de collision avec les routes `stations/:id/...` du même routeur.
+- **Redémarrage à distance implémenté pour de vrai** (demandé par l'utilisateur : "il faut aussi renforcer le redémarrage possible des pod depuis le serveur... en admin sur le site") — `system:restart` existait dans le contrat partagé (`packages/shared`) depuis longtemps mais n'était **branché nulle part** (ni handler agent, ni émetteur backend, ni bouton) : seul l'arrêt (`system:shutdown`) fonctionnait. Ajouté de bout en bout : `agent.ts` (`shutdown /r /t 0`, symétrique au handler d'arrêt existant), `AgentGateway.emitRestart()`, `PowerManagementService.restart()`, `POST /api/stations/:id/restart`. Bouton "Redémarrer" ajouté aussi sur la carte poste de `/settings` (à côté d'Allumer/Éteindre déjà là), en plus de l'action groupée.
+- Vérifié en conditions réelles (Playwright, compte de test jetable) : page accessible, 8 postes listés avec cases à cocher, tous les boutons présents, compteur de sélection réactif, et la confirmation native se déclenche bien avec le bon message pour "Redémarrer tout" (annulée pendant le test — aucune action réelle envoyée aux postes de production).
+
 ## v2.2.144 — Wake-on-LAN envoyé en unicast au lieu de broadcast, jamais reçu
 
 ### Corrigé
