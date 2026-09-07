@@ -788,7 +788,6 @@ export class SimRacingAgent {
       this.acRunning = true;
       this.acSharedMemoryReader?.start();
       this.lapTelemetryRecorder.start(payload.sessionId);
-      await this.luaBridge.autoStart();
       this.setReportedStatus(StationStatus.IN_GAME);
       // Keep the blanking screen up until telemetry confirms the game has
       // really started (mirrors the in_game status just reported). Resets

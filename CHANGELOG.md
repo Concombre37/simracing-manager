@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.2.148 — Mise en Drive obligatoire pour tous les formats
+
+### Corrigé
+
+- Chaque lancement piloté par le site arme désormais le passage automatique en « Drive » avant de démarrer Assetto Corsa, aussi bien via Content Manager qu'en lancement direct et quelle que soit la configuration du format (Practice libre 12h, qualifications, course ou futur format).
+- L'app Lua réessaie toutes les 500 ms tant que le jeu se trouve dans le menu. Elle ne considère plus la demande réussie dès que la connexion en ligne apparaît : le drapeau persistant reste présent jusqu'à ce qu'Assetto Corsa confirme réellement `isSessionStarted`.
+- La commande ponctuelle `autoStart` n'est plus envoyée deux fois sur le chemin de lancement historique. Le drapeau est supprimé lors de l'arrêt d'Assetto Corsa afin qu'un lancement manuel ultérieur ne soit pas affecté.
+- L'ancien réglage `AUTO_DRIVE_HELPER`, qui n'était déjà relié à aucun comportement, est retiré : la mise en Drive est maintenant une règle obligatoire du système et ne peut pas être désactivée par erreur sur un POD.
+
+### Vérifié
+
+- Tests agent dédiés au lancement normal, à plusieurs formats de serveur et au nettoyage à l'arrêt, en plus de la suite complète de 64 tests agent.
+
 ## v2.2.147 — Dashboard de contrôle rapide et lancements simultanés
 
 ### Amélioré

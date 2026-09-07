@@ -39,7 +39,6 @@ export interface StationConfig {
   screenMode?: ScreenMode;
   assistPreset?: AssistPreset;
   autoMapAcControls?: boolean;
-  autoDriveHelper?: boolean;
 }
 
 export interface SessionConfig {

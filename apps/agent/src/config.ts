@@ -41,7 +41,6 @@ if (!existsSync(envPath)) {
     '',
     '# Helpers',
     'AUTO_MAP_AC_CONTROLS=1',
-    'AUTO_DRIVE_HELPER=1',
     '',
     '# Démarrage automatique avec Windows (1 = activer, 0 = désactiver)',
     'AUTO_START=0',
@@ -104,7 +103,6 @@ const configSchema = z.object({
   BLANKING_MONITOR: z.coerce.number().int().min(1).default(1),
   ASSIST_PRESET: z.nativeEnum(AssistPreset).default(AssistPreset.PRO),
   AUTO_MAP_AC_CONTROLS: z.coerce.boolean().default(true),
-  AUTO_DRIVE_HELPER: z.coerce.boolean().default(true),
   AUTO_START: z.coerce.boolean().default(false),
   TRAY_ICON: z.coerce.boolean().default(false),
   // Cached locally from the backend's Station.role (see station:role in

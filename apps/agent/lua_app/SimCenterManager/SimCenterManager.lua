@@ -8,7 +8,7 @@ local joinFlagFile = commandsDir .. "/join.flag"
 local stationFile = commandsDir .. "/station.txt"
 
 local lastCommandId = nil
-local joinAutoStartCooldown = 0
+local autoDriveCooldown = 0
 
 local telemetryEnabled = false
 local telemetryCooldown = 0
@@ -31,7 +31,7 @@ local function writeMarkerFile(name, content)
   end
 end
 
-writeMarkerFile("lua_loaded.txt", os.time() .. " v2.0.24")
+writeMarkerFile("lua_loaded.txt", os.time() .. " v2.0.25")
 
 local function parseCommand(path)
   local file = io.open(path, "r")
@@ -250,7 +250,7 @@ local function executeCommand(cmd)
   end
 end
 
-ac.log("[SimCenterManager] Lua app loaded, version 2.0.24")
+ac.log("[SimCenterManager] Lua app loaded, version 2.0.25")
 
 local function scriptUpdate(dt)
   local sim = ac.getSim()
@@ -261,19 +261,21 @@ local function scriptUpdate(dt)
     carIndex = 0
   end
 
-  -- Auto-start when joining a server and AC has reached the main menu.
+  -- Every agent-driven launch must enter Drive, regardless of its race
+  -- format or launch mode. Keep retrying while AC is in the menu and only
+  -- acknowledge success once the simulation reports a started session.
   if flagExists(joinFlagFile) then
-    if sim.isInMainMenu then
-      joinAutoStartCooldown = joinAutoStartCooldown - dt
-      if joinAutoStartCooldown <= 0 then
-        ac.log("[SimCenterManager] Join flag detected, auto-starting")
-        pcall(function() ac.tryToStart(true) end)
-        joinAutoStartCooldown = 0.5
-      end
-    elseif sim.isOnlineRace then
-      -- We successfully joined the online race, remove the flag.
+    if sim.isSessionStarted == true then
       removeFlag(joinFlagFile)
-      joinAutoStartCooldown = 0
+      autoDriveCooldown = 0
+      ac.log("[SimCenterManager] Drive confirmed, auto-Drive flag cleared")
+    elseif sim.isInMainMenu then
+      autoDriveCooldown = autoDriveCooldown - dt
+      if autoDriveCooldown <= 0 then
+        ac.log("[SimCenterManager] Auto-Drive flag detected, requesting Drive")
+        pcall(function() ac.tryToStart(true) end)
+        autoDriveCooldown = 0.5
+      end
     end
   end
 

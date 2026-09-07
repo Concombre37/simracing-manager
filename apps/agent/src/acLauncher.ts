@@ -59,9 +59,10 @@ export class AcLauncher {
 
     await this.configureVideoIni(documentsPath);
     await this.configureGameplayIni(documentsPath);
+    await this.ensureLuaAppInstalled();
+    await this.luaBridge.setAutoDriveFlag();
 
     if (config.LAUNCH_MODE === 'cm') {
-      await this.ensureLuaAppInstalled();
       await this.launchViaContentManager({
         host: String(cfg.serverIp ?? ''),
         port: Number(cfg.serverPort ?? 0),
@@ -71,10 +72,10 @@ export class AcLauncher {
         trackLayout: cfg.trackConfig ? String(cfg.trackConfig) : undefined,
         password: cfg.password ? String(cfg.password) : undefined,
       });
-      await this.luaBridge.autoStart();
     } else {
       await this.launchDirect(documentsPath);
     }
+    await this.luaBridge.autoStart();
   }
 
   async joinServer(joinConfig: JoinServerConfig): Promise<void> {
@@ -85,7 +86,7 @@ export class AcLauncher {
     await fs.mkdir(cfgDir, { recursive: true });
 
     await this.ensureLuaAppInstalled();
-    await this.luaBridge.setJoinFlag();
+    await this.luaBridge.setAutoDriveFlag();
 
     await this.writeJoinRaceIni(cfgDir, {
       track: joinConfig.track,
@@ -130,6 +131,7 @@ export class AcLauncher {
     // only once that's true, graceful or forced) — safe to drop whatever
     // command was last sent to the Lua app (see LuaBridge.clearCommand()).
     await this.luaBridge.clearCommand();
+    await this.luaBridge.clearAutoDriveFlag();
   }
 
   /**

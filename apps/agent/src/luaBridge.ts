@@ -79,13 +79,13 @@ export class LuaBridge {
     });
   }
 
-  async setJoinFlag(): Promise<void> {
+  async setAutoDriveFlag(): Promise<void> {
     const flagPath = path.join(path.dirname(this.commandFile), 'join.flag');
     await fs.writeFile(flagPath, '1', 'utf-8');
-    this.logger.info('Join flag written for Lua app');
+    this.logger.info('Persistent auto-Drive flag written for Lua app');
   }
 
-  async clearJoinFlag(): Promise<void> {
+  async clearAutoDriveFlag(): Promise<void> {
     const flagPath = path.join(path.dirname(this.commandFile), 'join.flag');
     try {
       await fs.unlink(flagPath);
