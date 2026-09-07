@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { StationsService } from '../stations/stations.service';
 import { AgentGateway } from '../agent/agent.gateway';
 import { PowerManagementService } from '../power-management/power-management.service';
+import { StationRole } from '@simracing/shared';
 
 export interface BulkActionResult {
   succeeded: string[];
@@ -22,24 +23,30 @@ export class BulkActionsService {
   ) {}
 
   async wake(stationIds: string[]): Promise<BulkActionResult> {
-    return this.run(stationIds, (id) => this.powerManagementService.wake(id));
+    return this.run(stationIds, (id) =>
+      this.withPodDbId(id, (podId) => this.powerManagementService.wake(podId)),
+    );
   }
 
   async shutdown(stationIds: string[]): Promise<BulkActionResult> {
     return this.run(stationIds, (id) =>
-      this.powerManagementService.shutdown(id),
+      this.withPodDbId(id, (podId) =>
+        this.powerManagementService.shutdown(podId),
+      ),
     );
   }
 
   async restart(stationIds: string[]): Promise<BulkActionResult> {
     return this.run(stationIds, (id) =>
-      this.powerManagementService.restart(id),
+      this.withPodDbId(id, (podId) =>
+        this.powerManagementService.restart(podId),
+      ),
     );
   }
 
   async blankingHide(stationIds: string[]): Promise<BulkActionResult> {
     return this.run(stationIds, (id) =>
-      this.withBusinessId(id, (stationId) =>
+      this.withPodBusinessId(id, (stationId) =>
         this.agentGateway.emitBlankingHide(stationId),
       ),
     );
@@ -47,7 +54,7 @@ export class BulkActionsService {
 
   async blankingShow(stationIds: string[]): Promise<BulkActionResult> {
     return this.run(stationIds, (id) =>
-      this.withBusinessId(id, (stationId) =>
+      this.withPodBusinessId(id, (stationId) =>
         this.agentGateway.emitBlankingShow(stationId),
       ),
     );
@@ -55,7 +62,7 @@ export class BulkActionsService {
 
   async updateAgent(stationIds: string[]): Promise<BulkActionResult> {
     return this.run(stationIds, (id) =>
-      this.withBusinessId(id, (stationId) =>
+      this.withPodBusinessId(id, (stationId) =>
         this.agentGateway.emitUpdateAgent(stationId),
       ),
     );
@@ -63,18 +70,36 @@ export class BulkActionsService {
 
   async syncContent(stationIds: string[]): Promise<BulkActionResult> {
     return this.run(stationIds, (id) =>
-      this.withBusinessId(id, (stationId) =>
+      this.withPodBusinessId(id, (stationId) =>
         this.agentGateway.emitContentSync(stationId),
       ),
     );
   }
 
-  private async withBusinessId(
+  private async withPodDbId(
+    id: string,
+    fn: (id: string) => Promise<unknown>,
+  ): Promise<void> {
+    const station = await this.requirePod(id);
+    await fn(station.id);
+  }
+
+  private async withPodBusinessId(
     id: string,
     fn: (stationId: string) => Promise<void>,
   ): Promise<void> {
-    const station = await this.stationsService.findOne(id);
+    const station = await this.requirePod(id);
     await fn(station.stationId);
+  }
+
+  private async requirePod(id: string) {
+    const station = await this.stationsService.findOne(id);
+    if (station.role !== StationRole.SIMULATOR) {
+      throw new Error(
+        `Le poste ${station.name} est un administrateur et a été exclu de l'action.`,
+      );
+    }
+    return station;
   }
 
   private async run(

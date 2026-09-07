@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { stationsApi, type Station } from '../services/stations';
 import { bulkActionsApi, type BulkActionResult } from '../services/bulkActions';
@@ -18,9 +18,16 @@ import {
   Download,
   CheckSquare,
   Square,
+  Wifi,
+  WifiOff,
+  TriangleAlert,
 } from 'lucide-react';
 
 type Feedback = { type: 'success' | 'error'; message: string } | null;
+
+function isReachable(station: Station): boolean {
+  return station.status !== 'offline';
+}
 
 /** Page QOL demandée par l'utilisateur ("faciliter le QOL avec tous les
  * PODs") : actions groupées (allumer/éteindre/redémarrer/masquer les écrans
@@ -45,14 +52,33 @@ export function PodsControl() {
     refetchInterval: 5000,
   });
 
+  const podStations = useMemo(
+    () =>
+      (stations ?? [])
+        .filter((station) => station.role === 'simulator')
+        .sort((a, b) => {
+          return (
+            Number(isReachable(b)) - Number(isReachable(a)) ||
+            a.name.localeCompare(b.name, 'fr', { numeric: true })
+          );
+        }),
+    [stations],
+  );
+  const onlineCount = podStations.filter(isReachable).length;
+  const offlineCount = podStations.length - onlineCount;
+
   // Sélectionne tout le monde par défaut au premier chargement seulement —
   // ne jamais écraser une (dé)sélection déjà faite par l'utilisateur sur un
   // rafraîchissement suivant (poll 5s).
   useEffect(() => {
     if (stations && selected === null) {
-      setSelected(new Set(stations.map((s) => s.id)));
+      setSelected(new Set(podStations.map((s) => s.id)));
+    } else if (stations && selected) {
+      const allowedIds = new Set(podStations.map((s) => s.id));
+      const sanitized = new Set(Array.from(selected).filter((id) => allowedIds.has(id)));
+      if (sanitized.size !== selected.size) setSelected(sanitized);
     }
-  }, [stations, selected]);
+  }, [stations, selected, podStations]);
 
   useEffect(() => {
     if (!socket) return;
@@ -87,7 +113,17 @@ export function PodsControl() {
   }
 
   function selectAll() {
-    setSelected(new Set(stations?.map((s) => s.id) ?? []));
+    setSelected(new Set(podStations.map((s) => s.id)));
+  }
+
+  function selectByStatus(online: boolean) {
+    setSelected(
+      new Set(
+        podStations
+          .filter((station) => (online ? isReachable(station) : station.status === 'offline'))
+          .map((station) => station.id),
+      ),
+    );
   }
 
   function selectNone() {
@@ -141,7 +177,7 @@ export function PodsControl() {
     <PageShell
       title="Contrôle"
       accent="de la flotte"
-      subtitle="Actions groupées sur tous les postes — sélectionnez qui est concerné avant d'agir."
+      subtitle="Actions groupées réservées aux POD — les postes administrateur sont toujours exclus."
     >
       {feedback && (
         <div
@@ -165,12 +201,20 @@ export function PodsControl() {
       <Card>
         <CardHeader
           title="Postes concernés"
-          subtitle={`${selectedIds.length} / ${stations?.length ?? 0} sélectionné(s)`}
+          subtitle={`${selectedIds.length} / ${podStations.length} POD sélectionné(s) · ${onlineCount} en ligne · ${offlineCount} hors ligne`}
           action={
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={selectAll}>
                 <CheckSquare className="w-4 h-4" />
                 Tout sélectionner
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => selectByStatus(true)}>
+                <Wifi className="w-4 h-4" />
+                En ligne
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => selectByStatus(false)}>
+                <WifiOff className="w-4 h-4" />
+                Hors ligne
               </Button>
               <Button variant="ghost" size="sm" onClick={selectNone}>
                 <Square className="w-4 h-4" />
@@ -180,9 +224,10 @@ export function PodsControl() {
           }
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {stations?.map((station) => {
-            const isOnline = station.status === 'online' || station.status === 'in_game';
+          {podStations.map((station) => {
+            const isOnline = isReachable(station);
             const isChecked = selected?.has(station.id) ?? false;
+            const wolReady = Boolean(station.macAddress && station.localIp);
             return (
               <label
                 key={station.id}
@@ -203,10 +248,27 @@ export function PodsControl() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">{station.name}</p>
-                  <p className="text-xs text-gray-500 font-mono truncate">{station.stationId}</p>
+                  <p className="text-xs text-gray-500 font-mono truncate">
+                    {station.version ? `v${station.version}` : 'Version inconnue'}
+                    {station.localIp ? ` · ${station.localIp}` : ''}
+                  </p>
+                  {!isOnline && !wolReady && (
+                    <p className="flex items-center gap-1 mt-1 text-[11px] text-yellow-400">
+                      <TriangleAlert className="w-3 h-3" />
+                      WoL indisponible : IP ou MAC manquante
+                    </p>
+                  )}
                 </div>
-                <Badge variant={station.role === 'admin' ? 'purple' : 'blue'}>
-                  {station.role === 'admin' ? 'Admin' : 'POD'}
+                <Badge
+                  variant={station.status === 'updating' ? 'yellow' : isOnline ? 'green' : 'gray'}
+                >
+                  {station.status === 'in_game'
+                    ? 'En jeu'
+                    : station.status === 'updating'
+                      ? 'Mise à jour'
+                      : isOnline
+                        ? 'En ligne'
+                        : 'Hors ligne'}
                 </Badge>
               </label>
             );
@@ -225,10 +287,10 @@ export function PodsControl() {
               variant="success"
               onClick={() => runBulk('wake', 'Allumage', bulkActionsApi.wake)}
               isLoading={pendingAction === 'wake'}
-              disabled={pendingAction !== null}
+              disabled={pendingAction !== null || selectedIds.length === 0}
             >
               <Power className="w-4 h-4" />
-              Allumer tout
+              Allumer la sélection
             </Button>
             <Button
               variant="secondary"
@@ -241,10 +303,10 @@ export function PodsControl() {
                 )
               }
               isLoading={pendingAction === 'restart'}
-              disabled={pendingAction !== null}
+              disabled={pendingAction !== null || selectedIds.length === 0}
             >
               <RotateCw className="w-4 h-4" />
-              Redémarrer tout
+              Redémarrer la sélection
             </Button>
             <Button
               variant="danger"
@@ -257,10 +319,10 @@ export function PodsControl() {
                 )
               }
               isLoading={pendingAction === 'shutdown'}
-              disabled={pendingAction !== null}
+              disabled={pendingAction !== null || selectedIds.length === 0}
             >
               <PowerOff className="w-4 h-4" />
-              Éteindre tout
+              Éteindre la sélection
             </Button>
           </div>
         </Card>
@@ -277,10 +339,10 @@ export function PodsControl() {
                 runBulk('blanking-hide', 'Masquage des écrans', bulkActionsApi.blankingHide)
               }
               isLoading={pendingAction === 'blanking-hide'}
-              disabled={pendingAction !== null}
+              disabled={pendingAction !== null || selectedIds.length === 0}
             >
               <EyeOff className="w-4 h-4" />
-              Masquer tout
+              Masquer la sélection
             </Button>
             <Button
               variant="secondary"
@@ -288,10 +350,10 @@ export function PodsControl() {
                 runBulk('blanking-show', 'Réaffichage des écrans', bulkActionsApi.blankingShow)
               }
               isLoading={pendingAction === 'blanking-show'}
-              disabled={pendingAction !== null}
+              disabled={pendingAction !== null || selectedIds.length === 0}
             >
               <Eye className="w-4 h-4" />
-              Réafficher tout
+              Réafficher la sélection
             </Button>
           </div>
         </Card>
@@ -306,19 +368,19 @@ export function PodsControl() {
               variant="secondary"
               onClick={() => runBulk('update-agent', 'Mise à jour', bulkActionsApi.updateAgent)}
               isLoading={pendingAction === 'update-agent'}
-              disabled={pendingAction !== null}
+              disabled={pendingAction !== null || selectedIds.length === 0}
             >
               <Download className="w-4 h-4" />
-              Mettre à jour tout
+              Mettre à jour la sélection
             </Button>
             <Button
               variant="secondary"
               onClick={() => runBulk('sync-content', 'Synchronisation', bulkActionsApi.syncContent)}
               isLoading={pendingAction === 'sync-content'}
-              disabled={pendingAction !== null}
+              disabled={pendingAction !== null || selectedIds.length === 0}
             >
               <RefreshCw className="w-4 h-4" />
-              Synchroniser tout
+              Synchroniser la sélection
             </Button>
           </div>
         </Card>

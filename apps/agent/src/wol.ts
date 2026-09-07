@@ -21,7 +21,7 @@ export async function sendWakeOnLan(
   // la carte réseau de la cible au niveau liaison ; seule la carte dont le
   // magic packet contient la bonne MAC réagit, donc rien de plus n'est
   // réveillé par erreur.
-  const address = getBroadcastAddress() ?? '255.255.255.255';
+  const address = getBroadcastAddress(targetIp) ?? '255.255.255.255';
 
   logger.info({ macAddress: normalized, address, targetIp }, 'Sending Wake-on-LAN magic packet');
 

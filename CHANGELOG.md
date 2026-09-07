@@ -1,5 +1,22 @@
 # Changelog
 
+## v2.2.146 — Wake-on-LAN multi-interface fiable + flotte limitée aux POD
+
+### Corrigé
+
+- Le relais Wake-on-LAN ne prend plus aveuglément la première interface IPv4 de Windows et ne suppose plus un réseau `/24`. Il choisit désormais l'interface appartenant au même sous-réseau que l'IP du POD cible, préfère la route au masque le plus précis et calcule le broadcast depuis le vrai masque réseau. Cela évite d'envoyer le magic packet sur une interface VPN, Hyper-V, Wi-Fi ou Ethernet qui ne mène pas au POD.
+- La page `/pods-control` exclut maintenant tous les postes ayant le rôle `admin`. Seuls les POD `simulator` sont affichés, sélectionnés et comptés. Une protection identique côté backend refuse toute action groupée sur un admin même si son identifiant est envoyé manuellement à l'API.
+
+### Amélioré
+
+- Ajout de sélections rapides « En ligne » et « Hors ligne », tri des POD connectés en premier, état/version/IP visibles sur chaque carte et désactivation des actions quand aucun POD n'est sélectionné.
+- Les libellés d'alimentation parlent désormais de « sélection » afin de refléter exactement la portée de l'action.
+
+### Vérifié
+
+- Tests unitaires du calcul de broadcast (`/24`, `/20`, IPv4 invalide) et du verrou anti-admin sur les actions groupées.
+- Typecheck agent, backend et frontend réussi. Aucun paquet WoL ni aucune commande d'alimentation n'a été envoyé aux postes pendant ces tests.
+
 ## v2.2.145 — Page « Contrôle de la flotte » (actions groupées sur tous les POD) + redémarrage à distance
 
 ### Ajouté
