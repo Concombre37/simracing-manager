@@ -1,6 +1,6 @@
 # Changelog
 
-## À venir — Dashboard de contrôle rapide
+## v2.2.147 — Dashboard de contrôle rapide et lancements simultanés
 
 ### Amélioré
 
