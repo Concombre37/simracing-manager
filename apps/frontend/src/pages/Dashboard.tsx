@@ -2,22 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { PageTransition } from '../components/PageTransition';
+import { FleetQuickControl } from '../components/FleetQuickControl';
 import { stationsApi, type Station } from '../services/stations';
 import { dedicatedServersApi, type DedicatedServer } from '../services/dedicatedServers';
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { findTrackName } from '../utils/track';
 import { useContentLabelMap, type ContentLabelMap } from '../services/contentLabels';
-import {
-  Monitor,
-  Server,
-  Play,
-  Zap,
-  ArrowRight,
-  Plus,
-  Tv,
-  ShieldCheck,
-  AlertTriangle,
-} from 'lucide-react';
+import { Monitor, Server, Play, Zap, ArrowRight, Plus, Tv, AlertTriangle } from 'lucide-react';
 
 function useCountUp(target: number, duration = 900) {
   const [value, setValue] = useState(0);
@@ -161,17 +152,7 @@ export function Dashboard() {
         .sort((a, b) => a.name.localeCompare(b.name)),
     [stations],
   );
-  const adminStations = useMemo(
-    () =>
-      (stations ?? [])
-        .filter((s) => s.role === 'admin')
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [stations],
-  );
-
-  const onlinePods = simulatorStations.filter(
-    (s) => s.status === 'online' || s.status === 'in_game',
-  ).length;
+  const onlinePods = simulatorStations.filter((s) => s.status !== 'offline').length;
   const inGamePods = simulatorStations.filter((s) => s.status === 'in_game').length;
   const offlinePods = simulatorStations.length - onlinePods;
   const fleetPct =
@@ -212,32 +193,30 @@ export function Dashboard() {
               </span>
             </div>
             <h1 className="font-hud text-[clamp(38px,5.2vw,62px)] font-bold leading-[0.94] tracking-tight text-white">
-              Dashboard
+              Contrôle
               <br />
               <span className="bg-gradient-to-r from-racing-blue to-racing-cyan bg-clip-text text-transparent">
-                technique
+                de la flotte
               </span>
             </h1>
             <p className="mt-3.5 font-hud-mono text-xs text-gray-500">
-              Infrastructure SimRacing · {simulatorStations.length} POD · {adminStations.length}{' '}
-              poste
-              {adminStations.length > 1 ? 's' : ''} admin · {totalServers} serveur
+              Actions rapides · {simulatorStations.length} POD · {totalServers} serveur
               {totalServers > 1 ? 's' : ''} dédié{totalServers > 1 ? 's' : ''}
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <Link
-                to="/dedicated-servers/create"
+                to="/pods-control"
                 className="flex items-center gap-2 whitespace-nowrap rounded-md bg-gradient-to-r from-racing-blue to-racing-cyan px-5 py-2.5 font-hud text-sm font-bold tracking-wide text-dark-950 shadow-[0_0_26px_rgba(0,120,255,0.3)] transition-shadow hover:shadow-[0_0_36px_rgba(0,150,255,0.5)]"
+              >
+                <Monitor className="h-3.5 w-3.5" />
+                Contrôle avancé
+              </Link>
+              <Link
+                to="/dedicated-servers/create"
+                className="flex items-center gap-2 whitespace-nowrap rounded-md border border-white/10 px-4 py-2.5 font-hud text-sm font-bold tracking-wide text-gray-300 transition-colors hover:border-racing-cyan/40 hover:text-sky-200"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Nouveau serveur
-              </Link>
-              <Link
-                to="/stations"
-                className="flex items-center gap-2 whitespace-nowrap rounded-md border border-white/10 px-4 py-2.5 font-hud text-sm font-bold tracking-wide text-gray-300 transition-colors hover:border-racing-cyan/40 hover:text-sky-200"
-              >
-                <ArrowRight className="h-3.5 w-3.5" />
-                Gérer le parc
               </Link>
             </div>
           </div>
@@ -365,6 +344,8 @@ export function Dashboard() {
           />
         </section>
 
+        <FleetQuickControl stations={stations ?? []} />
+
         <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1.85fr)_minmax(280px,1fr)]">
           {/* PARC */}
           <div className="flex min-w-0 flex-col gap-7">
@@ -398,26 +379,6 @@ export function Dashboard() {
                 </div>
               )}
             </section>
-
-            {adminStations.length > 0 && (
-              <section className="min-w-0">
-                <div className="mb-3.5 flex items-center gap-3.5">
-                  <h2 className="whitespace-nowrap font-hud text-lg font-bold tracking-wide text-white">
-                    Poste{adminStations.length > 1 ? 's' : ''} admin
-                  </h2>
-                  <span className="h-1 w-1 flex-none rotate-45 bg-purple-400" />
-                  <span className="whitespace-nowrap font-hud-mono text-[11px] text-gray-500">
-                    hors parc simulateur
-                  </span>
-                  <div className="h-px min-w-[12px] flex-1 bg-gradient-to-r from-white/10 to-transparent" />
-                </div>
-                <div className="flex flex-col gap-2.5">
-                  {adminStations.map((station) => (
-                    <AdminStationRow key={station.id} station={station} />
-                  ))}
-                </div>
-              </section>
-            )}
           </div>
 
           {/* LATÉRAL */}
@@ -560,41 +521,6 @@ function PodCard({ station, index }: { station: Station; index: number }) {
       </p>
       <p className="truncate font-hud-mono text-xs text-gray-500">{station.localIp ?? '—'}</p>
       <p className={`mt-2 font-hud text-xs font-bold ${v.labelColor}`}>{v.label}</p>
-    </div>
-  );
-}
-
-function AdminStationRow({ station }: { station: Station }) {
-  const online = station.status === 'online' || station.status === 'in_game';
-  return (
-    <div className="relative flex flex-wrap items-center gap-3.5 overflow-hidden rounded-lg border border-purple-400/25 bg-gradient-to-r from-purple-400/10 to-dark-900/50 p-3.5">
-      <span className="absolute inset-y-0 left-0 w-[2px] bg-purple-400 shadow-[0_0_9px_rgba(145,132,217,.6)]" />
-      <div className="grid h-9 w-9 flex-none place-items-center rounded-md border border-purple-400/30 bg-purple-400/10 text-purple-200">
-        <ShieldCheck className="h-4.5 w-4.5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2.5">
-          <span
-            className={`h-1.5 w-1.5 flex-none rounded-full ${
-              online ? 'animate-pulse-glow bg-emerald-400 shadow-[0_0_9px_#24d17e]' : 'bg-gray-600'
-            }`}
-          />
-          <span className="truncate font-hud text-lg font-bold tracking-wide text-white">
-            {station.name}
-          </span>
-        </div>
-        <p className="mt-0.5 truncate pl-4 font-hud-mono text-[11.5px] text-gray-500">
-          {station.localIp ?? '—'} · v{station.version ?? '—'}
-        </p>
-      </div>
-      <span className="flex-none rounded border border-purple-400/35 px-2.5 py-1 font-hud text-xs font-bold text-purple-200">
-        Admin
-      </span>
-      <span
-        className={`flex-none font-hud text-sm font-bold ${online ? 'text-emerald-400' : 'text-orange-400'}`}
-      >
-        {online ? 'En ligne' : 'Hors ligne'}
-      </span>
     </div>
   );
 }

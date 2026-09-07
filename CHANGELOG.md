@@ -1,5 +1,14 @@
 # Changelog
 
+## À venir — Dashboard de contrôle rapide
+
+### Amélioré
+
+- Le dashboard devient un poste de contrôle de flotte : sélection rapide de tous les POD, des postes en ligne ou hors ligne, puis commandes directes pour allumer, redémarrer, éteindre, masquer le blanking ou le réafficher.
+- Chaque commande cible automatiquement les postes compatibles de la sélection : le Wake-on-LAN vise les POD hors ligne, tandis que le redémarrage, l'extinction et le blanking visent les POD joignables. Les comptes sont affichés sur les boutons avant l'envoi.
+- L'état de connexion et du blanking est visible sur chaque POD. Les résultats partiels et erreurs sont affichés directement dans le dashboard.
+- Les postes administrateur ont été retirés du dashboard et restent exclus des actions côté interface comme côté serveur.
+
 ## v2.2.146 — Wake-on-LAN multi-interface fiable + flotte limitée aux POD
 
 ### Corrigé
