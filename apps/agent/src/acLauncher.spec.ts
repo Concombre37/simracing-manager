@@ -4,7 +4,7 @@ import path from 'path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const testState = vi.hoisted(() => ({
-  root: `${process.cwd()}\\.tmp-auto-drive-test`,
+  root: `${process.cwd()}/.tmp-auto-drive-test`,
   bridge: {
     autoStart: vi.fn(async () => undefined),
     setAutoDriveFlag: vi.fn(async () => undefined),
@@ -17,7 +17,7 @@ const testState = vi.hoisted(() => ({
 
 vi.mock('./config', () => ({
   config: {
-    DOCUMENTS_PATH: `${testState.root}\\documents`,
+    DOCUMENTS_PATH: `${testState.root}/documents`,
     LAUNCH_MODE: 'ac',
     SCREEN_MODE: 'single',
     ASSIST_PRESET: 'pro',
@@ -29,7 +29,7 @@ vi.mock('./luaBridge', () => ({
 }));
 
 vi.mock('./acPathResolver', () => ({
-  resolveAcInstallPath: vi.fn(async () => `${testState.root}\\assettocorsa`),
+  resolveAcInstallPath: vi.fn(async () => `${testState.root}/assettocorsa`),
 }));
 
 vi.mock('child_process', async (importOriginal) => {

@@ -1,6 +1,6 @@
 {
   "name": "@simracing/agent",
-  "version": "2.2.148",
+  "version": "2.2.149",
   "private": true,
   "description": "Local agent for SimRacing Manager stations",
   "main": "./dist/index.js",

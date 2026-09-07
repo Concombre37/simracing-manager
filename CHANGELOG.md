@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.2.148 — Mise en Drive obligatoire pour tous les formats
+## v2.2.149 — Mise en Drive obligatoire pour tous les formats
 
 ### Corrigé
 
@@ -11,7 +11,7 @@
 
 ### Vérifié
 
-- Tests agent dédiés au lancement normal, à plusieurs formats de serveur et au nettoyage à l'arrêt, en plus de la suite complète de 64 tests agent.
+- Tests agent dédiés au lancement normal, à plusieurs formats de serveur et au nettoyage à l'arrêt, en plus de la suite complète de 64 tests agent. Le test utilise des chemins temporaires portables sous Windows et Linux.
 
 ## v2.2.147 — Dashboard de contrôle rapide et lancements simultanés
 
