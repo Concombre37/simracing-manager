@@ -135,15 +135,40 @@ export function Stations() {
     );
   });
 
-  const launchMutation = useMutation({
-    mutationFn: stationsApi.launch,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
-  });
+  // Track power/game operations per station. A single React Query mutation's
+  // `isPending` flag disabled every row as soon as the first POD was launched,
+  // so clicks on the other PODs never sent a request. Independent sets keep
+  // each row locked only while its own request is in flight and allow genuine
+  // concurrent starts/stops across the fleet.
+  const [launchingIds, setLaunchingIds] = useState<Set<string>>(() => new Set());
+  const [stoppingIds, setStoppingIds] = useState<Set<string>>(() => new Set());
+  const [stationActionError, setStationActionError] = useState<string | null>(null);
 
-  const stopMutation = useMutation({
-    mutationFn: stationsApi.stop,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
-  });
+  async function runStationAction(
+    id: string,
+    label: string,
+    action: (stationId: string) => Promise<unknown>,
+    setPendingIds: React.Dispatch<React.SetStateAction<Set<string>>>,
+  ) {
+    setStationActionError(null);
+    setPendingIds((current) => new Set(current).add(id));
+    try {
+      await action(id);
+      await queryClient.invalidateQueries({ queryKey: ['stations'] });
+    } catch (error) {
+      const apiError = error as { response?: { data?: { message?: string } }; message?: string };
+      const stationName = data?.find((station) => station.id === id)?.name ?? id;
+      setStationActionError(
+        `${label} impossible sur ${stationName} : ${apiError.response?.data?.message ?? apiError.message ?? 'erreur inconnue'}`,
+      );
+    } finally {
+      setPendingIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
 
   const updateAgentMutation = useMutation({
     mutationFn: stationsApi.updateAgent,
@@ -194,10 +219,11 @@ export function Stations() {
     isTechnician,
     expandedId,
     onToggleExpand: (id: string) => setExpandedId((prev) => (prev === id ? null : id)),
-    onLaunch: (id: string) => launchMutation.mutate(id),
-    isLaunching: launchMutation.isPending,
-    onStop: (id: string) => stopMutation.mutate(id),
-    isStopping: stopMutation.isPending,
+    onLaunch: (id: string) =>
+      void runStationAction(id, 'Lancement', stationsApi.launch, setLaunchingIds),
+    isLaunching: (id: string) => launchingIds.has(id),
+    onStop: (id: string) => void runStationAction(id, 'Arrêt', stationsApi.stop, setStoppingIds),
+    isStopping: (id: string) => stoppingIds.has(id),
     onSendCommand: sendCommand,
     onOpenBlanking: setBlankingStation,
     onOpenLogs: setLogsStation,
@@ -284,6 +310,11 @@ export function Stations() {
         {error && (
           <div className="rounded-lg border border-red-800 bg-red-900/30 p-4 text-red-300">
             Erreur lors du chargement des stations
+          </div>
+        )}
+        {stationActionError && (
+          <div className="rounded-lg border border-red-800 bg-red-900/30 p-4 text-red-300">
+            {stationActionError}
           </div>
         )}
 
@@ -479,9 +510,9 @@ interface StationRowSharedProps {
   expanded: boolean;
   onToggleExpand: (id: string) => void;
   onLaunch: (id: string) => void;
-  isLaunching: boolean;
+  isLaunching: (id: string) => boolean;
   onStop: (id: string) => void;
-  isStopping: boolean;
+  isStopping: (id: string) => boolean;
   onSendCommand: (stationId: string, command: string) => void;
   onOpenBlanking: (station: Station) => void;
   onOpenLogs: (station: Station) => void;
@@ -599,7 +630,7 @@ function StationRow({
               <ActionPill
                 icon={Play}
                 tone="green"
-                disabled={isLaunching}
+                disabled={isLaunching(station.id)}
                 onClick={(e) => {
                   e.stopPropagation();
                   onLaunch(station.id);
@@ -610,7 +641,7 @@ function StationRow({
               <ActionPill
                 icon={Square}
                 tone="red"
-                disabled={isStopping}
+                disabled={isStopping(station.id)}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStop(station.id);

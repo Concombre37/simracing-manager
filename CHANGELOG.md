@@ -9,6 +9,10 @@
 - L'état de connexion et du blanking est visible sur chaque POD. Les résultats partiels et erreurs sont affichés directement dans le dashboard.
 - Les postes administrateur ont été retirés du dashboard et restent exclus des actions côté interface comme côté serveur.
 
+### Corrigé
+
+- Sur `/stations`, lancer un premier POD ne désactive plus le bouton « Lancer » de tous les autres. Les lancements et arrêts sont maintenant suivis indépendamment par station, ce qui permet d'envoyer réellement plusieurs commandes en parallèle.
+
 ## v2.2.146 — Wake-on-LAN multi-interface fiable + flotte limitée aux POD
 
 ### Corrigé
