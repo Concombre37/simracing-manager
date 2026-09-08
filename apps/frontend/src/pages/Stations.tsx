@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PageTransition } from '../components/PageTransition';
@@ -129,11 +129,28 @@ export function Stations() {
     refetchInterval: 5000,
   });
 
-  socket?.on('station:updated', ({ stationId, status, blankingActive }) => {
-    queryClient.setQueryData<Station[]>(['stations'], (old) =>
-      old?.map((s) => (s.stationId === stationId ? { ...s, status, blankingActive } : s)),
-    );
-  });
+  useEffect(() => {
+    if (!socket) return;
+    const handler = ({
+      stationId,
+      status,
+      blankingActive,
+    }: {
+      stationId: string;
+      status: Station['status'];
+      blankingActive: boolean;
+    }) => {
+      queryClient.setQueryData<Station[]>(['stations'], (old) =>
+        old?.map((station) =>
+          station.stationId === stationId ? { ...station, status, blankingActive } : station,
+        ),
+      );
+    };
+    socket.on('station:updated', handler);
+    return () => {
+      socket.off('station:updated', handler);
+    };
+  }, [socket, queryClient]);
 
   // Track power/game operations per station. A single React Query mutation's
   // `isPending` flag disabled every row as soon as the first POD was launched,
