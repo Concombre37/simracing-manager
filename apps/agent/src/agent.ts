@@ -48,6 +48,7 @@ import { sendWakeOnLan } from './wol';
 import { runWolDiagnostics } from './wolDiagnostics';
 import { WatchdogManager } from './watchdogManager';
 import { SpectatorManager } from './spectatorManager';
+import { LiveCaptureManager } from './liveCaptureManager';
 
 const execFileAsync = promisify(execFile);
 
@@ -114,6 +115,7 @@ export class SimRacingAgent {
   private blankingMediaSync: BlankingMediaSync;
   private watchdogManager: WatchdogManager;
   private spectatorManager: SpectatorManager;
+  private liveCaptureManager: LiveCaptureManager;
 
   constructor(private readonly logger: Logger) {
     this.acLauncher = new AcLauncher(logger);
@@ -138,6 +140,12 @@ export class SimRacingAgent {
     this.updater = new Updater(logger);
     this.watchdogManager = new WatchdogManager(logger);
     this.spectatorManager = new SpectatorManager(logger, config.SERVER_URL, config.STATION_ID);
+    this.liveCaptureManager = new LiveCaptureManager(
+      logger,
+      config.SERVER_URL,
+      config.STATION_ID,
+      () => this.apiKey,
+    );
     this.processMonitor = new ProcessMonitor(logger);
     this.raceResultReader = new RaceResultReader(logger);
     this.kioskManager = new KioskManager(logger);
@@ -577,6 +585,7 @@ export class SimRacingAgent {
     this.acSharedMemoryReader?.stop();
     this.trayManager.stop();
     this.spectatorManager.close();
+    await this.liveCaptureManager.stop();
     // Child processes on Windows don't die with their parent automatically:
     // without this, every agent restart (update, crash recovery) piles up
     // another blanking/results window on top of an orphaned one.
@@ -793,6 +802,7 @@ export class SimRacingAgent {
     });
     try {
       await this.acLauncher.launch(payload);
+      await this.liveCaptureManager.start();
       this.acRunning = true;
       this.acSharedMemoryReader?.start();
       this.lapTelemetryRecorder.start(payload.sessionId);
@@ -806,6 +816,7 @@ export class SimRacingAgent {
       // window to the foreground once it appears.
       this.kioskManager.enter();
     } catch (err) {
+      await this.liveCaptureManager.stop();
       this.logger.error({ err }, 'Failed to launch Assetto Corsa');
       // Otherwise the POD is left stuck on the launching screen forever —
       // there was never a game to reveal it from.
@@ -834,6 +845,7 @@ export class SimRacingAgent {
     this.blankingManager.show();
     await this.blankingManager.waitUntilShown();
     await this.applyEndOfSessionSafety();
+    await this.liveCaptureManager.stop();
     this.acSharedMemoryReader?.stop();
     await this.luaBridge.quit();
     await this.acLauncher.stop();
@@ -1234,6 +1246,7 @@ export class SimRacingAgent {
     });
     try {
       await this.acLauncher.joinServer(payload);
+      await this.liveCaptureManager.start();
       this.acRunning = true;
       this.setReportedStatus(StationStatus.IN_GAME);
       // Keep the blanking screen up until telemetry confirms the game has
@@ -1283,6 +1296,7 @@ export class SimRacingAgent {
         // loading behind the "Lancement en cours" screen.
       }
     } catch (err) {
+      await this.liveCaptureManager.stop();
       this.logger.error({ err }, 'Failed to execute join server command');
       // Otherwise the POD is left stuck on the launching screen forever —
       // there was never a game to reveal it from.
@@ -1354,6 +1368,7 @@ export class SimRacingAgent {
     // later instead of disappearing.
     await this.blankingManager.waitUntilShown();
     await this.applyEndOfSessionSafety();
+    await this.liveCaptureManager.stop();
 
     try {
       await this.acLauncher.quit();

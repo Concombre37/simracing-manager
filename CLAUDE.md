@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.155`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.156`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -781,3 +781,5 @@ Le rôle `StationRole.SPECTATOR` (`spectator`) désigne un poste réservé au su
 `SpectatorController` expose `GET/POST /api/spectator/recordings`, `GET /api/spectator/recordings/:id/file` et `DELETE /api/spectator/recordings/:id`. Les fichiers sont stockés dans PostgreSQL (`screen_recordings`, migration `20260908110000_add_screen_recordings`, maximum 500 Mo). Le live HLS/WebRTC nécessiterait un relay média dédié ; cette release fournit la capture et la rediffusion à la demande.
 
 `/spectator/screen` est l'écran public plein écran pour une TV. Il lit `GET /api/spectator/screen-state` (serveurs et sessions sans secrets) toutes les trois secondes. `SpectatorManager` ouvre automatiquement Edge/Chrome avec `--kiosk` quand l'agent Windows reçoit `StationRole.SPECTATOR` et ferme le processus qu'il a lancé à l'arrêt ; aucune connexion dashboard n'est nécessaire sur le poste d'affichage.
+
+Depuis v2.2.156, `LiveCaptureManager` démarre avec chaque lancement ou join Assetto Corsa. FFmpeg (`gdigrab`) envoie les JPEG live à `/api/spectator/frame` et enregistre un MP4 local temporaire ; à l'arrêt de la session, celui-ci est envoyé à `/api/spectator/recordings/raw` et rejoint la bibliothèque PostgreSQL. Le flux live est conservé en mémoire par station et `/spectator/screen` le lit automatiquement. FFmpeg doit être installé sur chaque POD (PATH, `FFMPEG_PATH` ou chemin standard) ; son absence ne bloque pas AC et est journalisée.

@@ -38,9 +38,15 @@ export interface SpectatorScreenState {
   }[];
 }
 
+export interface LiveSource {
+  stationId: string;
+  updatedAt: number;
+}
+
 export const spectatorApi = {
   getPublicScreenState: () =>
     api.get<SpectatorScreenState>('/spectator/screen-state').then((res) => res.data),
+  getLiveSources: () => api.get<LiveSource[]>('/spectator/live-sources').then((res) => res.data),
   listRecordings: () => api.get<ScreenRecording[]>('/spectator/recordings').then((res) => res.data),
   uploadRecording: (file: Blob, fileName: string, title: string, durationSeconds: number) => {
     const form = new FormData();

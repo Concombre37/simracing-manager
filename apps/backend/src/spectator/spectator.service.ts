@@ -45,7 +45,35 @@ export interface SpectatorScreenState {
 
 @Injectable()
 export class SpectatorService {
+  private readonly liveFrames = new Map<
+    string,
+    { data: Buffer; updatedAt: number }
+  >();
+
   constructor(private readonly prisma: PrismaService) {}
+
+  saveLiveFrame(stationId: string, data: Buffer): void {
+    this.liveFrames.set(stationId, { data, updatedAt: Date.now() });
+  }
+
+  listLiveSources(): { stationId: string; updatedAt: number }[] {
+    const cutoff = Date.now() - 10_000;
+    for (const [stationId, frame] of this.liveFrames) {
+      if (frame.updatedAt < cutoff) this.liveFrames.delete(stationId);
+    }
+    return [...this.liveFrames.entries()]
+      .map(([stationId, frame]) => ({ stationId, updatedAt: frame.updatedAt }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  getLiveFrame(stationId?: string): { data: Buffer; updatedAt: number } | null {
+    if (stationId) {
+      const frame = this.liveFrames.get(stationId);
+      return frame && Date.now() - frame.updatedAt < 10_000 ? frame : null;
+    }
+    const source = this.listLiveSources()[0];
+    return source ? this.liveFrames.get(source.stationId) ?? null : null;
+  }
 
   async getPublicScreenState(): Promise<SpectatorScreenState> {
     const [servers, sessions] = await Promise.all([
@@ -129,15 +157,31 @@ export class SpectatorService {
     durationSeconds: number | undefined,
   ): Promise<ScreenRecordingDto> {
     if (!file) throw new BadRequestException('A recording file is required');
-    if (!ALLOWED_TYPES.includes(file.mimetype)) {
+    return this.createRecordingFromBuffer(
+      file.buffer,
+      file.mimetype,
+      file.originalname,
+      title,
+      durationSeconds,
+    );
+  }
+
+  async createRecordingFromBuffer(
+    data: Buffer,
+    mimeType: string,
+    fileName: string,
+    title: string | undefined,
+    durationSeconds: number | undefined,
+  ): Promise<ScreenRecordingDto> {
+    if (!ALLOWED_TYPES.includes(mimeType)) {
       throw new BadRequestException(
         `Unsupported recording type. Allowed: ${ALLOWED_TYPES.join(', ')}`,
       );
     }
-    if (file.size > MAX_SIZE_BYTES) {
+    if (data.length > MAX_SIZE_BYTES) {
       throw new BadRequestException('Recording is too large (maximum 500 MB)');
     }
-    const normalizedTitle = (title ?? '').trim().slice(0, 160) || file.originalname;
+    const normalizedTitle = (title ?? '').trim().slice(0, 160) || fileName;
     const safeDuration =
       durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds >= 0
         ? Math.min(durationSeconds, 24 * 60 * 60)
@@ -146,11 +190,11 @@ export class SpectatorService {
       data: {
         id: randomUUID(),
         title: normalizedTitle,
-        fileName: file.originalname.slice(0, 255),
-        mimeType: file.mimetype,
-        sizeBytes: file.size,
+        fileName: fileName.slice(0, 255),
+        mimeType,
+        sizeBytes: data.length,
         durationSeconds: safeDuration,
-        data: file.buffer,
+        data,
       },
       select: {
         id: true,

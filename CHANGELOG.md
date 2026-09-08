@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.156 — Capture automatique Assetto Corsa
+
+- L'agent Windows démarre une capture desktop FFmpeg après chaque lancement Content Manager ou connexion serveur Assetto Corsa.
+- Les images JPEG sont envoyées vers `/api/spectator/frame` et affichées automatiquement sur `/spectator/screen`.
+- La session est enregistrée en MP4 puis déposée dans la bibliothèque via `/api/spectator/recordings/raw` à la fermeture d'AC.
+- Sans FFmpeg installé sur un POD, la capture est désactivée sans bloquer le simulateur et le journal l'indique.
+
 ## v2.2.155 — Écran Spectateur automatique
 
 - Un poste dont le rôle est `spectator` ouvre automatiquement `/spectator/screen` en plein écran dès que l'agent reçoit son rôle.

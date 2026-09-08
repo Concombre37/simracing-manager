@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Activity, Flag, Radio, Server, Users, Wifi } from 'lucide-react';
 import { spectatorApi } from '../services/spectator';
@@ -9,6 +9,43 @@ export function SpectatorScreen() {
     queryFn: spectatorApi.getPublicScreenState,
     refetchInterval: 3000,
   });
+  const { data: liveSources } = useQuery({
+    queryKey: ['spectator-live-sources'],
+    queryFn: spectatorApi.getLiveSources,
+    refetchInterval: 2000,
+  });
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [frameTick, setFrameTick] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setFrameTick(Date.now()), 700);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (!liveSources?.length) {
+      setSourceIndex(0);
+      return;
+    }
+    setSourceIndex((current) => Math.min(current, liveSources.length - 1));
+  }, [liveSources?.length]);
+
+  useEffect(() => {
+    if (!liveSources || liveSources.length < 2) return;
+    const interval = window.setInterval(
+      () => setSourceIndex((current) => (current + 1) % liveSources.length),
+      10_000,
+    );
+    return () => window.clearInterval(interval);
+  }, [liveSources?.length]);
+
+  const liveSource = useMemo(
+    () => liveSources?.[sourceIndex] ?? null,
+    [liveSources, sourceIndex],
+  );
+  const frameUrl = liveSource
+    ? `/api/spectator/frame?station=${encodeURIComponent(liveSource.stationId)}&t=${frameTick}`
+    : null;
 
   useEffect(() => {
     document.title = 'SimRacing · Spectateur';
@@ -44,14 +81,26 @@ export function SpectatorScreen() {
           <div className="mt-8 rounded-xl border border-red-400/30 bg-red-400/10 p-8 text-center font-mono text-sm text-red-200">
             Serveur momentanément indisponible — nouvelle tentative automatique…
           </div>
-        ) : servers.length === 0 ? (
+        ) : servers.length === 0 && !liveSources?.length && sessions.length === 0 ? (
           <div className="mt-12 rounded-2xl border border-dashed border-white/15 bg-white/[0.02] p-16 text-center">
             <Activity className="mx-auto h-12 w-12 text-slate-600" />
             <h2 className="mt-4 font-hud text-2xl font-bold text-slate-200">En attente d’une course</h2>
             <p className="mt-2 font-mono text-sm text-slate-500">Les serveurs actifs apparaîtront automatiquement ici.</p>
           </div>
         ) : (
-          <div className="mt-7 grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(340px,1fr))]">
+          <>
+            <section className="mt-7 overflow-hidden rounded-2xl border border-cyan-400/25 bg-black shadow-[0_0_40px_rgba(0,120,255,.12)]">
+              <div className="flex items-center justify-between border-b border-white/10 px-5 py-3 font-mono text-xs uppercase tracking-wider text-slate-400">
+                <span className="flex items-center gap-2"><Activity className="h-3.5 w-3.5 text-cyan-300" /> Assetto Corsa · capture automatique</span>
+                <span className="text-cyan-200">{liveSource ? `Source ${liveSource.stationId}` : 'En attente du flux agent'}</span>
+              </div>
+              {frameUrl ? (
+                <img src={frameUrl} alt="Flux Assetto Corsa" className="max-h-[62vh] min-h-[220px] w-full object-contain" />
+              ) : (
+                <div className="flex min-h-[280px] items-center justify-center font-mono text-sm text-slate-600">L’agent ouvrira automatiquement le flux au lancement d’Assetto Corsa.</div>
+              )}
+            </section>
+            <div className="mt-7 grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(340px,1fr))]">
             {servers.map((server) => {
               const occupied = serverOccupancy(server.id);
               return (
@@ -70,7 +119,8 @@ export function SpectatorScreen() {
                 </article>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
 
         <footer className="mt-8 flex items-center justify-between border-t border-white/10 pt-4 font-mono text-[11px] uppercase tracking-wider text-slate-600"><span className="flex items-center gap-2"><Server className="h-3.5 w-3.5" /> SimRacing Manager</span><span className="flex items-center gap-2"><Wifi className="h-3.5 w-3.5" /> Flux public lecture seule</span></footer>
