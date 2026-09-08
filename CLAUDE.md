@@ -533,6 +533,21 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 - **`[PRACTICE] TIME=` passé à 720 (12h) au lieu de 30 minutes (v2.2.105, demandé par l'utilisateur)** — avec `LOOP_MODE=1`, une durée courte de 30 min faisait automatiquement basculer le serveur en Qualifying puis Race, coupant les pilotes en pleine conduite libre (grille imposée, écran de session) pour un usage qui est en pratique de la conduite libre continue toute la journée. `SUN_ANGLE=80` (~17:00) était déjà une constante fixe identique pour chaque serveur créé — le second point de la demande ("bloquer sur l'heure actuelle qu'on avait mis") était déjà satisfait, aucun champ ne permettant de le faire varier à la création.
 - **`writeServerConfig()` génère `[PRACTICE]`/`[QUALIFY]`/`[RACE]`/`[WEATHER_N]` dynamiquement depuis `payload.raceFormat` depuis v2.2.115** (remplace les blocs figés ci-dessus, voir "Formats de course" en 3.1/3.2/4.2) — `buildSessionSections()`/`buildWeatherSections()`. Une session désactivée est **omise entièrement** du fichier (pas un flag à 0) : `acServer.exe` passe simplement à la session suivante configurée. Repli sur `DEFAULT_RACE_FORMAT` (mêmes valeurs que l'ancien code figé) si `payload.raceFormat` est absent — protection contre un décalage de version backend/agent pendant un déploiement, pas un cas attendu en fonctionnement normal. **Limite du protocole acServer.exe vanilla, assumée et documentée plutôt que contournée par une fausse fonctionnalité** : pas de météo par type de session (Practice/Qualifying/Race partagent toujours les mêmes `[WEATHER_N]`), seulement une rotation entre plusieurs entrées d'un lancement à l'autre si `weatherGraphics` en contient plusieurs.
 
+## 5.13 Vérifications Race et classement (v2.2.153)
+
+- `ServerLauncher.buildSessionSections()` génère séparément les blocs `[PRACTICE]`, `[QUALIFY]` et `[RACE]`. Une étape désactivée est omise ; Race utilise exclusivement `LAPS` ou `TIME` selon `RaceMode`.
+- `raceResultCleaner.getLeaderboard()` choisit la dernière session contenant `raceResult`, donc la session Race après une séquence Practice → Qualifying → Race. Pour un format sans Race, il utilise la session nommée Race/Course puis la dernière session disponible.
+- Les pilotes sans tour valide ou absents de `raceResult` restent après les pilotes classés. Le tableau retourné est trié par position.
+- Tests dédiés dans `apps/agent/src/raceResultCleaner.spec.ts`; la suite agent validée à 66 tests.
+- Limite vanilla `acServer.exe` : la météo reste commune aux trois étapes ; plusieurs entrées `[WEATHER_N]` tournent entre les lancements, pas par étape.
+
+## 5.14 Déploiement portable
+
+- Le frontend utilise `/api` par défaut et ne dépend pas du domaine public.
+- `deploy/.env.example` centralise `PUBLIC_URL`, `PUBLIC_HOST`, `BACKEND_PORT`, `CORS_ORIGIN` et `VITE_API_URL`.
+- `npm run deployment:nginx` ou `node scripts/render-nginx-config.mjs` génère la configuration Nginx adaptée au nouvel hôte et au nouveau port.
+- Après déplacement, régler `SERVER_URL` sur chaque agent Windows, appliquer les migrations Prisma, reconstruire shared → backend → frontend → agent, puis redémarrer le backend.
+
 ## 6. Contrats partagés (`packages/shared`)
 
 Toujours builder ce workspace **avant** backend/agent/frontend si les types/contrats changent.

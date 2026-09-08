@@ -4,7 +4,7 @@ Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au
 
 ## 0. État des releases agent vérifié (2026-09-08)
 
-Les releases GitHub de l’agent ont été relues jusqu’à `v2.2.152`. La chaîne récente est conservée ici : `v2.2.144` (WoL broadcast), `v2.2.145` (contrôle flotte), `v2.2.146` (multi-interface WoL et exclusion admin), `v2.2.147` (actions parallèles), `v2.2.148`/`v2.2.149` (Drive obligatoire), `v2.2.150` (boucle Lua et diagnostics), `v2.2.151` (helper RSlauncher ViGEm), `v2.2.152` (extraction fiable du helper dans pkg), `v2.2.153` (classement Race robuste et déploiement portable). Les versions antérieures restent documentées dans `CHANGELOG.md` et les notes GitHub ; aucune fonctionnalité agent ne doit être supprimée au motif qu’une version intermédiaire n’a pas de tag.
+Les releases GitHub de l’agent ont été relues jusqu’à `v2.2.153`. La chaîne récente est conservée ici : `v2.2.144` (WoL broadcast), `v2.2.145` (contrôle flotte), `v2.2.146` (multi-interface WoL et exclusion admin), `v2.2.147` (actions parallèles), `v2.2.148`/`v2.2.149` (Drive obligatoire), `v2.2.150` (boucle Lua et diagnostics), `v2.2.151` (helper RSlauncher ViGEm), `v2.2.152` (extraction fiable du helper dans pkg), `v2.2.153` (classement Race robuste et déploiement portable). Les versions antérieures restent documentées dans `CHANGELOG.md` et les notes GitHub ; aucune fonctionnalité agent ne doit être supprimée au motif qu’une version intermédiaire n’a pas de tag.
 
 Règle de déploiement : le code agent n’a d’effet sur un POD qu’après installation de l’artefact Windows de la release correspondante. Pour diagnostiquer Drive, lire les logs distants de l’agent puis `Documents/Assetto Corsa/logs/pressdrivekey.log` sur le POD ; Lua est le filet de sécurité, PressDriveKey est la voie d’entrée compatible avec l’ancien RSlauncher.
 
@@ -538,6 +538,21 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
   - **v2.2.78 (le fix v2.2.75 ne suffisait pas)** : signalé par l'utilisateur après un renommage de contenu ("le serveur ne veut plus lancer") — le rename n'y était pour rien (reproduit avec le contenu renommé exact, succès), c'est le même bug de port squatté qui **recommençait des heures après le dernier redémarrage d'agent**, sans qu'aucun nouveau redémarrage n'ait eu lieu. Le nettoyage v2.2.75 ne tournait qu'**au démarrage de l'agent** — un process orphelin apparu depuis (une tentative de lancement en apparence échouée peut laisser le process vivant) squattait son port indéfiniment jusqu'au prochain redémarrage. Fix : `killOrphanedProcesses()` tourne désormais aussi **avant chaque `launch()`**, pas seulement au démarrage de l'agent, et ne tue plus que les `acServer.exe` non suivis dans `servers` (comparaison par PID via `tasklist /FO CSV`, un `parseCsvLine()` local identique à celui de `processMonitor.ts`) — un serveur légitimement en cours (le modèle de données supporte plusieurs serveurs dédiés simultanés par poste) n'est jamais touché.
 - **`[PRACTICE] TIME=` passé à 720 (12h) au lieu de 30 minutes (v2.2.105, demandé par l'utilisateur)** — avec `LOOP_MODE=1`, une durée courte de 30 min faisait automatiquement basculer le serveur en Qualifying puis Race, coupant les pilotes en pleine conduite libre (grille imposée, écran de session) pour un usage qui est en pratique de la conduite libre continue toute la journée. `SUN_ANGLE=80` (~17:00) était déjà une constante fixe identique pour chaque serveur créé — le second point de la demande ("bloquer sur l'heure actuelle qu'on avait mis") était déjà satisfait, aucun champ ne permettant de le faire varier à la création.
 - **`writeServerConfig()` génère `[PRACTICE]`/`[QUALIFY]`/`[RACE]`/`[WEATHER_N]` dynamiquement depuis `payload.raceFormat` depuis v2.2.115** (remplace les blocs figés ci-dessus, voir "Formats de course" en 3.1/3.2/4.2) — `buildSessionSections()`/`buildWeatherSections()`. Une session désactivée est **omise entièrement** du fichier (pas un flag à 0) : `acServer.exe` passe simplement à la session suivante configurée. Repli sur `DEFAULT_RACE_FORMAT` (mêmes valeurs que l'ancien code figé) si `payload.raceFormat` est absent — protection contre un décalage de version backend/agent pendant un déploiement, pas un cas attendu en fonctionnement normal. **Limite du protocole acServer.exe vanilla, assumée et documentée plutôt que contournée par une fausse fonctionnalité** : pas de météo par type de session (Practice/Qualifying/Race partagent toujours les mêmes `[WEATHER_N]`), seulement une rotation entre plusieurs entrées d'un lancement à l'autre si `weatherGraphics` en contient plusieurs.
+
+## 5.13 Vérifications Race et classement (v2.2.153)
+
+- `ServerLauncher.buildSessionSections()` génère séparément les blocs `[PRACTICE]`, `[QUALIFY]` et `[RACE]`. Une étape désactivée est omise ; Race utilise exclusivement `LAPS` ou `TIME` selon `RaceMode`.
+- `raceResultCleaner.getLeaderboard()` choisit la dernière session contenant `raceResult`, donc la session Race après une séquence Practice → Qualifying → Race. Pour un format sans Race, il utilise la session nommée Race/Course puis la dernière session disponible.
+- Les pilotes sans tour valide ou absents de `raceResult` restent après les pilotes classés. Le tableau retourné est trié par position.
+- Tests dédiés dans `apps/agent/src/raceResultCleaner.spec.ts`; la suite agent validée à 66 tests.
+- Limite vanilla `acServer.exe` : la météo reste commune aux trois étapes ; plusieurs entrées `[WEATHER_N]` tournent entre les lancements, pas par étape.
+
+## 5.14 Déploiement portable
+
+- Le frontend utilise `/api` par défaut et ne dépend pas du domaine public.
+- `deploy/.env.example` centralise `PUBLIC_URL`, `PUBLIC_HOST`, `BACKEND_PORT`, `CORS_ORIGIN` et `VITE_API_URL`.
+- `npm run deployment:nginx` ou `node scripts/render-nginx-config.mjs` génère la configuration Nginx adaptée au nouvel hôte et au nouveau port.
+- Après déplacement, régler `SERVER_URL` sur chaque agent Windows, appliquer les migrations Prisma, reconstruire shared → backend → frontend → agent, puis redémarrer le backend.
 
 ## 6. Contrats partagés (`packages/shared`)
 
