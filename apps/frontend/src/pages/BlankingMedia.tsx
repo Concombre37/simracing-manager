@@ -70,11 +70,10 @@ export function BlankingMedia() {
     handleFile(files[0]);
   };
 
-  // Admin (hosting-only) stations never run the AC client and never show
-  // blanking at all (BlankingManager.setEnabled(role !== ADMIN) on the
-  // agent) — listing them here as a send target is misleading, nothing
-  // would ever actually display the media.
-  const simulatorStations = stations?.filter((s) => s.role !== 'admin') ?? [];
+  // Only simulator stations run the AC client and display blanking. Admin and
+  // spectator stations are control/observation machines and are not valid
+  // upload targets for this playlist.
+  const simulatorStations = stations?.filter((s) => s.role === 'simulator') ?? [];
   const onlineStations = simulatorStations.filter((s) => s.status !== 'offline');
   const offlineStations = simulatorStations.filter((s) => s.status === 'offline');
 

@@ -13,6 +13,8 @@ export enum StationStatus {
 export enum StationRole {
   SIMULATOR = 'simulator',
   ADMIN = 'admin',
+  /** Poste dédié à l'observation et à la diffusion Web, sans contrôle POD. */
+  SPECTATOR = 'spectator',
 }
 
 export enum LaunchMode {

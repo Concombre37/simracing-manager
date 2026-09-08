@@ -269,7 +269,10 @@ export class SimRacingAgent {
     // handleStationRole below) — real confirmation arrives over the socket
     // moments later, but an admin station shouldn't even flash blanking
     // once while waiting for that round-trip on every single boot.
-    this.blankingManager.setEnabled(config.STATION_ROLE !== StationRole.ADMIN);
+    // Seuls les postes simulateurs pilotent un écran Assetto Corsa. Les
+    // postes admin et spectateur servent au suivi/diffusion et ne doivent
+    // jamais afficher ni modifier le blanking d'un POD.
+    this.blankingManager.setEnabled(config.STATION_ROLE === StationRole.SIMULATOR);
     this.blankingManager.setAuto();
 
     await this.resolveAcPath();
@@ -1083,7 +1086,7 @@ export class SimRacingAgent {
 
   private handleStationRole(payload: { role: StationRole }): void {
     this.logger.info({ role: payload.role }, 'Station role received');
-    this.blankingManager.setEnabled(payload.role !== StationRole.ADMIN);
+    this.blankingManager.setEnabled(payload.role === StationRole.SIMULATOR);
     if (config.STATION_ROLE !== payload.role) {
       config.STATION_ROLE = payload.role;
       try {

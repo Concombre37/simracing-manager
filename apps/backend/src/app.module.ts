@@ -29,6 +29,7 @@ import { MenuModule } from './menu/menu.module';
 import { ArcadeModule } from './arcade/arcade.module';
 import { TabletMenuHtmlModule } from './tablet-menu-html/tablet-menu-html.module';
 import { BulkActionsModule } from './bulk-actions/bulk-actions.module';
+import { SpectatorModule } from './spectator/spectator.module';
 import { envSchema } from './config/env.validation';
 
 @Module({
@@ -70,6 +71,7 @@ import { envSchema } from './config/env.validation';
     ArcadeModule,
     TabletMenuHtmlModule,
     BulkActionsModule,
+    SpectatorModule,
   ],
 })
 export class AppModule {}

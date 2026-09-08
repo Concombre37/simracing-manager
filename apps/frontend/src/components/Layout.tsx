@@ -34,6 +34,7 @@ const primaryNavItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/stations', label: 'Postes', icon: Monitor },
   { path: '/dedicated-servers', label: 'Serveurs', icon: Server },
+  { path: '/spectator', label: 'Spectateur', icon: Tv },
 ];
 
 // Consulté occasionnellement — toujours à un clic, juste visuellement plus
@@ -61,6 +62,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/': ['Dashboard'],
   '/stations': ['Postes'],
   '/dedicated-servers': ['Serveurs'],
+  '/spectator': ['Spectateur'],
   '/dedicated-servers/create': ['Serveurs', 'Nouveau serveur'],
   '/leaderboard': ['Classement'],
   '/en-cours': ['Sessions en cours'],

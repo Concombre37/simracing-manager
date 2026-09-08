@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.154 — Mode Spectateur et rediffusions Web
+
+- Ajout du rôle station `spectator`, séparé des simulateurs et des postes admin. Il est exclu du lancement, des actions flotte, des joins serveur et du blanking.
+- Nouvelle page `/spectator` : serveurs actifs, pilotes en piste, postes spectateurs et accès rapide à la vue TV.
+- Capture d’écran depuis le navigateur via `getDisplayMedia`/`MediaRecorder`, stockage serveur en base, lecture Web authentifiée et téléchargement des rediffusions.
+- Ajout des endpoints `/api/spectator/recordings` et de la table `screen_recordings` (migration Prisma).
+
 ## v2.2.153 — Classement fiable pour les formats Practice / Qualifying / Race
 
 - L’écran de résultats choisit désormais la session Race quand un serveur contient Practice, Qualifying et Race, au lieu de prendre systématiquement la première session écrite par Assetto Corsa.

@@ -63,6 +63,9 @@ const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m
 const PodsControl = lazy(() =>
   import('./pages/PodsControl').then((m) => ({ default: m.PodsControl })),
 );
+const Spectator = lazy(() =>
+  import('./pages/Spectator').then((m) => ({ default: m.Spectator })),
+);
 
 const queryClient = new QueryClient();
 
@@ -146,6 +149,14 @@ function AnimatedRoutes() {
             element={
               <ProtectedRoute>
                 <DedicatedServers />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/spectator"
+            element={
+              <ProtectedRoute>
+                <Spectator />
               </ProtectedRoute>
             }
           />

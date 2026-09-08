@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.153`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.154`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -215,7 +215,7 @@ sim-center-manager/
 ### 3.2 Modèle de données (Prisma)
 
 - **`User`**: `id, email (unique), password, role (technician|admin), createdAt, updatedAt`.
-- **`Station`**: `id, stationId (unique, business id), name, role (simulator|admin), apiKeyHash, version, localIp, macAddress, lastSeenAt, status, blankingActive, config (json), content (json — cars/tracks scannés), createdAt, updatedAt`. Relations: `sessions[]`, `dedicatedServers[]`, `contentPreviews[]`, `blankingMedia[]`.
+- **`Station`**: `id, stationId (unique, business id), name, role (simulator|admin|spectator), apiKeyHash, version, localIp, macAddress, lastSeenAt, status, blankingActive, config (json), content (json — cars/tracks scannés), createdAt, updatedAt`. Relations: `sessions[]`, `dedicatedServers[]`, `contentPreviews[]`, `blankingMedia[]`.
 - **`Session`**: `id, stationId (FK Station.id — PAS la business stationId, voir gotcha 3.3), type (direct_launch|dedicated_join), serverId?, clientId? (FK Client), clientName?, difficulty?, gearbox?, carAcId?, track?, trackLayout?, durationMinutes?, config (json), status (pending|running|finished), startedAt?, endedAt?, result (json — race_out.json nettoyé), createdAt, updatedAt`. Relations: `station`, `client?`, `telemetryFiles[]`.
 - **`Client`** (v2.2.63) : `id, name (unique), createdAt, updatedAt`. Relation: `sessions[]`. Find-or-create insensible à la casse dans `ClientsService`.
 - **`TelemetryFile`**: `id, sessionId (FK), fileName, sizeBytes, content (bytes?), createdAt`.
@@ -261,6 +261,7 @@ sim-center-manager/
 | `/`                               | `Dashboard`             | `ProtectedRoute` (sidebar)    |                                                                   |
 | `/stations`                       | `Stations`              | `ProtectedRoute`              |                                                                   |
 | `/dedicated-servers`              | `DedicatedServers`      | `ProtectedRoute`              |                                                                   |
+| `/spectator`                      | `Spectator`             | `ProtectedRoute`              | suivi serveurs, capture MediaRecorder et bibliothèque Web, v2.2.154 |
 | `/dedicated-servers/create`       | `CreateDedicatedServer` | `ProtectedRoute`              |                                                                   |
 | `/dedicated-servers/:id/join`     | `JoinServer`            | `ProtectedRoute`              |                                                                   |
 | `/leaderboard`                    | `Leaderboard`           | `ProtectedRoute`              | classement par circuit/voiture, v2.2.102 — voir 4.2               |
@@ -566,7 +567,7 @@ Toujours builder ce workspace **avant** backend/agent/frontend si les types/cont
 
 ### 6.4 Types partagés clés
 
-`HeartbeatPayload`, `LogPayload`, `ResultsPayload`, `TelemetryCsvPayload`, `StatusPayload`, `TelemetrySnapshot`, `LaunchSessionPayload`, `LaunchDedicatedServerPayload`. Enums : `StationRole` (`SIMULATOR`, `ADMIN`), `StationStatus`, `LaunchMode`, `SessionStatus`, `GearboxMode`.
+`HeartbeatPayload`, `LogPayload`, `ResultsPayload`, `TelemetryCsvPayload`, `StatusPayload`, `TelemetrySnapshot`, `LaunchSessionPayload`, `LaunchDedicatedServerPayload`. Enums : `StationRole` (`SIMULATOR`, `ADMIN`, `SPECTATOR`), `StationStatus`, `LaunchMode`, `SessionStatus`, `GearboxMode`.
 
 - Historique dead-code cleanup (v2.2.40/41) : `HeartbeatPayload.cmRunning`/`vrConnected` étaient toujours `false`, jamais consommés — supprimés du contrat et de l'agent.
 - Changer un contrat oblige à rebuilder tous les workspaces qui en dépendent.
@@ -771,3 +772,10 @@ gh release view vX.Y.Z --json assets -q '.assets[].name'
 - Mettre à jour ce fichier (et `.kimi/skills/simracing-manager/SKILL.md`, sa copie miroir, et `CHANGELOG.md`) à chaque changement d'architecture, d'étape de build ou de déploiement.
 - Ne jamais forger de JWT pour usurper un compte utilisateur réel existant — créer un compte de test jetable à la place.
 - Toute action ayant un effet physique réel sur le matériel de production (lancer un serveur, rejoindre un POD, déclencher une mise à jour/redémarrage d'agent) nécessite une autorisation explicite de l'utilisateur, et doit être nettoyée après usage.
+## 5.15 Mode Spectateur et rediffusions Web (v2.2.154)
+
+Le rôle `StationRole.SPECTATOR` (`spectator`) désigne un poste réservé au suivi et à la diffusion. Il est proposé dans `CreateStationModal`, visible dans une section dédiée de `/stations`, mais il n'est jamais une cible du lancement direct, des joins serveur, des actions groupées de flotte ou du blanking. L'agent n'active le blanking que si le rôle reçu est exactement `SIMULATOR`; les rôles `ADMIN` et `SPECTATOR` restent des postes de contrôle/observation.
+
+`/spectator` est une page authentifiée qui agrège les serveurs dédiés actifs, les sessions en cours et les postes spectateurs avec rafraîchissement périodique et invalidation Socket.IO. La capture se fait volontairement depuis le navigateur avec `getDisplayMedia` et `MediaRecorder`, puis le fichier WebM est envoyé à l'API à l'arrêt. Le navigateur recharge le fichier avec Axios authentifié pour la lecture Web.
+
+`SpectatorController` expose `GET/POST /api/spectator/recordings`, `GET /api/spectator/recordings/:id/file` et `DELETE /api/spectator/recordings/:id`. Les fichiers sont stockés dans PostgreSQL (`screen_recordings`, migration `20260908110000_add_screen_recordings`, maximum 500 Mo). Le live HLS/WebRTC nécessiterait un relay média dédié ; cette release fournit la capture et la rediffusion à la demande.

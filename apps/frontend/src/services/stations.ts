@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 
-export type StationRole = 'simulator' | 'admin';
+export type StationRole = 'simulator' | 'admin' | 'spectator';
 
 export interface Station {
   id: string;

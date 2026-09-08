@@ -55,6 +55,24 @@ model Station {
   @@map("stations")
 }
 
+/// Screen recordings created from the Spectator workspace. The WebM/MP4
+/// bytes stay server-side so an authenticated browser can replay or download
+/// them later without relying on the capture computer being online.
+model ScreenRecording {
+  id              String   @id @default(uuid()) @db.Uuid
+  title           String
+  fileName        String   @map("file_name")
+  mimeType        String   @map("mime_type")
+  sizeBytes       Int      @map("size_bytes")
+  durationSeconds Float?   @map("duration_seconds")
+  data            Bytes    @db.ByteA
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("screen_recordings")
+}
+
 model Session {
   id              String    @id @default(uuid()) @db.Uuid
   stationId       String    @map("station_id") @db.Uuid

@@ -4,7 +4,7 @@ import { downloadEnvFile } from '../utils/downloadEnv';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
 import { Input, Label } from './ui/Input';
-import { Copy, Check, Download, Gamepad2, Server } from 'lucide-react';
+import { Copy, Check, Download, Gamepad2, Server, Tv } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
@@ -28,6 +28,12 @@ const ROLE_OPTIONS: {
     label: 'Admin',
     description: 'PC hébergement (serveurs dédiés)',
     icon: Server,
+  },
+  {
+    value: 'spectator',
+    label: 'Spectateur',
+    description: 'Suivi, capture et rediffusion Web',
+    icon: Tv,
   },
 ];
 
@@ -130,7 +136,7 @@ export function CreateStationModal({ onClose, onCreated }: Props) {
           </div>
           <div>
             <Label>Type de poste</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               {ROLE_OPTIONS.map((option) => {
                 const Icon = option.icon;
                 const selected = role === option.value;

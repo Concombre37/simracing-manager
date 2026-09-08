@@ -30,6 +30,7 @@ import {
   Server,
   Terminal,
   AlertTriangle,
+  Tv,
 } from 'lucide-react';
 
 type StatusFilter = 'all' | Station['status'];
@@ -47,6 +48,7 @@ const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
   { value: 'all', label: 'Tous types' },
   { value: 'simulator', label: 'Simulateurs' },
   { value: 'admin', label: 'Admin' },
+  { value: 'spectator', label: 'Spectateurs' },
 ];
 
 const STATUS_VARIANT: Record<
@@ -230,6 +232,7 @@ export function Stations() {
 
   const simulatorRows = filtered.filter((s) => s.role === 'simulator');
   const adminRows = filtered.filter((s) => s.role === 'admin');
+  const spectatorRows = filtered.filter((s) => s.role === 'spectator');
 
   const rowProps = {
     isAdmin,
@@ -365,6 +368,24 @@ export function Stations() {
             <motion.div layout className="flex flex-col gap-2">
               <AnimatePresence mode="popLayout">
                 {adminRows.map((station) => (
+                  <StationRow
+                    key={station.id}
+                    station={station}
+                    expanded={expandedId === station.id}
+                    {...rowProps}
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          </section>
+        )}
+
+        {spectatorRows.length > 0 && (
+          <section>
+            <SectionHeader title="Spectateurs" hint="suivi et diffusion Web" dot="cyan" />
+            <motion.div layout className="flex flex-col gap-2">
+              <AnimatePresence mode="popLayout">
+                {spectatorRows.map((station) => (
                   <StationRow
                     key={station.id}
                     station={station}
@@ -599,6 +620,11 @@ function StationRow({
         {station.role === 'admin' && (
           <div className="grid h-8 w-8 flex-none place-items-center rounded-md border border-purple-400/30 bg-purple-400/10 text-purple-200">
             <Server className="h-4 w-4" />
+            </div>
+          )}
+        {station.role === 'spectator' && (
+          <div className="grid h-8 w-8 flex-none place-items-center rounded-md border border-racing-cyan/30 bg-racing-cyan/10 text-racing-cyan">
+            <Tv className="h-4 w-4" />
           </div>
         )}
 
@@ -616,6 +642,11 @@ function StationRow({
             {station.role === 'admin' && (
               <span className="flex-none whitespace-nowrap rounded border border-purple-400/35 px-2 py-0.5 font-hud text-[11px] font-bold text-purple-200">
                 Admin
+              </span>
+            )}
+            {station.role === 'spectator' && (
+              <span className="flex-none whitespace-nowrap rounded border border-racing-cyan/35 px-2 py-0.5 font-hud text-[11px] font-bold text-racing-cyan">
+                Spectateur
               </span>
             )}
             <span className="flex flex-none items-center gap-1.5 whitespace-nowrap font-hud text-[13px] font-semibold text-gray-500">
@@ -721,7 +752,7 @@ function StationRow({
                 </CommandGroup>
               )}
 
-              {isAdmin && (
+              {isAdmin && station.role === 'simulator' && (
                 <CommandGroup title="Écran">
                   <Chip icon={Eye} onClick={() => onSendCommand(station.stationId, 'blankingHide')}>
                     Masquer
@@ -784,6 +815,14 @@ function StationRow({
                     onClick={() => onUpdateRole(station.id, 'admin')}
                   >
                     Admin
+                  </Chip>
+                  <Chip
+                    icon={Tv}
+                    active={station.role === 'spectator'}
+                    isLoading={updateRolePendingId === station.id}
+                    onClick={() => onUpdateRole(station.id, 'spectator')}
+                  >
+                    Spectateur
                   </Chip>
                 </CommandGroup>
               )}
