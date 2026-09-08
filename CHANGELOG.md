@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.2.150 — Réparation de la boucle Lua Drive et diagnostics distants
+
+- Suppression de la lecture Lua de `sim.isSessionStarted` : ce champ appartient au payload calculé par notre lecteur Node et ne doit pas être supposé présent dans `ac.StateSim`. Drive utilise l'état du menu CSP, avec une seconde stable hors menu avant de terminer les tentatives.
+- Les tentatives toutes les 500 ms utilisent `os.preciseClock()`, indépendamment de `dt`, qui peut être nul dans le menu. Les erreurs de `ac.tryToStart()` deviennent visibles.
+- Correction de deux références Lua appelées avant leur déclaration locale (`readSessionId` et `sendHttpTelemetry`), qui interrompaient la télémétrie.
+- Les logs demandés depuis le site incluent désormais les fichiers de diagnostic Lua horodatés : chargement, erreur, état du menu, nombre de tentatives et drapeau Drive. Un fichier absent est signalé explicitement.
+- Les commandes de toutes les instances LuaBridge utilisent des UUID pour éviter les collisions de compteur. En lancement direct, le drapeau est armé après la fin de taskkill de l'ancien jeu.
+- Tests : exécution du vrai script livré sous LuaJIT avec API stricte, menu connecté avec `dt=0`, sortie transitoire du menu, erreur de Drive et télémétrie. Ces tests sont ajoutés à la CI, en complément des 64 tests agent.
+
 ## v2.2.149 — Mise en Drive obligatoire pour tous les formats
 
 ### Corrigé

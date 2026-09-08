@@ -89,3 +89,12 @@ jobs:
 
       - name: Run tests
         run: npm run test
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Execute shipped CSP app with LuaJIT
+        run: |
+          python -m pip install lupa==2.6
+          python apps/agent/scripts/test-lua.py

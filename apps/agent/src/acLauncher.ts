@@ -60,9 +60,9 @@ export class AcLauncher {
     await this.configureVideoIni(documentsPath);
     await this.configureGameplayIni(documentsPath);
     await this.ensureLuaAppInstalled();
-    await this.luaBridge.setAutoDriveFlag();
 
     if (config.LAUNCH_MODE === 'cm') {
+      await this.luaBridge.setAutoDriveFlag();
       await this.launchViaContentManager({
         host: String(cfg.serverIp ?? ''),
         port: Number(cfg.serverPort ?? 0),
@@ -86,7 +86,6 @@ export class AcLauncher {
     await fs.mkdir(cfgDir, { recursive: true });
 
     await this.ensureLuaAppInstalled();
-    await this.luaBridge.setAutoDriveFlag();
 
     await this.writeJoinRaceIni(cfgDir, {
       track: joinConfig.track,
@@ -396,10 +395,11 @@ export class AcLauncher {
 
     // Kill any existing AC process so the new race.ini is read.
     if (process.platform === 'win32') {
-      spawn('taskkill', ['/F', '/IM', 'acs.exe'], { stdio: 'ignore' });
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await this.killProcess('acs.exe');
     }
 
+    // Arm after the old process exits: it must not consume the new launch's flag.
+    await this.luaBridge.setAutoDriveFlag();
     this.currentProcess = spawn(acsExe, [], {
       cwd: acPath,
       detached: true,

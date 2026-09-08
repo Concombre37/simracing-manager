@@ -8,7 +8,11 @@ local joinFlagFile = commandsDir .. "/join.flag"
 local stationFile = commandsDir .. "/station.txt"
 
 local lastCommandId = nil
-local autoDriveCooldown = 0
+local nextAutoDriveAt = 0
+local driveReadySince = nil
+local autoDriveAttempts = 0
+local readSessionId
+local sendHttpTelemetry
 
 local telemetryEnabled = false
 local telemetryCooldown = 0
@@ -31,7 +35,7 @@ local function writeMarkerFile(name, content)
   end
 end
 
-writeMarkerFile("lua_loaded.txt", os.time() .. " v2.0.25")
+writeMarkerFile("lua_loaded.txt", os.time() .. " v2.0.26")
 
 local function parseCommand(path)
   local file = io.open(path, "r")
@@ -161,7 +165,7 @@ local function sendTelemetry(sim, car)
     sessionId = sessionId,
     timestamp = math.floor(sim.timestampMs or (os.time() * 1000)),
     isInMainMenu = sim.isInMainMenu == true,
-    isSessionStarted = sim.isSessionStarted == true,
+    isSessionStarted = sim.isInMainMenu == false,
     isOnlineRace = sim.isOnlineRace == true,
     speedKmh = car.speedKmh or 0,
     rpm = car.rpm or 0,
@@ -201,7 +205,7 @@ local function sendTelemetry(sim, car)
   sendHttpTelemetry(json)
 end
 
-local function sendHttpTelemetry(json)
+sendHttpTelemetry = function(json)
   local ok, http = pcall(function() return require("socket.http") end)
   if not ok or not http then
     return
@@ -224,7 +228,8 @@ end
 local function executeCommand(cmd)
   ac.log("SimCenterManager command: " .. tostring(cmd.type))
   if cmd.type == "autoStart" then
-    pcall(function() ac.tryToStart(true) end)
+    local ok, err = pcall(function() ac.tryToStart() end)
+    if not ok then writeMarkerFile("lua_error.txt", "Drive: " .. tostring(err)) end
   elseif cmd.type == "teleportToPits" then
     ac.tryToTeleportToPits()
   elseif cmd.type == "idealLine" then
@@ -245,12 +250,12 @@ local function executeCommand(cmd)
     if ac.joinOnlineRace then
       pcall(function() ac.joinOnlineRace(host, port, password) end)
     else
-      pcall(function() ac.tryToStart(true) end)
+      pcall(function() ac.tryToStart() end)
     end
   end
 end
 
-ac.log("[SimCenterManager] Lua app loaded, version 2.0.25")
+ac.log("[SimCenterManager] Lua app loaded, version 2.0.26")
 
 local function scriptUpdate(dt)
   local sim = ac.getSim()
@@ -263,19 +268,27 @@ local function scriptUpdate(dt)
 
   -- Every agent-driven launch must enter Drive, regardless of its race
   -- format or launch mode. Keep retrying while AC is in the menu and only
-  -- acknowledge success once the simulation reports a started session.
+  -- Menu time can be paused (dt == 0), so retry using CSP's real clock.
+  -- isSessionStarted belongs to our Node telemetry payload, not StateSim.
   if flagExists(joinFlagFile) then
-    if sim.isSessionStarted == true then
-      removeFlag(joinFlagFile)
-      autoDriveCooldown = 0
-      ac.log("[SimCenterManager] Drive confirmed, auto-Drive flag cleared")
-    elseif sim.isInMainMenu then
-      autoDriveCooldown = autoDriveCooldown - dt
-      if autoDriveCooldown <= 0 then
+    local now = os.preciseClock()
+    if sim.isInMainMenu then
+      driveReadySince = nil
+      if now >= nextAutoDriveAt then
+        nextAutoDriveAt = now + 0.5
+        autoDriveAttempts = autoDriveAttempts + 1
         ac.log("[SimCenterManager] Auto-Drive flag detected, requesting Drive")
-        pcall(function() ac.tryToStart(true) end)
-        autoDriveCooldown = 0.5
+        local ok, err = pcall(function() ac.tryToStart() end)
+        if not ok then writeMarkerFile("lua_error.txt", "Drive: " .. tostring(err)) end
       end
+    elseif sim.isInMainMenu == false and car ~= nil then
+      driveReadySince = driveReadySince or now
+      if now - driveReadySince >= 1 then
+        removeFlag(joinFlagFile)
+        ac.log("[SimCenterManager] Drive confirmed: outside menu for one second")
+      end
+    else
+      driveReadySince = nil
     end
   end
 
@@ -286,8 +299,17 @@ local function scriptUpdate(dt)
     executeCommand(cmd)
   end
 
+  -- Report control health before telemetry, so a telemetry error cannot hide it.
+  writeStatus(statusFile, {
+    inMainMenu = sim.isInMainMenu and 1 or 0,
+    isOnlineRace = sim.isOnlineRace and 1 or 0,
+    autoDrivePending = flagExists(joinFlagFile) and 1 or 0,
+    autoDriveAttempts = autoDriveAttempts,
+    timestamp = os.time(),
+  })
+
   -- Telemetry lifecycle: stream whenever the player is in a driving session.
-  local isSession = not sim.isInMainMenu or (sim.isSessionStarted == true)
+  local isSession = sim.isInMainMenu == false
   local canStream = car ~= nil and isSession
   updateCount = updateCount + 1
   if updateCount - lastMarkerAt > 300 then
@@ -296,7 +318,7 @@ local function scriptUpdate(dt)
       updateCount ..
       " idx=" .. tostring(carIndex) ..
       " menu=" .. tostring(sim.isInMainMenu) ..
-      " session=" .. tostring(sim.isSessionStarted) ..
+      " session=" .. tostring(isSession) ..
       " online=" .. tostring(sim.isOnlineRace) ..
       " car=" .. tostring(car and true) ..
       " stream=" .. tostring(canStream))
@@ -323,12 +345,6 @@ local function scriptUpdate(dt)
     end
   end
 
-  -- Report basic status back to the agent.
-  writeStatus(statusFile, {
-    inMainMenu = sim.isInMainMenu and 1 or 0,
-    isOnlineRace = sim.isOnlineRace and 1 or 0,
-    timestamp = os.time(),
-  })
 end
 
 local function readClientName()
@@ -349,7 +365,7 @@ local function readClientName()
   return cachedClientName
 end
 
-local function readSessionId()
+readSessionId = function()
   if cachedSessionId then return cachedSessionId end
   local file = io.open(commandsDir .. "/session.txt", "r")
   if not file then return nil end

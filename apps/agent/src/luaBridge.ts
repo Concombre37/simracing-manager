@@ -1,11 +1,11 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import { Logger } from 'pino';
 import { config } from './config';
 
 export class LuaBridge {
   private commandFile: string;
-  private commandId = 0;
 
   constructor(private readonly logger: Logger) {
     const documentsPath =
@@ -17,13 +17,28 @@ export class LuaBridge {
   }
 
   async sendCommand(type: string, params: Record<string, string> = {}): Promise<void> {
-    this.commandId += 1;
-    const lines = [`id=${this.commandId}`, `type=${type}`];
+    const commandId = randomUUID();
+    const lines = [`id=${commandId}`, `type=${type}`];
     for (const [key, value] of Object.entries(params)) {
       lines.push(`${key}=${value}`);
     }
     await fs.writeFile(this.commandFile, lines.join('\n'), 'utf-8');
-    this.logger.info({ type, commandId: this.commandId }, 'Sent Lua command');
+    this.logger.info({ type, commandId }, 'Sent Lua command');
+  }
+
+  async diagnosticLines(): Promise<string[]> {
+    return Promise.all(
+      ['lua_loaded.txt', 'status.txt', 'lua_error.txt', 'join.flag'].map(async (name) => {
+        const file = path.join(path.dirname(this.commandFile), name);
+        try {
+          const content = await fs.readFile(file, 'utf-8');
+          const stat = await fs.stat(file);
+          return `[Lua ${stat.mtime.toISOString()}] ${name}: ${content.slice(0, 2000).replace(/[\r\n]+/g, ' ')}`;
+        } catch {
+          return `[Lua] ${name}: absent ou inaccessible (${file})`;
+        }
+      }),
+    );
   }
 
   async autoStart(): Promise<void> {

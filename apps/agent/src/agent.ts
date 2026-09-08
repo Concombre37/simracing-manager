@@ -510,10 +510,11 @@ export class SimRacingAgent {
     this.socket.on('logs:request', () => this.handleLogsRequest());
   }
 
-  private handleLogsRequest(): void {
+  private async handleLogsRequest(): Promise<void> {
+    const luaDiagnostics = await this.luaBridge.diagnosticLines();
     this.socket?.emit('agent:logs', {
       stationId: config.STATION_ID,
-      lines: agentLogRingBuffer.getLines(),
+      lines: [...agentLogRingBuffer.getLines(), ...luaDiagnostics],
     });
   }
 
