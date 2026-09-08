@@ -16,6 +16,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "npm run test:e2e --workspaces --if-present",
+    "deployment:nginx": "node scripts/render-nginx-config.mjs",
     "prepare": "husky"
   },
   "devDependencies": {

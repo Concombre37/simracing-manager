@@ -14,6 +14,7 @@ export interface RaceResultLap {
 }
 
 export interface RaceResultSession {
+  name?: string;
   lapstotal?: number[];
   laps?: RaceResultLap[];
   raceResult?: number[];
@@ -123,7 +124,17 @@ export function getLeaderboard(resultData: RaceResultData): {
   laps: number;
   bestLapMs: number;
 }[] {
-  const session = resultData.sessions[0];
+  // AC writes one result block per enabled session. Prefer the final Race
+  // block (identified by a raceResult), then a named Race block, and only
+  // fall back to the last available block for Practice/Qualifying-only runs.
+  // Reading sessions[0] made a Practice -> Qualifying -> Race server show the
+  // wrong classification on the results screen.
+  const session =
+    [...resultData.sessions].reverse().find((candidate) => candidate.raceResult?.length) ??
+    [...resultData.sessions]
+      .reverse()
+      .find((candidate) => /race|course/i.test(candidate.name ?? '')) ??
+    resultData.sessions.at(-1);
   if (!session) return [];
 
   const players = resultData.players ?? [];
@@ -133,27 +144,44 @@ export function getLeaderboard(resultData: RaceResultData): {
 
   const entries = players.map((player, index) => {
     const bestLap = bestLaps.find((bl) => bl.car === index);
+    const fallbackLap = (session.laps ?? [])
+      .filter((lap) => lap.car === index && lap.time > 0)
+      .sort((a, b) => a.time - b.time)[0];
     return {
       position: 0,
       name: player.name || `Pilote ${index + 1}`,
       car: player.car || '-',
       laps: lapstotal[index] ?? 0,
-      bestLapMs: bestLap?.time ?? 0,
+      bestLapMs: bestLap?.time ?? fallbackLap?.time ?? 0,
     };
   });
 
   if (raceResult.length > 0) {
+    const classified = new Set<number>();
     raceResult.forEach((carIndex, position) => {
       if (entries[carIndex]) {
         entries[carIndex].position = position + 1;
+        classified.add(carIndex);
       }
     });
+    // Drivers not present in raceResult (DNF/no classified finish) stay after
+    // classified drivers, ordered by completed laps and then best valid lap.
+    const unclassified = entries
+      .filter((_, index) => !classified.has(index))
+      .sort((a, b) => b.laps - a.laps || validLap(a.bestLapMs) - validLap(b.bestLapMs));
+    unclassified.forEach((entry, index) => {
+      entry.position = raceResult.length + index + 1;
+    });
   } else {
-    entries.sort((a, b) => b.laps - a.laps || a.bestLapMs - b.bestLapMs);
+    entries.sort((a, b) => b.laps - a.laps || validLap(a.bestLapMs) - validLap(b.bestLapMs));
     entries.forEach((entry, index) => {
       entry.position = index + 1;
     });
   }
 
-  return entries;
+  return entries.sort((a, b) => a.position - b.position);
+}
+
+function validLap(timeMs: number): number {
+  return timeMs > 0 ? timeMs : Number.POSITIVE_INFINITY;
 }

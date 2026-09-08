@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.153 — Classement fiable pour les formats Practice / Qualifying / Race
+
+- L’écran de résultats choisit désormais la session Race quand un serveur contient Practice, Qualifying et Race, au lieu de prendre systématiquement la première session écrite par Assetto Corsa.
+- Les pilotes sans tour valide sont placés après les pilotes classés et les résultats sont affichés dans l’ordre de position.
+- Ajout d’une configuration de déploiement portable (`deploy/.env.example` et génération Nginx) pour changer l’hôte et le port sans modifier le code métier.
+
 ## v2.2.152 — Extraction fiable du helper dans l’exécutable pkg
 
 - L’extraction de `PressDriveKey.exe` utilise maintenant `readFile`/`writeFile`, compatibles avec les assets embarqués dans l’exécutable pkg. Le helper est donc réellement disponible au lancement du POD.
