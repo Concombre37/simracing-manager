@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.152 — Extraction fiable du helper dans l’exécutable pkg
+
+- L’extraction de `PressDriveKey.exe` utilise maintenant `readFile`/`writeFile`, compatibles avec les assets embarqués dans l’exécutable pkg. Le helper est donc réellement disponible au lancement du POD.
+
 ## v2.2.151 — Helper manette du RSlauncher pour le bouton Drive
 
 - Réintégration du mécanisme qui fonctionnait dans l’ancien RSlauncher : `PressDriveKey.exe` crée une manette Xbox virtuelle via ViGEmBus et envoie trois appuis sur `A` après le chargement de la fenêtre Assetto Corsa.

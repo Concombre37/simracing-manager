@@ -451,7 +451,8 @@ export class AcLauncher {
       await fs.mkdir(path.dirname(logPath), { recursive: true });
       // In a pkg snapshot the asset is readable but not executable. Extract
       // it to TEMP before spawning it; a real installed tools/ copy also works.
-      await fs.copyFile(source, helperPath);
+      const helperBytes = await fs.readFile(source);
+      await fs.writeFile(helperPath, helperBytes);
       const child = spawn(
         helperPath,
         [
