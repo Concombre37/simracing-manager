@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.154`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.155`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -779,3 +779,5 @@ Le rôle `StationRole.SPECTATOR` (`spectator`) désigne un poste réservé au su
 `/spectator` est une page authentifiée qui agrège les serveurs dédiés actifs, les sessions en cours et les postes spectateurs avec rafraîchissement périodique et invalidation Socket.IO. La capture se fait volontairement depuis le navigateur avec `getDisplayMedia` et `MediaRecorder`, puis le fichier WebM est envoyé à l'API à l'arrêt. Le navigateur recharge le fichier avec Axios authentifié pour la lecture Web.
 
 `SpectatorController` expose `GET/POST /api/spectator/recordings`, `GET /api/spectator/recordings/:id/file` et `DELETE /api/spectator/recordings/:id`. Les fichiers sont stockés dans PostgreSQL (`screen_recordings`, migration `20260908110000_add_screen_recordings`, maximum 500 Mo). Le live HLS/WebRTC nécessiterait un relay média dédié ; cette release fournit la capture et la rediffusion à la demande.
+
+`/spectator/screen` est l'écran public plein écran pour une TV. Il lit `GET /api/spectator/screen-state` (serveurs et sessions sans secrets) toutes les trois secondes. `SpectatorManager` ouvre automatiquement Edge/Chrome avec `--kiosk` quand l'agent Windows reçoit `StationRole.SPECTATOR` et ferme le processus qu'il a lancé à l'arrêt ; aucune connexion dashboard n'est nécessaire sur le poste d'affichage.

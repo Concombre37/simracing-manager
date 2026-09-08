@@ -66,6 +66,9 @@ const PodsControl = lazy(() =>
 const Spectator = lazy(() =>
   import('./pages/Spectator').then((m) => ({ default: m.Spectator })),
 );
+const SpectatorScreen = lazy(() =>
+  import('./pages/SpectatorScreen').then((m) => ({ default: m.SpectatorScreen })),
+);
 
 const queryClient = new QueryClient();
 
@@ -128,6 +131,7 @@ function AnimatedRoutes() {
       <Suspense fallback={<RouteFallback />}>
         <Routes location={location} key={location.pathname}>
           <Route path="/login" element={<Login />} />
+          <Route path="/spectator/screen" element={<SpectatorScreen />} />
           <Route
             path="/"
             element={

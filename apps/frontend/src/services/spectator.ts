@@ -12,7 +12,35 @@ export interface ScreenRecording {
   downloadUrl: string;
 }
 
+export interface SpectatorScreenState {
+  updatedAt: string;
+  servers: {
+    id: string;
+    name: string;
+    track: string;
+    trackLayout: string | null;
+    status: string;
+    maxClients: number;
+    stationName: string;
+    stationIp: string | null;
+    raceFormatName: string | null;
+    startedAt: string | null;
+  }[];
+  sessions: {
+    id: string;
+    serverId: string | null;
+    clientName: string | null;
+    carAcId: string | null;
+    track: string | null;
+    status: string;
+    stationName: string;
+    startedAt: string | null;
+  }[];
+}
+
 export const spectatorApi = {
+  getPublicScreenState: () =>
+    api.get<SpectatorScreenState>('/spectator/screen-state').then((res) => res.data),
   listRecordings: () => api.get<ScreenRecording[]>('/spectator/recordings').then((res) => res.data),
   uploadRecording: (file: Blob, fileName: string, title: string, durationSeconds: number) => {
     const form = new FormData();

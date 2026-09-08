@@ -1,10 +1,10 @@
 # SimRacing Manager — Skill
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.154`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.155`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 0. État des releases agent vérifié (2026-09-08)
 
-Les releases GitHub de l’agent ont été relues jusqu’à `v2.2.154`. La chaîne récente est conservée ici : `v2.2.144` (WoL broadcast), `v2.2.145` (contrôle flotte), `v2.2.146` (multi-interface WoL et exclusion admin), `v2.2.147` (actions parallèles), `v2.2.148`/`v2.2.149` (Drive obligatoire), `v2.2.150` (boucle Lua et diagnostics), `v2.2.151` (helper RSlauncher ViGEm), `v2.2.152` (extraction fiable du helper dans pkg), `v2.2.153` (classement Race robuste et déploiement portable), `v2.2.154` (rôle Spectateur et capture Web). Les versions antérieures restent documentées dans `CHANGELOG.md` et les notes GitHub ; aucune fonctionnalité agent ne doit être supprimée au motif qu’une version intermédiaire n’a pas de tag.
+Les releases GitHub de l’agent ont été relues jusqu’à `v2.2.155`. La chaîne récente est conservée ici : `v2.2.144` (WoL broadcast), `v2.2.145` (contrôle flotte), `v2.2.146` (multi-interface WoL et exclusion admin), `v2.2.147` (actions parallèles), `v2.2.148`/`v2.2.149` (Drive obligatoire), `v2.2.150` (boucle Lua et diagnostics), `v2.2.151` (helper RSlauncher ViGEm), `v2.2.152` (extraction fiable du helper dans pkg), `v2.2.153` (classement Race robuste et déploiement portable), `v2.2.154` (rôle Spectateur et capture Web), `v2.2.155` (écran Spectateur automatique). Les versions antérieures restent documentées dans `CHANGELOG.md` et les notes GitHub ; aucune fonctionnalité agent ne doit être supprimée au motif qu’une version intermédiaire n’a pas de tag.
 
 Règle de déploiement : le code agent n’a d’effet sur un POD qu’après installation de l’artefact Windows de la release correspondante. Pour diagnostiquer Drive, lire les logs distants de l’agent puis `Documents/Assetto Corsa/logs/pressdrivekey.log` sur le POD ; Lua est le filet de sécurité, PressDriveKey est la voie d’entrée compatible avec l’ancien RSlauncher.
 
@@ -792,3 +792,9 @@ Le rôle `StationRole.SPECTATOR` (`spectator`) désigne un poste réservé au su
 - `DELETE /spectator/recordings/:id` (JWT) — suppression de la rediffusion.
 
 Les fichiers sont stockés dans PostgreSQL avec leurs métadonnées (`screen_recordings`, migration `20260908110000_add_screen_recordings`) : un redémarrage ou un changement de conteneur ne perd pas la bibliothèque. Cette première version couvre la capture et la rediffusion à la demande ; le live HLS/WebRTC nécessiterait un relay média dédié et ne doit pas être simulé par un simple endpoint HTTP.
+
+## 5.16 Écran Spectateur automatique (v2.2.155)
+
+`/spectator/screen` est une route publique, plein écran et strictement en lecture seule. Elle consomme `GET /api/spectator/screen-state`, qui ne renvoie ni mots de passe serveur ni commandes, seulement les serveurs en démarrage/en cours et les sessions actives. Le composant se rafraîchit toutes les trois secondes et est adapté à une TV ou un moniteur mural.
+
+`SpectatorManager` côté agent Windows ouvre cette route avec Edge ou Chrome en mode `--kiosk` lorsque le backend pousse `station:role` avec `SPECTATOR`. Il évite les doublons pendant la connexion, ferme le processus qu'il a lancé lors de l'arrêt de l'agent et désactive l'écran quand le rôle repasse à `SIMULATOR` ou `ADMIN`. Le poste doit donc seulement démarrer l'agent : aucune connexion manuelle au dashboard n'est nécessaire pour l'affichage public.

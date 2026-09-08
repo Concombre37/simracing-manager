@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.155 — Écran Spectateur automatique
+
+- Un poste dont le rôle est `spectator` ouvre automatiquement `/spectator/screen` en plein écran dès que l'agent reçoit son rôle.
+- Ajout d'un flux public en lecture seule (`/api/spectator/screen-state`) pour afficher serveurs, circuits et pilotes sans connexion utilisateur.
+- L'écran Spectateur se rafraîchit automatiquement toutes les trois secondes et reste séparé de la page de contrôle et de la bibliothèque de rediffusions.
+
 ## v2.2.154 — Mode Spectateur et rediffusions Web
 
 - Ajout du rôle station `spectator`, séparé des simulateurs et des postes admin. Il est exclu du lancement, des actions flotte, des joins serveur et du blanking.

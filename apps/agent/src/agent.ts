@@ -47,6 +47,7 @@ import { BlankingMediaSync } from './blankingMediaSync';
 import { sendWakeOnLan } from './wol';
 import { runWolDiagnostics } from './wolDiagnostics';
 import { WatchdogManager } from './watchdogManager';
+import { SpectatorManager } from './spectatorManager';
 
 const execFileAsync = promisify(execFile);
 
@@ -112,6 +113,7 @@ export class SimRacingAgent {
   private trayManager: TrayManager;
   private blankingMediaSync: BlankingMediaSync;
   private watchdogManager: WatchdogManager;
+  private spectatorManager: SpectatorManager;
 
   constructor(private readonly logger: Logger) {
     this.acLauncher = new AcLauncher(logger);
@@ -135,6 +137,7 @@ export class SimRacingAgent {
     });
     this.updater = new Updater(logger);
     this.watchdogManager = new WatchdogManager(logger);
+    this.spectatorManager = new SpectatorManager(logger, config.SERVER_URL, config.STATION_ID);
     this.processMonitor = new ProcessMonitor(logger);
     this.raceResultReader = new RaceResultReader(logger);
     this.kioskManager = new KioskManager(logger);
@@ -573,6 +576,7 @@ export class SimRacingAgent {
     this.stopTelemetry();
     this.acSharedMemoryReader?.stop();
     this.trayManager.stop();
+    this.spectatorManager.close();
     // Child processes on Windows don't die with their parent automatically:
     // without this, every agent restart (update, crash recovery) piles up
     // another blanking/results window on top of an orphaned one.
@@ -1087,6 +1091,11 @@ export class SimRacingAgent {
   private handleStationRole(payload: { role: StationRole }): void {
     this.logger.info({ role: payload.role }, 'Station role received');
     this.blankingManager.setEnabled(payload.role === StationRole.SIMULATOR);
+    if (payload.role === StationRole.SPECTATOR) {
+      this.spectatorManager.open();
+    } else {
+      this.spectatorManager.close();
+    }
     if (config.STATION_ROLE !== payload.role) {
       config.STATION_ROLE = payload.role;
       try {

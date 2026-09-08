@@ -17,9 +17,95 @@ export interface ScreenRecordingDto {
   downloadUrl: string;
 }
 
+export interface SpectatorScreenState {
+  updatedAt: string;
+  servers: {
+    id: string;
+    name: string;
+    track: string;
+    trackLayout: string | null;
+    status: string;
+    maxClients: number;
+    stationName: string;
+    stationIp: string | null;
+    raceFormatName: string | null;
+    startedAt: Date | null;
+  }[];
+  sessions: {
+    id: string;
+    serverId: string | null;
+    clientName: string | null;
+    carAcId: string | null;
+    track: string | null;
+    status: string;
+    stationName: string;
+    startedAt: Date | null;
+  }[];
+}
+
 @Injectable()
 export class SpectatorService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getPublicScreenState(): Promise<SpectatorScreenState> {
+    const [servers, sessions] = await Promise.all([
+      this.prisma.dedicatedServer.findMany({
+        where: { status: { in: ['starting', 'running'] } },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          name: true,
+          track: true,
+          trackLayout: true,
+          status: true,
+          maxClients: true,
+          startedAt: true,
+          station: { select: { name: true, localIp: true } },
+          raceFormat: { select: { name: true } },
+        },
+      }),
+      this.prisma.session.findMany({
+        where: { status: { in: ['pending', 'running'] } },
+        orderBy: { createdAt: 'asc' },
+        select: {
+          id: true,
+          serverId: true,
+          clientName: true,
+          carAcId: true,
+          track: true,
+          status: true,
+          startedAt: true,
+          station: { select: { name: true } },
+        },
+      }),
+    ]);
+
+    return {
+      updatedAt: new Date().toISOString(),
+      servers: servers.map((server) => ({
+        id: server.id,
+        name: server.name,
+        track: server.track,
+        trackLayout: server.trackLayout,
+        status: server.status,
+        maxClients: server.maxClients,
+        stationName: server.station.name,
+        stationIp: server.station.localIp,
+        raceFormatName: server.raceFormat?.name ?? null,
+        startedAt: server.startedAt,
+      })),
+      sessions: sessions.map((session) => ({
+        id: session.id,
+        serverId: session.serverId,
+        clientName: session.clientName,
+        carAcId: session.carAcId,
+        track: session.track,
+        status: session.status,
+        stationName: session.station.name,
+        startedAt: session.startedAt,
+      })),
+    };
+  }
 
   async listRecordings(): Promise<ScreenRecordingDto[]> {
     const recordings = await this.prisma.screenRecording.findMany({
