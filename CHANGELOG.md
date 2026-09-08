@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.157 — Correctif démarrage backend Spectateur
+
+- Le module Spectateur importe désormais `StationsModule`, nécessaire à l'authentification des uploads agent (`/api/spectator/frame` et `/api/spectator/recordings/raw`).
+- Le conteneur backend démarre correctement avec la capture automatique activée.
+
 ## v2.2.156 — Capture automatique Assetto Corsa
 
 - L'agent Windows démarre une capture desktop FFmpeg après chaque lancement Content Manager ou connexion serveur Assetto Corsa.
