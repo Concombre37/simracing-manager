@@ -1,6 +1,6 @@
 {
   "name": "@simracing/agent",
-  "version": "2.2.150",
+  "version": "2.2.151",
   "private": true,
   "description": "Local agent for SimRacing Manager stations",
   "main": "./dist/index.js",
@@ -45,6 +45,7 @@
     "assets": [
       "lua_app/**/*",
       "assets/**/*",
+      "tools/PressDriveKey.exe",
       "node_modules/koffi/**/*"
     ],
     "targets": [

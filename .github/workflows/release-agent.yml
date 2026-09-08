@@ -34,6 +34,16 @@ jobs:
       - name: Install 7zip
         run: choco install 7zip -y
 
+      - name: Setup .NET SDK for Drive helper
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      - name: Build legacy Drive helper
+        run: |
+          dotnet publish agent-legacy/tools/PressDriveKey/PressDriveKey.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o apps/agent/tools
+          if (-not (Test-Path apps/agent/tools/PressDriveKey.exe)) { throw "PressDriveKey.exe not created" }
+
       - name: Package Windows agent
         run: |
           cd apps/agent

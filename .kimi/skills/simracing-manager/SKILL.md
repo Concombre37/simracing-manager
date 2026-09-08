@@ -1,6 +1,6 @@
 # SimRacing Manager — Skill
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.150`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.151`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -8,7 +8,7 @@ Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au
 - **GitHub**: `Concombre37/simracing-manager`
 - **Production**: `https://simracing.hytlabs.com` (derrière Cloudflare Tunnel — voir mémoire `hytlabs-cloudflare-tunnel`)
 - **Architecture**: NestJS 10 (backend) + React 18/Vite (frontend) + agent Windows Node.js (`pkg`), le tout en npm workspaces.
-- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.150`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
+- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.151`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
 - **Deux stations réelles connues** (hytlabs) : `concombre` (rôle `admin`, hôte de serveurs dédiés, IP `192.168.1.63`) et `desktop-gl3t50t` (rôle `simulator`, POD joueur, IP `192.168.1.64`).
 
 ### Agents
@@ -17,6 +17,10 @@ Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au
 | --------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/agent/`   | Agent monorepo actuel, `@simracing/shared`, auto-provisioning + clé API, télémétrie mémoire partagée via koffi | **Utilisé, release actif**                                                                                                                                 |
 | `agent-legacy/` | Ancien agent standalone, archivé                                                                               | Ne jamais release ni utiliser — sert uniquement de référence historique (ex: `joinServer.ts`'s `buildRaceIni()` a servi à corriger un bug réel en v2.2.64) |
+
+### Correction Drive RSlauncher (v2.2.151)
+
+`agent-legacy` confirme que le passage Drive fiable utilise `PressDriveKey.exe`, une manette Xbox virtuelle ViGEmBus et trois appuis sur le bouton A après apparition de la fenêtre Assetto Corsa. L’agent moderne extrait ce helper vers TEMP, le lance pour les modes Content Manager et direct, et conserve Lua comme seconde voie. Le journal `Documents/Assetto Corsa/logs/pressdrivekey.log` doit être consulté avec les diagnostics Lua lors d’une validation sur POD.
 
 ## 2. Structure du monorepo
 

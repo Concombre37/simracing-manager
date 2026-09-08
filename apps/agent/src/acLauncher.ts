@@ -1,6 +1,7 @@
 import { spawn, ChildProcess, execFile } from 'child_process';
 import { promises as fs } from 'fs';
 import path from 'path';
+import os from 'os';
 import { promisify } from 'util';
 import { Logger } from 'pino';
 import { config } from './config';
@@ -325,6 +326,7 @@ export class AcLauncher {
       this.logger.error({ err }, 'Failed to spawn Content Manager');
     });
     this.logger.info({ uri, cmExe }, 'Launched via Content Manager');
+    await this.scheduleDriveKeyPress();
   }
 
   private async ensureSteamRunning(): Promise<void> {
@@ -410,6 +412,72 @@ export class AcLauncher {
       this.logger.error({ err }, 'Failed to spawn acs.exe');
     });
     this.logger.info({ exe: acsExe }, 'Launched acs.exe');
+    await this.scheduleDriveKeyPress();
+  }
+
+  /**
+   * CSP's Lua `ac.tryToStart()` does not reliably dismiss AC's red-wheel
+   * safety screen on every pod. The legacy RSlauncher solved that screen by
+   * sending the Xbox controller A button through ViGEmBus. Keep that helper
+   * as a second, independent path: it waits for AC's window and presses A
+   * three times after the loading screen has had time to settle.
+   */
+  private async scheduleDriveKeyPress(): Promise<void> {
+    if (process.platform !== 'win32') return;
+
+    const sourceCandidates = [
+      path.join(path.dirname(process.execPath), 'tools', 'PressDriveKey.exe'),
+      path.join(__dirname, '..', 'tools', 'PressDriveKey.exe'),
+    ];
+    let source: string | undefined;
+    for (const candidate of sourceCandidates) {
+      try {
+        await fs.access(candidate);
+        source = candidate;
+        break;
+      } catch {
+        // Try the next packaged/unpackaged location.
+      }
+    }
+    if (!source) {
+      this.logger.warn('PressDriveKey.exe absent: Lua auto-Drive remains the only fallback');
+      return;
+    }
+
+    const helperPath = path.join(os.tmpdir(), 'simracing-manager', 'PressDriveKey.exe');
+    const logPath = path.join(this.getDocumentsPath(), 'logs', 'pressdrivekey.log');
+    try {
+      await fs.mkdir(path.dirname(helperPath), { recursive: true });
+      await fs.mkdir(path.dirname(logPath), { recursive: true });
+      // In a pkg snapshot the asset is readable but not executable. Extract
+      // it to TEMP before spawning it; a real installed tools/ copy also works.
+      await fs.copyFile(source, helperPath);
+      const child = spawn(
+        helperPath,
+        [
+          '--window',
+          'Assetto Corsa',
+          '--delay',
+          '30000',
+          '--press',
+          '300',
+          '--repeat',
+          '3',
+          '--interval',
+          '2000',
+          '--log',
+          logPath,
+        ],
+        { detached: true, stdio: 'ignore', windowsHide: true },
+      );
+      child.on('error', (err) => {
+        this.logger.warn({ err, helperPath }, 'PressDriveKey failed to start');
+      });
+      child.unref();
+      this.logger.info({ helperPath, logPath }, 'PressDriveKey scheduled for AC Drive screen');
+    } catch (err) {
+      this.logger.warn({ err }, 'Unable to schedule PressDriveKey');
+    }
   }
 
   private async getAcPath(): Promise<string | undefined> {

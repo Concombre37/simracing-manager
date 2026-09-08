@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.151 — Helper manette du RSlauncher pour le bouton Drive
+
+- Réintégration du mécanisme qui fonctionnait dans l’ancien RSlauncher : `PressDriveKey.exe` crée une manette Xbox virtuelle via ViGEmBus et envoie trois appuis sur `A` après le chargement de la fenêtre Assetto Corsa.
+- Le helper est lancé en complément de Lua pour les lancements Content Manager et directs. Le binaire est extrait vers le dossier temporaire avant exécution et écrit dans `Documents/Assetto Corsa/logs/pressdrivekey.log`.
+- La release Windows compile automatiquement ce helper .NET 8 avant le packaging. Si ViGEmBus ou le helper manque, le diagnostic reste visible et la boucle Lua continue comme secours.
+- Validation : code legacy comparé, boucle Lua testée sous LuaJIT, 64 tests agent, typecheck et lint.
+
 ## v2.2.150 — Réparation de la boucle Lua Drive et diagnostics distants
 
 - Suppression de la lecture Lua de `sim.isSessionStarted` : ce champ appartient au payload calculé par notre lecteur Node et ne doit pas être supposé présent dans `ac.StateSim`. Drive utilise l'état du menu CSP, avec une seconde stable hors menu avant de terminer les tentatives.
