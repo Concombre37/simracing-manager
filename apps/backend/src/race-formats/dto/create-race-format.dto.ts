@@ -4,6 +4,7 @@ import { RaceMode, GridType } from '@simracing/shared';
 export const raceFormatShape = {
   name: z.string().min(1).max(128),
   description: z.string().max(500).optional(),
+  category: z.enum(['training', 'race']).nullable().optional().default(null),
   practiceEnabled: z.boolean().default(true),
   practiceMinutes: z.number().int().min(1).max(1440).default(720),
   qualifyingEnabled: z.boolean().default(false),

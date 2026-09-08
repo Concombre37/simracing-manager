@@ -1,10 +1,13 @@
 import { RaceMode, GridType } from '@simracing/shared';
 import { api } from './api';
 
+export type RaceFormatCategory = 'training' | 'race';
+
 export interface RaceFormat {
   id: string;
   name: string;
   description: string | null;
+  category: RaceFormatCategory | null;
   practiceEnabled: boolean;
   practiceMinutes: number;
   qualifyingEnabled: boolean;
@@ -23,6 +26,7 @@ export interface RaceFormat {
 export interface RaceFormatInput {
   name: string;
   description?: string;
+  category?: RaceFormatCategory | null;
   practiceEnabled: boolean;
   practiceMinutes: number;
   qualifyingEnabled: boolean;

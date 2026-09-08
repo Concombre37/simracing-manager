@@ -98,7 +98,12 @@ export function CreateDedicatedServer() {
   // ne fonctionne pas.
   useEffect(() => {
     if (!raceFormatId && raceFormats.length > 0) {
-      setRaceFormatId(raceFormats[0].id);
+      const practiceLibre = raceFormats.find(
+        (format) =>
+          format.category === null &&
+          format.name.toLocaleLowerCase('fr') === 'practice libre (12h)',
+      );
+      setRaceFormatId((practiceLibre ?? raceFormats[0]).id);
     }
   }, [raceFormats, raceFormatId]);
 

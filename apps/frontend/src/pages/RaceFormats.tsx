@@ -2,7 +2,12 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Flag, Plus, Pencil, Trash2, Clock, Users, CloudSun } from 'lucide-react';
 import { RaceMode, GridType } from '@simracing/shared';
-import { raceFormatsApi, type RaceFormat, type RaceFormatInput } from '../services/raceFormats';
+import {
+  raceFormatsApi,
+  type RaceFormat,
+  type RaceFormatCategory,
+  type RaceFormatInput,
+} from '../services/raceFormats';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -17,9 +22,15 @@ const GRID_TYPE_LABELS: Record<GridType, string> = {
   [GridType.REVERSED_FULL]: 'Grille inversée',
 };
 
+const CATEGORY_LABELS: Record<RaceFormatCategory, string> = {
+  training: 'Entraînement',
+  race: 'Course',
+};
+
 const DEFAULT_INPUT: RaceFormatInput = {
   name: '',
   description: '',
+  category: null,
   practiceEnabled: true,
   practiceMinutes: 720,
   qualifyingEnabled: false,
@@ -68,16 +79,34 @@ export function RaceFormats() {
           <p className="text-gray-400">Aucun format de course pour le moment.</p>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {formats.map((format) => (
-            <RaceFormatCard
-              key={format.id}
-              format={format}
-              onEdit={() => setEditing(format)}
-              onRemove={() => removeMutation.mutate(format.id)}
-              isRemoving={removeMutation.isPending && removeMutation.variables === format.id}
-            />
-          ))}
+        <div className="space-y-8">
+          {(['training', 'race', null] as const).map((category) => {
+            const categoryFormats = formats.filter((format) => format.category === category);
+            if (categoryFormats.length === 0) return null;
+            return (
+              <section key={category ?? 'uncategorized'}>
+                <div className="mb-3 flex items-center gap-3">
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-300">
+                    {category ? CATEGORY_LABELS[category] : 'Sans catégorie'}
+                  </h2>
+                  <span className="text-xs text-gray-600">{categoryFormats.length} format(s)</span>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {categoryFormats.map((format) => (
+                    <RaceFormatCard
+                      key={format.id}
+                      format={format}
+                      onEdit={() => setEditing(format)}
+                      onRemove={() => removeMutation.mutate(format.id)}
+                      isRemoving={
+                        removeMutation.isPending && removeMutation.variables === format.id
+                      }
+                    />
+                  ))}
+                </div>
+              </section>
+            );
+          })}
         </div>
       )}
 
@@ -106,7 +135,10 @@ function RaceFormatCard({
     <Card className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="truncate text-base font-semibold text-white">{format.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="truncate text-base font-semibold text-white">{format.name}</h3>
+            {format.category && <Badge variant="gray">{CATEGORY_LABELS[format.category]}</Badge>}
+          </div>
           {format.description && (
             <p className="mt-1 text-sm text-gray-400 line-clamp-2">{format.description}</p>
           )}
@@ -187,6 +219,7 @@ function RaceFormatFormModal({
       ? {
           name: format.name,
           description: format.description ?? '',
+          category: format.category,
           practiceEnabled: format.practiceEnabled,
           practiceMinutes: format.practiceMinutes,
           qualifyingEnabled: format.qualifyingEnabled,
@@ -258,6 +291,28 @@ function RaceFormatFormModal({
             placeholder="Optionnel — un rappel de quand utiliser ce format"
             rows={2}
           />
+        </div>
+
+        <div>
+          <Label htmlFor="rf-category">Catégorie</Label>
+          <Select
+            id="rf-category"
+            value={input.category ?? ''}
+            onChange={(e) =>
+              setInput({
+                ...input,
+                category: (e.target.value || null) as RaceFormatCategory | null,
+              })
+            }
+          >
+            <option value="">Sans catégorie</option>
+            <option value="training">Entraînement</option>
+            <option value="race">Course</option>
+          </Select>
+          <p className="mt-1 text-xs text-gray-500">
+            Practice libre reste volontairement sans catégorie et prioritaire à la création d’un
+            serveur.
+          </p>
         </div>
 
         <SessionToggleSection

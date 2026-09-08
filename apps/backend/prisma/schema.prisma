@@ -160,6 +160,8 @@ model RaceFormat {
   id                String   @id @default(uuid()) @db.Uuid
   name              String
   description       String?
+  // Optional grouping used by the admin UI. Existing formats remain uncategorized.
+  category          String?
   practiceEnabled   Boolean  @default(true) @map("practice_enabled")
   practiceMinutes   Int      @default(720) @map("practice_minutes")
   qualifyingEnabled Boolean  @default(false) @map("qualifying_enabled")
