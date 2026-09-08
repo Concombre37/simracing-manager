@@ -24,6 +24,8 @@ import {
   Tablet,
   Gamepad2,
   Zap,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 // L'essentiel du quotidien : toujours en pleine évidence, jamais replié.
@@ -77,6 +79,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { logout, user, isAdmin } = useAuth();
   const location = useLocation();
   const [now, setNow] = useState(new Date());
+  const [showMoreNav, setShowMoreNav] = useState(false);
+  const hiddenNavActive =
+    secondaryNavItems.some((item) => location.pathname === item.path) ||
+    (isAdmin && adminNavItems.some((item) => location.pathname === item.path));
+
+  useEffect(() => {
+    if (hiddenNavActive) setShowMoreNav(true);
+  }, [hiddenNavActive]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
@@ -152,16 +162,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
           ))}
 
           <div className="my-3 border-t border-dark-700" />
-          <RailSectionLabel>Suivi</RailSectionLabel>
-          {secondaryNavItems.map((item) => (
-            <RailLink key={item.path} item={item} active={location.pathname === item.path} muted />
-          ))}
+          <button
+            type="button"
+            aria-expanded={showMoreNav || hiddenNavActive}
+            onClick={() => setShowMoreNav((open) => !open)}
+            className="group/more flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left text-gray-400 transition-colors hover:border-dark-600 hover:bg-dark-800/70 hover:text-white"
+          >
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-dark-700 text-[10px] font-bold text-accent-orange">
+              +
+            </span>
+            <span className="flex-1 whitespace-nowrap text-xs font-bold uppercase tracking-wider opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100">
+              Plus de navigation
+            </span>
+            {showMoreNav || hiddenNavActive ? (
+              <ChevronUp className="h-4 w-4 shrink-0 opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100" />
+            ) : (
+              <ChevronDown className="h-4 w-4 shrink-0 opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100" />
+            )}
+          </button>
 
-          {isAdmin && (
+          {(showMoreNav || hiddenNavActive) && (
             <>
-              <div className="my-3 border-t border-dark-700" />
-              <RailSectionLabel>Administration</RailSectionLabel>
-              {adminNavItems.map((item) => (
+              <RailSectionLabel>Suivi</RailSectionLabel>
+              {secondaryNavItems.map((item) => (
                 <RailLink
                   key={item.path}
                   item={item}
@@ -169,6 +192,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   muted
                 />
               ))}
+
+              {isAdmin && (
+                <>
+                  <div className="my-3 border-t border-dark-700" />
+                  <RailSectionLabel>Administration</RailSectionLabel>
+                  {adminNavItems.map((item) => (
+                    <RailLink
+                      key={item.path}
+                      item={item}
+                      active={location.pathname === item.path}
+                      muted
+                    />
+                  ))}
+                </>
+              )}
             </>
           )}
         </nav>
