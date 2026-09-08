@@ -26,6 +26,7 @@ import {
   Zap,
   ChevronDown,
   ChevronUp,
+  MoreHorizontal,
 } from 'lucide-react';
 
 // L'essentiel du quotidien : toujours en pleine évidence, jamais replié.
@@ -165,20 +166,37 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             aria-expanded={showMoreNav || hiddenNavActive}
+            aria-label={
+              showMoreNav || hiddenNavActive
+                ? 'Réduire les autres sections'
+                : 'Afficher les autres sections'
+            }
             onClick={() => setShowMoreNav((open) => !open)}
-            className="group/more flex w-full items-center gap-3 rounded-lg border border-transparent px-3 py-2 text-left text-gray-400 transition-colors hover:border-dark-600 hover:bg-dark-800/70 hover:text-white"
+            className={`group/more relative flex w-full items-center gap-3 overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-all duration-200 ${
+              showMoreNav || hiddenNavActive
+                ? 'border-racing-cyan/35 bg-gradient-to-r from-racing-blue/20 via-racing-cyan/10 to-transparent text-white shadow-[0_0_18px_rgba(0,194,255,0.08)]'
+                : 'border-white/[0.06] bg-gradient-to-r from-white/[0.04] to-transparent text-gray-400 hover:border-racing-cyan/25 hover:from-racing-blue/10 hover:text-white'
+            }`}
           >
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-dark-700 text-[10px] font-bold text-accent-orange">
-              +
+            <span
+              className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border shadow-inner transition-colors ${
+                showMoreNav || hiddenNavActive
+                  ? 'border-racing-cyan/40 bg-racing-cyan/15 text-racing-cyan'
+                  : 'border-white/10 bg-dark-700/80 text-gray-400 group-hover/more:border-racing-cyan/30 group-hover/more:text-racing-cyan'
+              }`}
+            >
+              <MoreHorizontal className="h-4 w-4" />
             </span>
-            <span className="flex-1 whitespace-nowrap text-xs font-bold uppercase tracking-wider opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100">
-              Plus de navigation
+            <span className="flex-1 whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.12em] opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100">
+              Autres sections
             </span>
-            {showMoreNav || hiddenNavActive ? (
-              <ChevronUp className="h-4 w-4 shrink-0 opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100" />
-            ) : (
-              <ChevronDown className="h-4 w-4 shrink-0 opacity-0 transition-opacity duration-200 group-hover/rail:opacity-100" />
-            )}
+            <span className="shrink-0 opacity-0 transition-all duration-200 group-hover/rail:opacity-100">
+              {showMoreNav || hiddenNavActive ? (
+                <ChevronUp className="h-4 w-4 text-racing-cyan" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </span>
           </button>
 
           {(showMoreNav || hiddenNavActive) && (
