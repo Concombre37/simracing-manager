@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.165 — Groupes de classement robustes
+
+- Le blanking sépare explicitement le podium et le contexte local du pilote.
+- P1 et P2 restent uniquement dans le tableau du podium ; P3 affiche seulement le voisin P4 dans le second groupe.
+- Les pilotes au milieu, en dernière position ou dans une petite grille n'affichent que les voisins réellement disponibles, sans doublon ni ligne fantôme.
+- Le tableau conserve les mêmes colonnes dans les deux groupes, avec un seul séparateur `···` entre eux.
+
 ## v2.2.164 — Contexte du pilote absent de l'historique
 
 - Lorsqu'un pilote réalise son premier temps valide, il est inséré dans le classement affiché afin de calculer sa position.

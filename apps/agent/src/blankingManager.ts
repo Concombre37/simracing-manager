@@ -8,6 +8,7 @@ import {
   RaceResultData,
   getLeaderboard,
   selectResultsEntries,
+  selectResultsGroups,
 } from './raceResultCleaner';
 import { config } from './config';
 
@@ -693,7 +694,12 @@ export class BlankingManager {
     // yet. Insert that driver into the historical list so the screen can show
     // the requested predecessor and successor with real positions. Existing
     // archived rows remain the source for everybody else.
-    if (!ownEntry && summary.archivedEntries !== undefined && ownName && (summary.bestLapMs ?? 0) > 0) {
+    if (
+      !ownEntry &&
+      summary.archivedEntries !== undefined &&
+      ownName &&
+      (summary.bestLapMs ?? 0) > 0
+    ) {
       const currentEntry: LeaderboardEntry = {
         position: 0,
         name: summary.clientName ?? 'Pilote',
@@ -708,9 +714,7 @@ export class BlankingManager {
           return aTime - bTime || a.position - b.position;
         })
         .map((entry, index) => ({ ...entry, position: index + 1 }));
-      ownEntry = entries.find(
-        (entry) => normalizeDriverName(entry.name) === ownName,
-      );
+      ownEntry = entries.find((entry) => normalizeDriverName(entry.name) === ownName);
     }
     const posClass = ownEntry
       ? ownEntry.position === 1
@@ -917,44 +921,36 @@ export class BlankingManager {
   </div>
   <div class="lb-divider"></div>`;
 
-    const rows = entries
-      .map((entry, index) => {
-        const posClass =
-          entry.position === 1
-            ? 'p1'
-            : entry.position === 2
-              ? 'p2'
-              : entry.position === 3
-              ? 'p3'
-              : '';
-        const tierClass = posClass ? 'top3' : 'other';
-        const ownClass = entry.position === ownPosition ? 'own' : '';
-        const previous = index > 0 ? entries[index - 1] : undefined;
-        // Keep the podium and the driver's local context as two visual
-        // groups even when their positions are consecutive (P3/P4 is the
-        // common case). Numeric gaps still get a separator as before.
-        const startsDriverGroup =
-          ownPosition !== undefined &&
-          ownPosition >= 3 &&
-          entry.position > 3 &&
-          previous !== undefined &&
-          previous.position <= 3;
-        const gap =
-          previous &&
-          (entry.position - previous.position > 1 || startsDriverGroup)
-            ? '<div class="lb-gap">···</div>'
-            : '';
-        return `${gap}<div class="lb-row-flex lb-row ${posClass} ${tierClass} ${ownClass}">
+    const renderRows = (group: LeaderboardEntry[]): string =>
+      group
+        .map((entry) => {
+          const posClass =
+            entry.position === 1
+              ? 'p1'
+              : entry.position === 2
+                ? 'p2'
+                : entry.position === 3
+                  ? 'p3'
+                  : '';
+          const tierClass = posClass ? 'top3' : 'other';
+          const ownClass = entry.position === ownPosition ? 'own' : '';
+          return `<div class="lb-row-flex lb-row ${posClass} ${tierClass} ${ownClass}">
     <div class="lb-col-pos lb-pos">${entry.position}</div>
     <div class="lb-col-name">${this.escapeHtml(entry.name)}</div>
     <div class="lb-col-car">${this.escapeHtml(entry.car)}</div>
     <div class="lb-col-laps">${entry.laps}</div>
     <div class="lb-col-time">${formatLapTime(entry.bestLapMs)}</div>
   </div>`;
-      })
-      .join('');
+        })
+        .join('');
 
-    return `${header}${rows}`;
+    const { podium, context } = selectResultsGroups(entries, ownPosition);
+    const podiumRows = `<div class="lb-group lb-podium-group">${renderRows(podium)}</div>`;
+    const contextRows =
+      context.length > 0
+        ? `<div class="lb-gap">···</div><div class="lb-group lb-context-group">${renderRows(context)}</div>`
+        : '';
+    return `${header}${podiumRows}${contextRows}`;
   }
 
   /** Shuffled once per launch so the starting image and the rotation order

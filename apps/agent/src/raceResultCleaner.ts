@@ -44,15 +44,22 @@ export function cleanupRaceResult(resultData: unknown): CleanedRaceResult {
   // a zero-lap session so the UI can explicitly report "no valid time".
   const sessionsWithResult = data.sessions.filter((session) => {
     const totalLaps = session.lapstotal?.reduce((a, b) => a + (b || 0), 0) ?? 0;
-    return totalLaps > 0 || Boolean(session.raceResult?.length) || Boolean(session.bestLaps?.length) || Boolean(session.laps?.length);
+    return (
+      totalLaps > 0 ||
+      Boolean(session.raceResult?.length) ||
+      Boolean(session.bestLaps?.length) ||
+      Boolean(session.laps?.length)
+    );
   });
   if (sessionsWithResult.length > 0) {
     data.sessions = sessionsWithResult;
   } else if (data.players.length > 0) {
-    data.sessions = [{
-      name: 'Race',
-      lapstotal: data.players.map(() => 0),
-    }];
+    data.sessions = [
+      {
+        name: 'Race',
+        lapstotal: data.players.map(() => 0),
+      },
+    ];
   } else {
     return { valid: false };
   }
@@ -224,6 +231,35 @@ export function selectResultsEntries(
     positions.add(position + 1);
   }
   return entries.filter((entry) => positions.has(entry.position));
+}
+
+/**
+ * Split the compact result view into the two visual groups used by the
+ * blanking screen. The podium is always kept together. The local context is
+ * limited to the driver's real predecessor/current/successor and excludes
+ * anything already shown in the podium, so P1/P2 never get a duplicate lower
+ * table and the last driver never gets a phantom row after them.
+ */
+export interface ResultsGroups {
+  podium: LeaderboardEntry[];
+  context: LeaderboardEntry[];
+}
+
+export function selectResultsGroups(
+  entries: LeaderboardEntry[],
+  ownPosition?: number,
+): ResultsGroups {
+  const podium = entries.filter((entry) => entry.position >= 1 && entry.position <= 3);
+  if (!Number.isInteger(ownPosition) || (ownPosition as number) <= 0) {
+    return { podium, context: [] };
+  }
+
+  const position = ownPosition as number;
+  const contextPositions = new Set(
+    [position - 1, position, position + 1].filter((candidate) => candidate > 3),
+  );
+  const context = entries.filter((entry) => contextPositions.has(entry.position));
+  return { podium, context };
 }
 
 function validLap(timeMs: number): number {

@@ -431,6 +431,49 @@ describe('BlankingManager', () => {
     expect(html.match(/class="lb-gap">···<\/div>/g) ?? []).toHaveLength(0);
   });
 
+  it('keeps podium-only results clean for P1 and P2', () => {
+    for (const position of [1, 2]) {
+      manager.setAuto();
+      manager.setAcRunning(false);
+      manager.showResults({
+        clientName: `Test ${position}`,
+        carAcId: 'ks_audi_r8_lms',
+        archivedEntries: [
+          { position: 1, name: 'Test 1', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 100000 },
+          { position: 2, name: 'Test 2', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 101000 },
+          { position: 3, name: 'Test 3', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 102000 },
+          { position: 4, name: 'Test 4', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 103000 },
+        ],
+      });
+
+      const { resultsHtmlPath } = lastSpawnArgs();
+      const html = readFileSync(resultsHtmlPath!, 'utf-8');
+      expect(html.match(/class="lb-gap">···<\/div>/g) ?? []).toHaveLength(0);
+      expect(html.match(/class="lb-row-flex lb-row/g)).toHaveLength(3);
+    }
+  });
+
+  it('shows only the available neighbour for the last driver', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({
+      clientName: 'Test 4',
+      carAcId: 'ks_audi_r8_lms',
+      archivedEntries: [
+        { position: 1, name: 'Test 1', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 100000 },
+        { position: 2, name: 'Test 2', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 101000 },
+        { position: 3, name: 'Test 3', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 102000 },
+        { position: 4, name: 'Test 4', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 103000 },
+      ],
+    });
+
+    const { resultsHtmlPath } = lastSpawnArgs();
+    const html = readFileSync(resultsHtmlPath!, 'utf-8');
+    expect(html.match(/class="lb-gap">···<\/div>/g) ?? []).toHaveLength(1);
+    expect(html.match(/class="lb-row-flex lb-row/g)).toHaveLength(4);
+    expect(html).toContain('>4</div>');
+  });
+
   it('returns to normal blanking after showing results even if the window was still up', () => {
     manager.setAuto();
     manager.setAcRunning(false);

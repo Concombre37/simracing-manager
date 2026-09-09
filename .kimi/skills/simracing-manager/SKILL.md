@@ -1,10 +1,10 @@
 # SimRacing Manager — Skill
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.164`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.165`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 0. État des releases agent vérifié (2026-09-08)
 
-Les releases GitHub de l’agent ont été relues jusqu’à `v2.2.164`. La chaîne récente est conservée ici : `v2.2.144` (WoL broadcast), `v2.2.145` (contrôle flotte), `v2.2.146` (multi-interface WoL et exclusion admin), `v2.2.147` (actions parallèles), `v2.2.148`/`v2.2.149` (Drive obligatoire), `v2.2.150` (boucle Lua et diagnostics), `v2.2.151` (helper RSlauncher ViGEm), `v2.2.152` (extraction fiable du helper dans pkg), `v2.2.153` (classement Race robuste et déploiement portable), `v2.2.154` (rôle Spectateur et capture Web), `v2.2.155` (écran Spectateur automatique), `v2.2.156` (capture FFmpeg automatique depuis l’agent), `v2.2.157` (correctif de démarrage du module Spectateur), `v2.2.158` (classement de fin ciblé autour du pilote), `v2.2.159` (protection résultats sans temps valide), `v2.2.160` (classement final depuis les temps historiques BDD), `v2.2.161` (repli historique toutes voitures du circuit), `v2.2.162` (message explicite pour la voiture sans historique), `v2.2.163` (séparation visuelle des groupes podium et pilote), `v2.2.164` (insertion du pilote sans historique pour afficher ses voisins). Les versions antérieures restent documentées dans `CHANGELOG.md` et les notes GitHub ; aucune fonctionnalité agent ne doit être supprimée au motif qu’une version intermédiaire n’a pas de tag.
+Les releases GitHub de l’agent ont été relues jusqu’à `v2.2.165`. La chaîne récente est conservée ici : `v2.2.144` (WoL broadcast), `v2.2.145` (contrôle flotte), `v2.2.146` (multi-interface WoL et exclusion admin), `v2.2.147` (actions parallèles), `v2.2.148`/`v2.2.149` (Drive obligatoire), `v2.2.150` (boucle Lua et diagnostics), `v2.2.151` (helper RSlauncher ViGEm), `v2.2.152` (extraction fiable du helper dans pkg), `v2.2.153` (classement Race robuste et déploiement portable), `v2.2.154` (rôle Spectateur et capture Web), `v2.2.155` (écran Spectateur automatique), `v2.2.156` (capture FFmpeg automatique depuis l’agent), `v2.2.157` (correctif de démarrage du module Spectateur), `v2.2.158` (classement de fin ciblé autour du pilote), `v2.2.159` (protection résultats sans temps valide), `v2.2.160` (classement final depuis les temps historiques BDD), `v2.2.161` (repli historique toutes voitures du circuit), `v2.2.162` (message explicite pour la voiture sans historique), `v2.2.163` (séparation visuelle des groupes podium et pilote), `v2.2.164` (insertion du pilote sans historique pour afficher ses voisins), `v2.2.165` (groupes podium/contexte robustes selon la position). Les versions antérieures restent documentées dans `CHANGELOG.md` et les notes GitHub ; aucune fonctionnalité agent ne doit être supprimée au motif qu’une version intermédiaire n’a pas de tag.
 
 Règle de déploiement : le code agent n’a d’effet sur un POD qu’après installation de l’artefact Windows de la release correspondante. Pour diagnostiquer Drive, lire les logs distants de l’agent puis `Documents/Assetto Corsa/logs/pressdrivekey.log` sur le POD ; Lua est le filet de sécurité, PressDriveKey est la voie d’entrée compatible avec l’ancien RSlauncher.
 
@@ -14,7 +14,7 @@ Règle de déploiement : le code agent n’a d’effet sur un POD qu’après in
 - **GitHub**: `Concombre37/simracing-manager`
 - **Production**: `https://simracing.hytlabs.com` (derrière Cloudflare Tunnel — voir mémoire `hytlabs-cloudflare-tunnel`)
 - **Architecture**: NestJS 10 (backend) + React 18/Vite (frontend) + agent Windows Node.js (`pkg`), le tout en npm workspaces.
-- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.160`. Les autres workspaces suivent désormais la même version de release.
+- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.165`. Les autres workspaces suivent désormais la même version de release.
 - **Deux stations réelles connues** (hytlabs) : `concombre` (rôle `admin`, hôte de serveurs dédiés, IP `192.168.1.63`) et `desktop-gl3t50t` (rôle `simulator`, POD joueur, IP `192.168.1.64`).
 
 ### Agents
@@ -818,3 +818,7 @@ La v2.2.159 conserve aussi les sessions dont `lapstotal`, `bestLaps` et les temp
 `GET /api/leaderboard/history` est protégé par `AdminOrStationAuthGuard` et accepte `track`, `trackLayout`, `car` et `before`. Il relit les sessions `finished` dont le résultat JSON est archivé, extrait le meilleur tour propre, trie les temps et attribue les positions. La borne `before` compare `endedAt` (ou `createdAt` si la session n'a pas de date de fin) au début de la session courante.
 
 À la fin d'une session, l'agent appelle cet endpoint avec sa clé station et `before=session.startedAt`. `BlankingManager` reçoit `archivedEntries` et n'utilise alors jamais le `race_out.json` de la session courante pour le classement de l'écran final. Une réponse vide reste explicite et affiche `Aucun temps valide dans cette session`.
+
+## 5.20 Groupes de classement robustes (v2.2.165)
+
+`selectResultsGroups` découpe la vue compacte en deux groupes indépendants : les positions 1 à 3, puis uniquement les positions `P-1`, `P` et `P+1` strictement hors podium. Le rendu garde un en-tête de colonnes commun, les mêmes lignes dans chaque groupe et un seul séparateur `···` lorsque le second groupe existe. Ainsi P1/P2 n'ont pas de doublon, P3 n'affiche que P4, un pilote au milieu garde ses deux voisins, et le dernier pilote n'obtient jamais une position inventée.

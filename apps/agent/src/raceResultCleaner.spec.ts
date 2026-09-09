@@ -3,6 +3,7 @@ import {
   cleanupRaceResult,
   getLeaderboard,
   selectResultsEntries,
+  selectResultsGroups,
   type RaceResultData,
 } from './raceResultCleaner';
 
@@ -57,7 +58,13 @@ describe('getLeaderboard', () => {
 
     const cleaned = cleanupRaceResult(result);
     expect(cleaned.valid).toBe(true);
-    expect(getLeaderboard(cleaned.resultData!).map((entry) => [entry.name, entry.position, entry.bestLapMs])).toEqual([
+    expect(
+      getLeaderboard(cleaned.resultData!).map((entry) => [
+        entry.name,
+        entry.position,
+        entry.bestLapMs,
+      ]),
+    ).toEqual([
       ['Chloé', 1, 0],
       ['Alice', 2, 0],
       ['Bob', 3, 0],
@@ -100,5 +107,21 @@ describe('getLeaderboard', () => {
     }));
 
     expect(selectResultsEntries(entries, 3).map((entry) => entry.position)).toEqual([1, 2, 3, 4]);
+  });
+
+  it('keeps podium and context groups separate for every edge position', () => {
+    const entries = Array.from({ length: 5 }, (_, index) => ({
+      position: index + 1,
+      name: `Driver ${index + 1}`,
+      car: 'car',
+      laps: 10,
+      bestLapMs: 90000,
+    }));
+
+    expect(selectResultsGroups(entries, 1).context.map((entry) => entry.position)).toEqual([]);
+    expect(selectResultsGroups(entries, 2).context.map((entry) => entry.position)).toEqual([]);
+    expect(selectResultsGroups(entries, 3).context.map((entry) => entry.position)).toEqual([4]);
+    expect(selectResultsGroups(entries, 4).context.map((entry) => entry.position)).toEqual([4, 5]);
+    expect(selectResultsGroups(entries, 5).context.map((entry) => entry.position)).toEqual([4, 5]);
   });
 });
