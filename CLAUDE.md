@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.158`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.159`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -787,3 +787,5 @@ Depuis v2.2.156, `LiveCaptureManager` démarre avec chaque lancement ou join Ass
 La v2.2.157 ajoute l'import de `StationsModule` dans `SpectatorModule` afin que le guard d'upload station soit résolu au démarrage du backend.
 
 Depuis v2.2.158, le blanking de fin affiche le podium puis le voisinage immédiat du pilote (`P-1`, pilote, `P+1`) avec sa ligne en bleu. Les résultats en base ne sont pas transformés ; `selectResultsEntries` ne filtre que la vue locale et affiche `···` entre les groupes éloignés.
+
+Depuis v2.2.159, une session sans temps valide conserve l'ordre AC ou la liste des pilotes pour afficher le podium, avec le message `Aucun temps valide dans cette session`. Aucun temps artificiel n'est ajouté au résultat enregistré.

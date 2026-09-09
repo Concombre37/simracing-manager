@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.159 — Résultats sans temps valide
+
+- Les résultats AC sans temps valide ne sont plus rejetés : l'ordre de course est conservé lorsqu'il est disponible.
+- Si AC ne fournit que la liste des pilotes, un classement de secours est construit pour afficher au moins le podium.
+- L'écran de fin affiche le podium et le message `Aucun temps valide dans cette session` au lieu de `Classement indisponible`.
+
 ## v2.2.158 — Classement de fin ciblé autour du pilote
 
 - L'écran de fin affiche toujours les positions 1, 2 et 3, puis le pilote et ses voisins directs (`P-1` et `P+1`) quel que soit son rang.

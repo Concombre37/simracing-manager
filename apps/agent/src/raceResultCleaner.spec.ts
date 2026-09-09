@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getLeaderboard, selectResultsEntries, type RaceResultData } from './raceResultCleaner';
+import {
+  cleanupRaceResult,
+  getLeaderboard,
+  selectResultsEntries,
+  type RaceResultData,
+} from './raceResultCleaner';
 
 describe('getLeaderboard', () => {
   it('uses the Race session when Practice and Qualifying precede it', () => {
@@ -38,6 +43,37 @@ describe('getLeaderboard', () => {
     };
 
     expect(getLeaderboard(result).map((entry) => entry.name)).toEqual(['Alice', 'Bob']);
+  });
+
+  it('keeps the race order when all recorded times are invalid', () => {
+    const result: RaceResultData = {
+      players: [
+        { name: 'Alice', car: 'car_a' },
+        { name: 'Bob', car: 'car_b' },
+        { name: 'Chloé', car: 'car_c' },
+      ],
+      sessions: [{ name: 'Race', lapstotal: [0, 0, 0], raceResult: [2, 0, 1] }],
+    };
+
+    const cleaned = cleanupRaceResult(result);
+    expect(cleaned.valid).toBe(true);
+    expect(getLeaderboard(cleaned.resultData!).map((entry) => [entry.name, entry.position, entry.bestLapMs])).toEqual([
+      ['Chloé', 1, 0],
+      ['Alice', 2, 0],
+      ['Bob', 3, 0],
+    ]);
+  });
+
+  it('creates a zero-time fallback leaderboard from the entry list', () => {
+    const result: RaceResultData = {
+      players: [{ name: 'Alice' }, { name: 'Bob' }, { name: 'Chloé' }],
+      sessions: [{ name: 'Race', lapstotal: [0, 0, 0] }],
+    };
+
+    const cleaned = cleanupRaceResult(result);
+    expect(cleaned.valid).toBe(true);
+    expect(getLeaderboard(cleaned.resultData!).map((entry) => entry.position)).toEqual([1, 2, 3]);
+    expect(getLeaderboard(cleaned.resultData!).every((entry) => entry.bestLapMs === 0)).toBe(true);
   });
 
   it('keeps the podium and the immediate neighbours of a driver deep in the field', () => {

@@ -627,6 +627,7 @@ export class BlankingManager {
     .tiles-spacer { height: 0.781vw; }
     .placeholder-box { padding: 1.5vw; text-align: center; color: rgba(244,244,247,0.5); font-size: 0.9vw; text-transform: uppercase; letter-spacing: 0.15em; }
     .placeholder-box .spinner { margin: 0 auto 0.8vw; }
+    .no-valid-time { padding: 0.65vw 0.586vw 0.20vw; color: #ff9b63; font-size: 0.68vw; font-weight: 600; letter-spacing: 0.16em; text-align: center; text-transform: uppercase; }
     .spinner { width: 1.6vw; height: 1.6vw; min-width: 24px; min-height: 24px; border-radius: 50%; border: 3px solid rgba(255,255,255,0.12); border-top-color: #00c2ff; animation: spin 0.8s linear infinite; }
 
     .lb-row-flex { display: flex; align-items: center; gap: 0.781vw; }
@@ -688,13 +689,18 @@ export class BlankingManager {
     const visibleEntries = ownEntry
       ? selectResultsEntries(entries, ownEntry.position)
       : selectResultsEntries(entries);
+    const noValidTimes = entries.length === 0 || !entries.some((entry) => entry.bestLapMs > 0);
 
     const leaderboard =
       visibleEntries.length > 0
-        ? this.renderLeaderboard(visibleEntries, ownEntry?.position)
+        ? `${this.renderLeaderboard(visibleEntries, ownEntry?.position)}${
+            noValidTimes
+              ? '<div class="no-valid-time">Aucun temps valide dans cette session</div>'
+              : ''
+          }`
         : summary.pending
           ? `<div class="placeholder-box"><div class="spinner"></div>Chargement du classement…</div>`
-          : `<div class="placeholder-box">Classement indisponible</div>`;
+          : `<div class="placeholder-box"><div class="no-valid-time">Aucun temps valide dans cette session</div></div>`;
 
     const html = `<!DOCTYPE html>
 <html lang="fr">

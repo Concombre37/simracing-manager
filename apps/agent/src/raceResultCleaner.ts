@@ -37,18 +37,29 @@ export function cleanupRaceResult(resultData: unknown): CleanedRaceResult {
     return { valid: false };
   }
 
-  // Remove sessions with no laps at all.
-  data.sessions = data.sessions.filter((session) => {
-    if (!session.lapstotal) return false;
-    const totalLaps = session.lapstotal.reduce((a, b) => a + (b || 0), 0);
-    return totalLaps > 0;
+  // Keep a session that has a raceResult/bestLaps/laps block even when every
+  // recorded time is invalid. AC can still provide the finishing order in
+  // that situation, and the blanking screen must show the podium instead of
+  // throwing the whole result away. If AC only gives the player list, create
+  // a zero-lap session so the UI can explicitly report "no valid time".
+  const sessionsWithResult = data.sessions.filter((session) => {
+    const totalLaps = session.lapstotal?.reduce((a, b) => a + (b || 0), 0) ?? 0;
+    return totalLaps > 0 || Boolean(session.raceResult?.length) || Boolean(session.bestLaps?.length) || Boolean(session.laps?.length);
   });
-
-  if (data.sessions.length === 0) {
+  if (sessionsWithResult.length > 0) {
+    data.sessions = sessionsWithResult;
+  } else if (data.players.length > 0) {
+    data.sessions = [{
+      name: 'Race',
+      lapstotal: data.players.map(() => 0),
+    }];
+  } else {
     return { valid: false };
   }
 
-  // Identify player indices that completed at least one lap.
+  // Identify player indices that completed at least one lap. When there are
+  // no laps at all, preserve the raceResult order (or the full entry list)
+  // so positions 1-3 remain available to the results screen.
   const playersWithLapsIndices = new Set<number>();
   data.sessions.forEach((session) => {
     if (session.lapstotal) {
@@ -59,6 +70,17 @@ export function cleanupRaceResult(resultData: unknown): CleanedRaceResult {
       });
     }
   });
+
+  if (playersWithLapsIndices.size === 0) {
+    data.sessions.forEach((session) => {
+      session.raceResult?.forEach((index) => {
+        if (index >= 0 && index < data.players.length) playersWithLapsIndices.add(index);
+      });
+    });
+  }
+  if (playersWithLapsIndices.size === 0) {
+    data.players.forEach((_, index) => playersWithLapsIndices.add(index));
+  }
 
   // Build the remapped player list.
   const newPlayers: RaceResultPlayer[] = [];
