@@ -53,6 +53,25 @@ export interface LeaderboardCircuit {
   cars: LeaderboardCarGroup[];
 }
 
+export interface HistoricalLeaderboardQuery {
+  track: string;
+  trackLayout?: string;
+  carAcId?: string;
+  /** ISO timestamp: only sessions archived before this instant are used. */
+  before?: string;
+}
+
+export interface HistoricalLeaderboardEntry {
+  position: number;
+  driver: string;
+  carAcId: string;
+  timeMs: number;
+  sessionId: string;
+  date: string;
+  stationName: string;
+  sessionType: string | null;
+}
+
 /** Le jeu chronomètre au milliseconde près en interne, mais l'affichage et
  * le classement se font au centième — arrondir ici (pas juste tronquer à
  * l'affichage) garantit que le tri et les écarts calculés plus bas
@@ -86,6 +105,66 @@ function bestCleanLap(
 @Injectable()
 export class LeaderboardService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Returns only laps already archived before the current session started.
+   * This is intentionally separate from the live race_out.json result: the
+   * blanking screen uses this list as the official historical ranking when a
+   * newly finished session has no valid lap.
+   */
+  async getHistoricalLeaderboard(
+    query: HistoricalLeaderboardQuery,
+  ): Promise<HistoricalLeaderboardEntry[]> {
+    if (!query.track?.trim()) return [];
+    const beforeDate = query.before ? new Date(query.before) : null;
+    const beforeFilter = beforeDate && Number.isFinite(beforeDate.getTime())
+      ? {
+          OR: [
+            { endedAt: { lt: beforeDate } },
+            { endedAt: null, createdAt: { lt: beforeDate } },
+          ],
+        }
+      : {};
+    const sessions = await this.prisma.session.findMany({
+      where: {
+        status: 'finished',
+        track: query.track.trim(),
+        ...(query.trackLayout ? { trackLayout: query.trackLayout } : {}),
+        ...(query.carAcId ? { carAcId: query.carAcId } : {}),
+        result: { not: Prisma.DbNull },
+        ...beforeFilter,
+      },
+      select: {
+        id: true,
+        carAcId: true,
+        clientName: true,
+        result: true,
+        endedAt: true,
+        createdAt: true,
+        station: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return sessions
+      .map((session) => {
+        const lap = bestCleanLap(session.result);
+        if (!lap || !session.carAcId) return null;
+        return {
+          position: 0,
+          driver: session.clientName?.trim() || 'Pilote inconnu',
+          carAcId: session.carAcId,
+          timeMs: lap.timeMs,
+          sessionId: session.id,
+          date: (session.endedAt ?? session.createdAt).toISOString(),
+          stationName: session.station.name,
+          sessionType: lap.sessionType,
+        } satisfies HistoricalLeaderboardEntry;
+      })
+      .filter((entry): entry is HistoricalLeaderboardEntry => entry !== null)
+      .sort((a, b) => a.timeMs - b.timeMs)
+      .map((entry, index) => ({ ...entry, position: index + 1 }));
+  }
 
   async getLeaderboard(): Promise<LeaderboardCircuit[]> {
     const sessions = await this.prisma.session.findMany({

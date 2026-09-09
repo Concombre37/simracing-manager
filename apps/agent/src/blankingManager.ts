@@ -70,6 +70,9 @@ interface SessionResultsSummary {
    * otherwise have beaten bestLapMs. */
   bestInvalidLapMs?: number;
   result?: RaceResultData;
+  /** Historical entries loaded from the backend. When provided (including an
+   * empty array), these are the only entries used for the final screen. */
+  archivedEntries?: LeaderboardEntry[];
   /** True while the leaderboard is still being read from race_out.json.
    * Shows a loading placeholder instead of an empty gap. */
   pending?: boolean;
@@ -672,7 +675,12 @@ export class BlankingManager {
     const carLabel = summary.carName ?? summary.carAcId;
     const trackDisplay = trackLabel ?? '-';
 
-    const entries = summary.result ? getLeaderboard(summary.result) : [];
+    const entries =
+      summary.archivedEntries !== undefined
+        ? summary.archivedEntries
+        : summary.result
+          ? getLeaderboard(summary.result)
+          : [];
     const ownName = normalizeDriverName(summary.clientName ?? '');
     const ownEntry = ownName ? entries.find((e) => normalizeDriverName(e.name) === ownName) : undefined;
     const posClass = ownEntry

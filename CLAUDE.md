@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.159`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.160`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -8,7 +8,7 @@ Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au
 - **GitHub**: `Concombre37/simracing-manager`
 - **Production**: `https://simracing.hytlabs.com` (derrière Cloudflare Tunnel — voir mémoire `hytlabs-cloudflare-tunnel`)
 - **Architecture**: NestJS 10 (backend) + React 18/Vite (frontend) + agent Windows Node.js (`pkg`), le tout en npm workspaces.
-- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.151`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
+- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.160`. Les autres workspaces suivent désormais la même version de release.
 - **Deux stations réelles connues** (hytlabs) : `concombre` (rôle `admin`, hôte de serveurs dédiés, IP `192.168.1.63`) et `desktop-gl3t50t` (rôle `simulator`, POD joueur, IP `192.168.1.64`).
 
 ### Agents
@@ -789,3 +789,5 @@ La v2.2.157 ajoute l'import de `StationsModule` dans `SpectatorModule` afin que 
 Depuis v2.2.158, le blanking de fin affiche le podium puis le voisinage immédiat du pilote (`P-1`, pilote, `P+1`) avec sa ligne en bleu. Les résultats en base ne sont pas transformés ; `selectResultsEntries` ne filtre que la vue locale et affiche `···` entre les groupes éloignés.
 
 Depuis v2.2.159, une session sans temps valide conserve l'ordre AC ou la liste des pilotes pour afficher le podium, avec le message `Aucun temps valide dans cette session`. Aucun temps artificiel n'est ajouté au résultat enregistré.
+
+Depuis v2.2.160, le classement final est chargé depuis les sessions terminées archivées en BDD via `GET /api/leaderboard/history`, avec une borne `before` fixée au début de la session courante. Le résultat `race_out.json` de la session qui vient de finir n'est jamais utilisé pour le classement affiché.

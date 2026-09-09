@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import axios from 'axios';
 import { Logger } from 'pino';
 import crypto from 'crypto';
 import path from 'path';
@@ -34,7 +35,7 @@ import { TelemetryReceiver } from './telemetryReceiver';
 import { TelemetryFileReader } from './telemetryFileReader';
 import { AcSharedMemoryReader } from './acSharedMemoryReader';
 import { RaceResultReader } from './raceResultReader';
-import { cleanupRaceResult, RaceResultData } from './raceResultCleaner';
+import { cleanupRaceResult, LeaderboardEntry, RaceResultData } from './raceResultCleaner';
 import { waitForServerReachable } from './serverReachability';
 import { agentLogRingBuffer } from './logRingBuffer';
 import { LapTelemetryRecorder } from './lapTelemetryRecorder';
@@ -1325,6 +1326,48 @@ export class SimRacingAgent {
       .catch((err) => this.logger.warn({ err }, 'Failed to open pause menu after session end'));
   }
 
+  /** Load the official leaderboard from sessions already archived in the
+   * backend. The `before` boundary is the current session start, so the
+   * session that just ended can never leak into its own results screen. */
+  private async fetchArchivedLeaderboard(context: {
+    track?: string;
+    trackLayout?: string;
+    carAcId?: string;
+    before: number;
+  }): Promise<LeaderboardEntry[]> {
+    const apiKey = this.apiKey;
+    if (!apiKey || !context.track) return [];
+
+    try {
+      const response = await axios.get<
+        Array<{ position: number; driver: string; carAcId: string; timeMs: number }>
+      >(`${config.SERVER_URL}/api/leaderboard/history`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        params: {
+          track: context.track,
+          ...(context.trackLayout ? { trackLayout: context.trackLayout } : {}),
+          ...(context.carAcId ? { car: context.carAcId } : {}),
+          before: new Date(context.before).toISOString(),
+        },
+        timeout: 5000,
+      });
+
+      return (response.data ?? []).map((entry) => ({
+        position: entry.position,
+        name: entry.driver,
+        car: entry.carAcId,
+        laps: 0,
+        bestLapMs: entry.timeMs,
+      }));
+    } catch (err) {
+      this.logger.warn(
+        { err, track: context.track, carAcId: context.carAcId },
+        'Failed to load archived leaderboard',
+      );
+      return [];
+    }
+  }
+
   /**
    * Ends a tracked session and shows the results screen, no matter why it
    * ended: duration expired naturally, was reduced to zero via extend, or
@@ -1413,6 +1456,12 @@ export class SimRacingAgent {
             this.logger.info({ sessionId: session.sessionId }, 'Session results pushed to backend');
           }
         }
+        const archivedEntries = await this.fetchArchivedLeaderboard({
+          track: session.track,
+          trackLayout: session.trackLayout,
+          carAcId: session.carAcId,
+          before: session.startedAt,
+        });
         this.blankingManager.showResults({
           clientName: session.clientName,
           carAcId: session.carAcId,
@@ -1422,7 +1471,10 @@ export class SimRacingAgent {
           trackLayout: session.trackLayout,
           bestLapMs: session.bestLapMs,
           bestInvalidLapMs: session.bestInvalidLapMs,
-          result: raceResult,
+          // The final classification is deliberately historical. The local
+          // race_out.json belongs to the session that just ended and must not
+          // be used to build this archived ranking.
+          archivedEntries,
         });
         this.socket?.emit('agent:session:ended', { sessionId: session.sessionId });
         this.resultsTimeout = setTimeout(() => {

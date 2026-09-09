@@ -1,10 +1,10 @@
 # SimRacing Manager — Skill
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.159`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.160`**. Ce fichier est la source de vérité du projet — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 0. État des releases agent vérifié (2026-09-08)
 
-Les releases GitHub de l’agent ont été relues jusqu’à `v2.2.159`. La chaîne récente est conservée ici : `v2.2.144` (WoL broadcast), `v2.2.145` (contrôle flotte), `v2.2.146` (multi-interface WoL et exclusion admin), `v2.2.147` (actions parallèles), `v2.2.148`/`v2.2.149` (Drive obligatoire), `v2.2.150` (boucle Lua et diagnostics), `v2.2.151` (helper RSlauncher ViGEm), `v2.2.152` (extraction fiable du helper dans pkg), `v2.2.153` (classement Race robuste et déploiement portable), `v2.2.154` (rôle Spectateur et capture Web), `v2.2.155` (écran Spectateur automatique), `v2.2.156` (capture FFmpeg automatique depuis l’agent), `v2.2.157` (correctif de démarrage du module Spectateur), `v2.2.158` (classement de fin ciblé autour du pilote), `v2.2.159` (protection résultats sans temps valide). Les versions antérieures restent documentées dans `CHANGELOG.md` et les notes GitHub ; aucune fonctionnalité agent ne doit être supprimée au motif qu’une version intermédiaire n’a pas de tag.
+Les releases GitHub de l’agent ont été relues jusqu’à `v2.2.160`. La chaîne récente est conservée ici : `v2.2.144` (WoL broadcast), `v2.2.145` (contrôle flotte), `v2.2.146` (multi-interface WoL et exclusion admin), `v2.2.147` (actions parallèles), `v2.2.148`/`v2.2.149` (Drive obligatoire), `v2.2.150` (boucle Lua et diagnostics), `v2.2.151` (helper RSlauncher ViGEm), `v2.2.152` (extraction fiable du helper dans pkg), `v2.2.153` (classement Race robuste et déploiement portable), `v2.2.154` (rôle Spectateur et capture Web), `v2.2.155` (écran Spectateur automatique), `v2.2.156` (capture FFmpeg automatique depuis l’agent), `v2.2.157` (correctif de démarrage du module Spectateur), `v2.2.158` (classement de fin ciblé autour du pilote), `v2.2.159` (protection résultats sans temps valide), `v2.2.160` (classement final depuis les temps historiques BDD). Les versions antérieures restent documentées dans `CHANGELOG.md` et les notes GitHub ; aucune fonctionnalité agent ne doit être supprimée au motif qu’une version intermédiaire n’a pas de tag.
 
 Règle de déploiement : le code agent n’a d’effet sur un POD qu’après installation de l’artefact Windows de la release correspondante. Pour diagnostiquer Drive, lire les logs distants de l’agent puis `Documents/Assetto Corsa/logs/pressdrivekey.log` sur le POD ; Lua est le filet de sécurité, PressDriveKey est la voie d’entrée compatible avec l’ancien RSlauncher.
 
@@ -14,7 +14,7 @@ Règle de déploiement : le code agent n’a d’effet sur un POD qu’après in
 - **GitHub**: `Concombre37/simracing-manager`
 - **Production**: `https://simracing.hytlabs.com` (derrière Cloudflare Tunnel — voir mémoire `hytlabs-cloudflare-tunnel`)
 - **Architecture**: NestJS 10 (backend) + React 18/Vite (frontend) + agent Windows Node.js (`pkg`), le tout en npm workspaces.
-- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.151`. Les autres `package.json` (`root`, `backend`, `frontend`, `shared`) restent à `2.2.14` et ne sont **pas** des indicateurs fiables de version produit.
+- **Version de référence**: l'agent (`apps/agent/package.json`) — `2.2.160`. Les autres workspaces suivent désormais la même version de release.
 - **Deux stations réelles connues** (hytlabs) : `concombre` (rôle `admin`, hôte de serveurs dédiés, IP `192.168.1.63`) et `desktop-gl3t50t` (rôle `simulator`, POD joueur, IP `192.168.1.64`).
 
 ### Agents
@@ -812,3 +812,9 @@ En parallèle, FFmpeg écrit un MP4 H.264 temporaire (30 fps, preset ultrafast).
 Le résultat envoyé par `agent:results` reste inchangé et continue d'être enregistré dans `Session.result`. Seul le rendu du blanking est filtré par `selectResultsEntries` : podium positions 1–3, puis position du pilote et ses voisins immédiats. Les lignes manquantes entre ces groupes sont remplacées par `···`. La recherche du pilote tolère casse, accents et espaces afin que la ligne correspondante soit bleue même si AC normalise le nom différemment.
 
 La v2.2.159 conserve aussi les sessions dont `lapstotal`, `bestLaps` et les temps de tour sont nuls lorsque AC fournit un ordre ou une liste de pilotes. Les temps sont affichés `-` et l'écran ajoute `Aucun temps valide dans cette session`; aucun faux chrono n'est écrit en base.
+
+## 5.19 Classement historique du blanking (v2.2.160)
+
+`GET /api/leaderboard/history` est protégé par `AdminOrStationAuthGuard` et accepte `track`, `trackLayout`, `car` et `before`. Il relit les sessions `finished` dont le résultat JSON est archivé, extrait le meilleur tour propre, trie les temps et attribue les positions. La borne `before` compare `endedAt` (ou `createdAt` si la session n'a pas de date de fin) au début de la session courante.
+
+À la fin d'une session, l'agent appelle cet endpoint avec sa clé station et `before=session.startedAt`. `BlankingManager` reçoit `archivedEntries` et n'utilise alors jamais le `race_out.json` de la session courante pour le classement de l'écran final. Une réponse vide reste explicite et affiche `Aucun temps valide dans cette session`.

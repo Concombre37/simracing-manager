@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.160 — Classement historique du blanking
+
+- Le classement de l'écran de fin est lu dans les sessions terminées archivées en BDD pour le circuit, le tracé et la voiture concernés.
+- Les sessions postérieures ou égales au début de la session courante sont exclues : `race_out.json` de la session qui vient de finir ne peut plus produire le classement affiché.
+- L'agent utilise une lecture authentifiée station (`GET /api/leaderboard/history`) et conserve le message de protection lorsqu'aucun temps historique valide n'existe.
+
 ## v2.2.159 — Résultats sans temps valide
 
 - Les résultats AC sans temps valide ne sont plus rejetés : l'ordre de course est conservé lorsqu'il est disponible.
