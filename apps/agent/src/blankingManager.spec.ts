@@ -408,6 +408,29 @@ describe('BlankingManager', () => {
     expect(html.indexOf('class="lb-gap">···</div>')).toBeLessThan(html.indexOf('>4</div>'));
   });
 
+  it('inserts a new driver with its current valid lap to show both neighbours', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({
+      clientName: 'Jean Tutus',
+      carAcId: 'ks_audi_r8_lms',
+      bestLapMs: 143722,
+      archivedEntries: [
+        { position: 1, name: 'Test 4', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 136010 },
+        { position: 2, name: 'Test 5', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 155440 },
+        { position: 3, name: 'Test 1', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 544555 },
+      ],
+    });
+
+    const { resultsHtmlPath } = lastSpawnArgs();
+    const html = readFileSync(resultsHtmlPath!, 'utf-8');
+    expect(html).toContain('Jean Tutus');
+    expect(html).toContain('P2');
+    expect(html).toContain('>1</div>');
+    expect(html).toContain('>3</div>');
+    expect(html.match(/class="lb-gap">···<\/div>/g) ?? []).toHaveLength(0);
+  });
+
   it('returns to normal blanking after showing results even if the window was still up', () => {
     manager.setAuto();
     manager.setAcRunning(false);

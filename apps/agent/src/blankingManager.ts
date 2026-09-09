@@ -678,14 +678,40 @@ export class BlankingManager {
     const carLabel = summary.carName ?? summary.carAcId;
     const trackDisplay = trackLabel ?? '-';
 
-    const entries =
+    let entries =
       summary.archivedEntries !== undefined
         ? summary.archivedEntries
         : summary.result
           ? getLeaderboard(summary.result)
           : [];
     const ownName = normalizeDriverName(summary.clientName ?? '');
-    const ownEntry = ownName ? entries.find((e) => normalizeDriverName(e.name) === ownName) : undefined;
+    let ownEntry = ownName
+      ? entries.find((e) => normalizeDriverName(e.name) === ownName)
+      : undefined;
+
+    // A new driver may have a valid lap in this session but no archived row
+    // yet. Insert that driver into the historical list so the screen can show
+    // the requested predecessor and successor with real positions. Existing
+    // archived rows remain the source for everybody else.
+    if (!ownEntry && summary.archivedEntries !== undefined && ownName && (summary.bestLapMs ?? 0) > 0) {
+      const currentEntry: LeaderboardEntry = {
+        position: 0,
+        name: summary.clientName ?? 'Pilote',
+        car: summary.carAcId ?? '-',
+        laps: 0,
+        bestLapMs: summary.bestLapMs ?? 0,
+      };
+      entries = [...entries, currentEntry]
+        .sort((a, b) => {
+          const aTime = a.bestLapMs > 0 ? a.bestLapMs : Number.POSITIVE_INFINITY;
+          const bTime = b.bestLapMs > 0 ? b.bestLapMs : Number.POSITIVE_INFINITY;
+          return aTime - bTime || a.position - b.position;
+        })
+        .map((entry, index) => ({ ...entry, position: index + 1 }));
+      ownEntry = entries.find(
+        (entry) => normalizeDriverName(entry.name) === ownName,
+      );
+    }
     const posClass = ownEntry
       ? ownEntry.position === 1
         ? 'p1'

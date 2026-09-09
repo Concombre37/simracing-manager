@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.164 — Contexte du pilote absent de l'historique
+
+- Lorsqu'un pilote réalise son premier temps valide, il est inséré dans le classement affiché afin de calculer sa position.
+- L'écran affiche alors systématiquement le pilote devant et celui derrière lorsque ces positions existent, en plus du podium et du séparateur `···`.
+
 ## v2.2.163 — Séparation des groupes du classement
 
 - Le podium (positions 1 à 3) et le groupe du pilote (pilote, précédent, suivant) sont maintenant séparés par `···`, même lorsque les positions sont consécutives.
