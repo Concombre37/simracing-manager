@@ -3,16 +3,99 @@ import { formatCarName, formatTrackName } from '@simracing/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertContentLabelDto } from './dto/upsert-content-label.dto';
 
-interface RawContentItem {
+export interface RawContentItem {
   type: 'car' | 'track';
   acId: string;
   rawName: string;
   layoutNames?: string[];
+  stations?: StationInfo[];
+  layoutStations?: Record<string, StationInfo[]>;
+}
+
+export interface StationInfo {
+  stationId: string;
+  name: string;
+}
+
+export interface ContentPresence extends StationInfo {
+  present: boolean;
 }
 
 interface StationContentShape {
   cars?: { acId: string; name?: string }[];
   tracks?: { acId: string; name?: string; layouts?: { name: string }[] }[];
+}
+
+function uniqueStations(stations: StationInfo[]): StationInfo[] {
+  const byId = new Map<string, StationInfo>();
+  for (const station of stations) {
+    if (station.stationId && !byId.has(station.stationId))
+      byId.set(station.stationId, station);
+  }
+  return [...byId.values()];
+}
+
+function presenceFor(
+  allStations: StationInfo[],
+  presentStations: StationInfo[] | undefined,
+): ContentPresence[] {
+  const presentIds = new Set(
+    (presentStations ?? []).map((station) => station.stationId),
+  );
+  return allStations.map((station) => ({
+    ...station,
+    present: presentIds.has(station.stationId),
+  }));
+}
+
+/** Fusionne les inventaires de tous les postes sans laisser un poste dont le
+ * scan est plus ancien effacer un circuit ou un layout ajouté ailleurs. Les
+ * previews sont déjà dédupliquées séparément par `loadPreviewMap`; ici on
+ * conserve seulement l'inventaire nominatif nécessaire pour les relier. */
+export function mergeRawContentItem(
+  rawByKey: Map<string, RawContentItem>,
+  item: RawContentItem,
+): void {
+  const key = `${item.type}:${item.acId}`;
+  const existing = rawByKey.get(key);
+  if (!existing) {
+    rawByKey.set(key, {
+      ...item,
+      layoutNames: item.layoutNames
+        ? [...new Set(item.layoutNames)]
+        : undefined,
+      stations: uniqueStations(item.stations ?? []),
+      layoutStations: Object.fromEntries(
+        Object.entries(item.layoutStations ?? {}).map(([name, stations]) => [
+          name,
+          uniqueStations(stations),
+        ]),
+      ),
+    });
+    return;
+  }
+
+  existing.stations = uniqueStations([
+    ...(existing.stations ?? []),
+    ...(item.stations ?? []),
+  ]);
+  if (item.type !== 'track') return;
+  const mergedLayouts = [
+    ...(existing.layoutNames ?? []),
+    ...(item.layoutNames ?? []),
+  ].filter(Boolean);
+  existing.layoutNames = [...new Set(mergedLayouts)];
+  const existingLayoutStations = existing.layoutStations ?? {};
+  for (const [name, stations] of Object.entries(item.layoutStations ?? {})) {
+    existingLayoutStations[name] = uniqueStations([
+      ...(existingLayoutStations[name] ?? []),
+      ...stations,
+    ]);
+  }
+  existing.layoutStations = existingLayoutStations;
+  if (!existing.rawName || existing.rawName === existing.acId) {
+    existing.rawName = item.rawName;
+  }
 }
 
 export interface LayoutImage {
@@ -42,6 +125,8 @@ export interface KnownContentItem {
   layoutImageUrl: string | null;
   layoutImages: LayoutImage[];
   hiddenLayouts: string[];
+  stations: ContentPresence[];
+  layoutPresence: Record<string, ContentPresence[]>;
 }
 
 export interface CatalogItem {
@@ -67,35 +152,49 @@ export class ContentLabelsService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Déduplique le contenu scanné (cars/tracks) à travers TOUS les postes,
-   * par acId — un même acId peut apparaître sur plusieurs postes, un seul
-   * exemplaire (le dernier vu) suffit pour lister "ce qui existe". */
-  private async gatherRawContent(): Promise<Map<string, RawContentItem>> {
+   * par acId. Un seul exemplaire est affiché, avec la présence détaillée par
+   * station et l'union des layouts disponibles. */
+  private async gatherRawContent(): Promise<{
+    items: Map<string, RawContentItem>;
+    stations: StationInfo[];
+  }> {
     const stations = await this.prisma.station.findMany({
-      select: { content: true },
+      select: { stationId: true, name: true, content: true },
     });
 
     const rawByKey = new Map<string, RawContentItem>();
     for (const station of stations) {
       const content = station.content as StationContentShape | null;
+      const stationInfo = {
+        stationId: station.stationId,
+        name: station.name || station.stationId,
+      };
       for (const car of content?.cars ?? []) {
         if (!car.acId) continue;
-        rawByKey.set(`car:${car.acId}`, {
+        mergeRawContentItem(rawByKey, {
           type: 'car',
           acId: car.acId,
           rawName: car.name?.trim() || car.acId,
+          stations: [stationInfo],
         });
       }
       for (const track of content?.tracks ?? []) {
         if (!track.acId) continue;
-        rawByKey.set(`track:${track.acId}`, {
+        mergeRawContentItem(rawByKey, {
           type: 'track',
           acId: track.acId,
           rawName: track.name?.trim() || track.acId,
           layoutNames: (track.layouts ?? []).map((l) => l.name).filter(Boolean),
+          stations: [stationInfo],
+          layoutStations: Object.fromEntries(
+            (track.layouts ?? [])
+              .filter((layout) => Boolean(layout.name))
+              .map((layout) => [layout.name, [stationInfo]]),
+          ),
         });
       }
     }
-    return rawByKey;
+    return { items: rawByKey, stations: uniqueStations(stations) };
   }
 
   /** Une preview par (type, acId) — n'importe quel poste l'ayant scannée
@@ -141,11 +240,12 @@ export class ContentLabelsService {
   }
 
   async getKnown(): Promise<KnownContentItem[]> {
-    const [rawByKey, labels, previewByKey] = await Promise.all([
-      this.gatherRawContent(),
-      this.prisma.contentLabel.findMany(),
-      this.loadPreviewMap(['car', 'track', 'layout']),
-    ]);
+    const [{ items: rawByKey, stations: allStations }, labels, previewByKey] =
+      await Promise.all([
+        this.gatherRawContent(),
+        this.prisma.contentLabel.findMany(),
+        this.loadPreviewMap(['car', 'track', 'layout']),
+      ]);
     const labelByKey = new Map(labels.map((l) => [`${l.type}:${l.acId}`, l]));
 
     return Array.from(rawByKey.values())
@@ -187,6 +287,13 @@ export class ContentLabelsService {
                 )
               : [],
           hiddenLayouts: label?.hiddenLayouts ?? [],
+          stations: presenceFor(allStations, item.stations),
+          layoutPresence: Object.fromEntries(
+            (item.layoutNames ?? []).map((name) => [
+              name,
+              presenceFor(allStations, item.layoutStations?.[name]),
+            ]),
+          ),
         };
       })
       .sort((a, b) => {
@@ -199,7 +306,7 @@ export class ContentLabelsService {
    * même agrégation que `getKnown()`, enrichie de l'image et triée par nom
    * affiché. */
   async getCatalog(): Promise<{ cars: CatalogItem[]; tracks: CatalogItem[] }> {
-    const [rawByKey, labels, previewByKey] = await Promise.all([
+    const [{ items: rawByKey }, labels, previewByKey] = await Promise.all([
       this.gatherRawContent(),
       this.prisma.contentLabel.findMany(),
       this.loadPreviewMap(['car', 'track', 'layout']),

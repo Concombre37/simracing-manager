@@ -4,6 +4,12 @@ import { api } from './api';
 
 export type { ContentLabelMap };
 
+export interface ContentPresence {
+  stationId: string;
+  name: string;
+  present: boolean;
+}
+
 export interface KnownContentItem {
   type: 'car' | 'track';
   acId: string;
@@ -25,6 +31,8 @@ export interface KnownContentItem {
   layoutImageUrl: string | null;
   layoutImages: { name: string; url: string; visible?: boolean }[];
   hiddenLayouts: string[];
+  stations: ContentPresence[];
+  layoutPresence: Record<string, ContentPresence[]>;
 }
 
 export const contentLabelsApi = {

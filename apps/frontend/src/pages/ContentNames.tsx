@@ -13,7 +13,11 @@ import {
   Eye,
   EyeOff,
 } from 'lucide-react';
-import { contentLabelsApi, type KnownContentItem } from '../services/contentLabels';
+import {
+  contentLabelsApi,
+  type ContentPresence,
+  type KnownContentItem,
+} from '../services/contentLabels';
 import { contentCategoriesApi, type ContentCategory } from '../services/contentCategories';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
@@ -300,6 +304,8 @@ function ContentNameRow({
     !item.visible ||
     hiddenLayouts.length > 0,
   );
+  const presentStations = item.stations.filter((station) => station.present);
+  const missingStations = item.stations.filter((station) => !station.present);
 
   function save(overrides: Partial<RowPayload> = {}) {
     mutation.mutate({
@@ -351,6 +357,8 @@ function ContentNameRow({
             {item.acId}
           </p>
         </div>
+
+        <PresenceSummary present={presentStations} missing={missingStations} />
 
         <label className="flex flex-none cursor-pointer items-center gap-2 text-xs text-gray-400">
           <input
@@ -471,6 +479,9 @@ function ContentNameRow({
               <div className="flex flex-wrap gap-2">
                 {item.layoutImages.map((l) => {
                   const isHidden = hiddenLayouts.includes(l.name) || l.visible === false;
+                  const layoutPresence = item.layoutPresence[l.name] ?? [];
+                  const layoutPresent = layoutPresence.filter((station) => station.present);
+                  const layoutMissing = layoutPresence.filter((station) => !station.present);
                   return (
                     <div
                       key={l.name}
@@ -479,11 +490,16 @@ function ContentNameRow({
                           ? 'border-dark-700 opacity-45'
                           : 'border-dark-600 hover:border-accent-orange/60'
                       }`}
-                      title={isHidden ? `${l.name} — masqué sur la tablette` : l.name}
+                      title={`${l.name} — présent sur: ${stationNames(layoutPresent) || 'aucun'}; absent sur: ${stationNames(layoutMissing) || 'aucun'}${isHidden ? ' — masqué sur la tablette' : ''}`}
                     >
                       <img src={l.url} alt={l.name} className="min-h-0 flex-1 object-contain p-1" />
                       <div className="flex items-center justify-between gap-1 border-t border-dark-700 bg-dark-900/90 px-1.5 py-1">
-                        <span className="min-w-0 truncate text-[9px] text-gray-300">{l.name}</span>
+                        <span className="min-w-0 truncate text-[9px] text-gray-300">
+                          {l.name}
+                          <span className="ml-1 text-[8px] text-gray-500">
+                            {layoutPresent.length}/{layoutPresence.length}
+                          </span>
+                        </span>
                         <button
                           type="button"
                           onClick={() =>
@@ -605,6 +621,34 @@ function ContentNameRow({
           />
         </Field>
       </div>
+    </div>
+  );
+}
+
+function stationNames(stations: ContentPresence[]): string {
+  return stations.map((station) => station.name || station.stationId).join(', ');
+}
+
+function PresenceSummary({
+  present,
+  missing,
+}: {
+  present: ContentPresence[];
+  missing: ContentPresence[];
+}) {
+  return (
+    <div
+      className="hidden max-w-[18rem] flex-wrap items-center gap-1 text-[9px] sm:flex"
+      title={`Présent sur: ${stationNames(present) || 'aucun'} | Absent sur: ${stationNames(missing) || 'aucun'}`}
+    >
+      <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-1.5 py-0.5 text-emerald-300">
+        {present.length} présent{present.length > 1 ? 's' : ''}
+      </span>
+      {missing.length > 0 && (
+        <span className="rounded-full border border-dark-600 bg-dark-900 px-1.5 py-0.5 text-gray-500">
+          {missing.length} absent{missing.length > 1 ? 's' : ''}
+        </span>
+      )}
     </div>
   );
 }

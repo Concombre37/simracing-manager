@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.2.168 — Présence du contenu par station
+
+- La liste **Noms** reste dédupliquée par voiture/circuit et affiche maintenant combien de postes possèdent chaque contenu.
+- Chaque layout indique aussi les postes où il est présent ou absent, directement dans son aperçu et son infobulle.
+
+## v2.2.167 — Fusion des layouts multi-stations
+
+- Les circuits et layouts sont maintenant fusionnés entre tous les postes au lieu d'être remplacés par le dernier scan reçu.
+- Un circuit ajouté sur un seul poste reste visible dans les noms et sur la tablette, même si les autres postes ont encore un inventaire plus ancien.
+
 ## v2.2.166 — Masquage des layouts tablette
 
 - La section **Noms** permet maintenant de masquer ou réafficher chaque layout nommé d'un circuit.

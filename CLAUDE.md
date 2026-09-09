@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.166`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.168`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -803,3 +803,7 @@ Depuis v2.2.164, un pilote qui n'existe pas encore dans l'historique mais possè
 Depuis v2.2.165, le rendu sépare explicitement le podium et le contexte local : P1/P2 n'ont pas de second groupe, P3 ne montre que P4, et les positions intermédiaires ou finales ne montrent que les voisins réellement présents.
 
 Depuis v2.2.166, la section Noms permet de masquer individuellement les layouts nommés d'un circuit pour le catalogue tablette ; les layouts masqués sont conservés et peuvent être réaffichés.
+
+Depuis v2.2.167, les inventaires de circuits et layouts sont fusionnés entre toutes les stations : un scan plus ancien ne peut plus effacer un circuit ou un layout découvert sur un autre poste.
+
+Depuis v2.2.168, la section Noms indique la présence/absence par station pour chaque voiture, circuit et layout, sans créer de doublons.
