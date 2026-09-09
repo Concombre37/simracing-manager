@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.163 — Séparation des groupes du classement
+
+- Le podium (positions 1 à 3) et le groupe du pilote (pilote, précédent, suivant) sont maintenant séparés par `···`, même lorsque les positions sont consécutives.
+- Le rendu reste limité à ces deux groupes, sans réafficher les positions intermédiaires.
+
 ## v2.2.162 — Message de voiture sans historique
 
 - L'écran précise quand aucun temps archivé n'existe encore avec la voiture actuelle.

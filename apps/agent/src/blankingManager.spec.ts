@@ -386,6 +386,28 @@ describe('BlankingManager', () => {
     expect(vi.mocked(spawn).mock.calls.length).toBe(spawnCountAfterFirstShow);
   });
 
+  it('separates the podium from the driver context even when P3 and P4 are consecutive', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({
+      clientName: 'Test 4',
+      carAcId: 'ks_audi_r8_lms',
+      archivedEntries: [
+        { position: 1, name: 'Test 5', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 155440 },
+        { position: 2, name: 'Test 1', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 544555 },
+        { position: 3, name: 'Test 2', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 544555 },
+        { position: 4, name: 'Test 3', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 544555 },
+        { position: 5, name: 'Test 4', car: 'ks_audi_r8_lms', laps: 0, bestLapMs: 544555 },
+      ],
+    });
+
+    const { resultsHtmlPath } = lastSpawnArgs();
+    const html = readFileSync(resultsHtmlPath!, 'utf-8');
+    expect(html.match(/class="lb-gap">···<\/div>/g)).toHaveLength(1);
+    expect(html.indexOf('>3</div>')).toBeLessThan(html.indexOf('class="lb-gap">···</div>'));
+    expect(html.indexOf('class="lb-gap">···</div>')).toBeLessThan(html.indexOf('>4</div>'));
+  });
+
   it('returns to normal blanking after showing results even if the window was still up', () => {
     manager.setAuto();
     manager.setAcRunning(false);

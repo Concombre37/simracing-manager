@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.162`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.163`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -795,3 +795,5 @@ Depuis v2.2.160, le classement final est chargé depuis les sessions terminées 
 Depuis v2.2.161, si le filtre voiture ne retourne aucun temps historique valide, l'agent recharge automatiquement l'historique du circuit et du tracé toutes voitures confondues avant d'afficher l'écran vide.
 
 Depuis v2.2.162, l'écran signale explicitement l'absence d'historique pour la voiture actuelle et précise lorsque le classement visible provient du repli toutes voitures.
+
+Depuis v2.2.163, le podium et le groupe local du pilote sont séparés visuellement par `···`, y compris lorsque P3 et P4 sont consécutifs.

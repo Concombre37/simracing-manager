@@ -903,9 +903,21 @@ export class BlankingManager {
               : '';
         const tierClass = posClass ? 'top3' : 'other';
         const ownClass = entry.position === ownPosition ? 'own' : '';
-        const gap = index > 0 && entry.position - entries[index - 1].position > 1
-          ? '<div class="lb-gap">···</div>'
-          : '';
+        const previous = index > 0 ? entries[index - 1] : undefined;
+        // Keep the podium and the driver's local context as two visual
+        // groups even when their positions are consecutive (P3/P4 is the
+        // common case). Numeric gaps still get a separator as before.
+        const startsDriverGroup =
+          ownPosition !== undefined &&
+          ownPosition >= 3 &&
+          entry.position > 3 &&
+          previous !== undefined &&
+          previous.position <= 3;
+        const gap =
+          previous &&
+          (entry.position - previous.position > 1 || startsDriverGroup)
+            ? '<div class="lb-gap">···</div>'
+            : '';
         return `${gap}<div class="lb-row-flex lb-row ${posClass} ${tierClass} ${ownClass}">
     <div class="lb-col-pos lb-pos">${entry.position}</div>
     <div class="lb-col-name">${this.escapeHtml(entry.name)}</div>
