@@ -73,6 +73,9 @@ interface SessionResultsSummary {
   /** Historical entries loaded from the backend. When provided (including an
    * empty array), these are the only entries used for the final screen. */
   archivedEntries?: LeaderboardEntry[];
+  /** True when the displayed entries come from the track-wide fallback
+   * because the current car has no archived valid lap yet. */
+  archivedCarFallback?: boolean;
   /** True while the leaderboard is still being read from race_out.json.
    * Shows a loading placeholder instead of an empty gap. */
   pending?: boolean;
@@ -698,17 +701,22 @@ export class BlankingManager {
       ? selectResultsEntries(entries, ownEntry.position)
       : selectResultsEntries(entries);
     const noValidTimes = entries.length === 0 || !entries.some((entry) => entry.bestLapMs > 0);
+    const historyNotice = summary.archivedCarFallback
+      ? 'Aucun temps archivé avec cette voiture — classement du circuit affiché'
+      : summary.archivedEntries !== undefined && noValidTimes && summary.carAcId
+        ? 'Aucun temps archivé avec cette voiture'
+        : noValidTimes
+          ? 'Aucun temps valide dans cette session'
+          : '';
 
     const leaderboard =
       visibleEntries.length > 0
         ? `${this.renderLeaderboard(visibleEntries, ownEntry?.position)}${
-            noValidTimes
-              ? '<div class="no-valid-time">Aucun temps valide dans cette session</div>'
-              : ''
+            historyNotice ? `<div class="no-valid-time">${historyNotice}</div>` : ''
           }`
         : summary.pending
           ? `<div class="placeholder-box"><div class="spinner"></div>Chargement du classement…</div>`
-          : `<div class="placeholder-box"><div class="no-valid-time">Aucun temps valide dans cette session</div></div>`;
+          : `<div class="placeholder-box"><div class="no-valid-time">${historyNotice || 'Aucun temps valide dans cette session'}</div></div>`;
 
     const html = `<!DOCTYPE html>
 <html lang="fr">

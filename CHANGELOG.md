@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.162 — Message de voiture sans historique
+
+- L'écran précise quand aucun temps archivé n'existe encore avec la voiture actuelle.
+- Lorsque le classement du circuit est affiché en repli, l'écran indique clairement que les temps viennent d'autres voitures.
+
 ## v2.2.161 — Repli historique par circuit
 
 - Si aucune session précédente ne contient de temps valide avec la voiture actuelle, l'agent recharge automatiquement le classement historique du circuit et du tracé, toutes voitures confondues.

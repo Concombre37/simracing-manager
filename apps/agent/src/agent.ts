@@ -1334,9 +1334,9 @@ export class SimRacingAgent {
     trackLayout?: string;
     carAcId?: string;
     before: number;
-  }): Promise<LeaderboardEntry[]> {
+  }): Promise<{ entries: LeaderboardEntry[]; usedTrackFallback: boolean }> {
     const apiKey = this.apiKey;
-    if (!apiKey || !context.track) return [];
+    if (!apiKey || !context.track) return { entries: [], usedTrackFallback: false };
 
     try {
       type HistoricalApiEntry = {
@@ -1363,6 +1363,7 @@ export class SimRacingAgent {
       };
 
       let apiEntries = await load(context.carAcId);
+      let usedTrackFallback = false;
       if (apiEntries.length === 0 && context.carAcId) {
         // A track can have valid archived laps from an earlier car while the
         // current car has no history yet. Keep the historical screen useful by
@@ -1373,21 +1374,25 @@ export class SimRacingAgent {
           'No archived laps for car; loading track-wide history',
         );
         apiEntries = await load();
+        usedTrackFallback = apiEntries.length > 0;
       }
 
-      return apiEntries.map((entry) => ({
-        position: entry.position,
-        name: entry.driver,
-        car: entry.carAcId,
-        laps: 0,
-        bestLapMs: entry.timeMs,
-      }));
+      return {
+        entries: apiEntries.map((entry) => ({
+          position: entry.position,
+          name: entry.driver,
+          car: entry.carAcId,
+          laps: 0,
+          bestLapMs: entry.timeMs,
+        })),
+        usedTrackFallback,
+      };
     } catch (err) {
       this.logger.warn(
         { err, track: context.track, carAcId: context.carAcId },
         'Failed to load archived leaderboard',
       );
-      return [];
+      return { entries: [], usedTrackFallback: false };
     }
   }
 
@@ -1479,7 +1484,7 @@ export class SimRacingAgent {
             this.logger.info({ sessionId: session.sessionId }, 'Session results pushed to backend');
           }
         }
-        const archivedEntries = await this.fetchArchivedLeaderboard({
+        const archivedLeaderboard = await this.fetchArchivedLeaderboard({
           track: session.track,
           trackLayout: session.trackLayout,
           carAcId: session.carAcId,
@@ -1497,7 +1502,8 @@ export class SimRacingAgent {
           // The final classification is deliberately historical. The local
           // race_out.json belongs to the session that just ended and must not
           // be used to build this archived ranking.
-          archivedEntries,
+          archivedEntries: archivedLeaderboard.entries,
+          archivedCarFallback: archivedLeaderboard.usedTrackFallback,
         });
         this.socket?.emit('agent:session:ended', { sessionId: session.sessionId });
         this.resultsTimeout = setTimeout(() => {
