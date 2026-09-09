@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.157`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.158`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -785,3 +785,5 @@ Le rôle `StationRole.SPECTATOR` (`spectator`) désigne un poste réservé au su
 Depuis v2.2.156, `LiveCaptureManager` démarre avec chaque lancement ou join Assetto Corsa. FFmpeg (`gdigrab`) envoie les JPEG live à `/api/spectator/frame` et enregistre un MP4 local temporaire ; à l'arrêt de la session, celui-ci est envoyé à `/api/spectator/recordings/raw` et rejoint la bibliothèque PostgreSQL. Le flux live est conservé en mémoire par station et `/spectator/screen` le lit automatiquement. FFmpeg doit être installé sur chaque POD (PATH, `FFMPEG_PATH` ou chemin standard) ; son absence ne bloque pas AC et est journalisée.
 
 La v2.2.157 ajoute l'import de `StationsModule` dans `SpectatorModule` afin que le guard d'upload station soit résolu au démarrage du backend.
+
+Depuis v2.2.158, le blanking de fin affiche le podium puis le voisinage immédiat du pilote (`P-1`, pilote, `P+1`) avec sa ligne en bleu. Les résultats en base ne sont pas transformés ; `selectResultsEntries` ne filtre que la vue locale et affiche `···` entre les groupes éloignés.

@@ -3,7 +3,12 @@ import fs from 'fs/promises';
 import { writeFileSync, existsSync, readFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
-import { RaceResultData, getLeaderboard } from './raceResultCleaner';
+import {
+  LeaderboardEntry,
+  RaceResultData,
+  getLeaderboard,
+  selectResultsEntries,
+} from './raceResultCleaner';
 import { config } from './config';
 
 export type BlankingOverride = 'auto' | 'hide' | 'show';
@@ -86,6 +91,15 @@ function formatLapTime(ms: number): string {
   const seconds = totalSeconds % 60;
   const millis = ms % 1000;
   return `${minutes}:${seconds.toString().padStart(2, '0')}.${millis.toString().padStart(3, '0')}`;
+}
+
+function normalizeDriverName(name: string): string {
+  return name
+    .trim()
+    .toLocaleLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ');
 }
 
 interface PlaylistItem {
@@ -632,6 +646,10 @@ export class BlankingManager {
     .lb-row.p1 .lb-pos { color: #ffd700; }
     .lb-row.p2 .lb-pos { color: #c0c0c0; }
     .lb-row.p3 .lb-pos { color: #cd7f32; }
+    .lb-row.own { border-left-color: #1688ff; background: linear-gradient(90deg, rgba(22,136,255,0.24), rgba(22,136,255,0)); }
+    .lb-row.own .lb-pos, .lb-row.own .lb-col-name, .lb-row.own .lb-col-time { color: #1688ff; }
+    .lb-row.own .lb-col-car, .lb-row.own .lb-col-laps { color: rgba(93,177,255,0.85); }
+    .lb-gap { padding: 0.20vw 0.586vw; color: rgba(244,244,247,0.30); font-size: 0.65vw; letter-spacing: 0.25em; text-align: center; }
     .lb-row.top3 .lb-col-name { font-size: 0.859vw; font-weight: 600; color: #f4f4f7; }
     .lb-row.other .lb-col-name { font-size: 0.859vw; font-weight: 500; color: rgba(244,244,247,0.85); }
     .lb-row.top3 .lb-col-car, .lb-row.top3 .lb-col-laps { font-size: 0.664vw; color: rgba(244,244,247,0.62); }
@@ -654,9 +672,8 @@ export class BlankingManager {
     const trackDisplay = trackLabel ?? '-';
 
     const entries = summary.result ? getLeaderboard(summary.result) : [];
-    const ownEntry = entries.find(
-      (e) => e.name.trim().toLowerCase() === (summary.clientName ?? '').trim().toLowerCase(),
-    );
+    const ownName = normalizeDriverName(summary.clientName ?? '');
+    const ownEntry = ownName ? entries.find((e) => normalizeDriverName(e.name) === ownName) : undefined;
     const posClass = ownEntry
       ? ownEntry.position === 1
         ? 'p1'
@@ -668,9 +685,13 @@ export class BlankingManager {
       : '';
     const posDisplay = ownEntry ? `P${ownEntry.position}` : '-';
 
+    const visibleEntries = ownEntry
+      ? selectResultsEntries(entries, ownEntry.position)
+      : selectResultsEntries(entries);
+
     const leaderboard =
-      entries.length > 0
-        ? this.renderLeaderboard(entries)
+      visibleEntries.length > 0
+        ? this.renderLeaderboard(visibleEntries, ownEntry?.position)
         : summary.pending
           ? `<div class="placeholder-box"><div class="spinner"></div>Chargement du classement…</div>`
           : `<div class="placeholder-box">Classement indisponible</div>`;
@@ -838,9 +859,7 @@ export class BlankingManager {
     }
   }
 
-  private renderLeaderboard(
-    entries: { position: number; name: string; car: string; laps: number; bestLapMs: number }[],
-  ): string {
+  private renderLeaderboard(entries: LeaderboardEntry[], ownPosition?: number): string {
     const header = `<div class="lb-row-flex lb-head">
     <div class="lb-col-pos">Pos</div>
     <div class="lb-col-name">Pilote</div>
@@ -851,17 +870,21 @@ export class BlankingManager {
   <div class="lb-divider"></div>`;
 
     const rows = entries
-      .map((entry) => {
+      .map((entry, index) => {
         const posClass =
           entry.position === 1
             ? 'p1'
             : entry.position === 2
               ? 'p2'
               : entry.position === 3
-                ? 'p3'
-                : '';
+              ? 'p3'
+              : '';
         const tierClass = posClass ? 'top3' : 'other';
-        return `<div class="lb-row-flex lb-row ${posClass} ${tierClass}">
+        const ownClass = entry.position === ownPosition ? 'own' : '';
+        const gap = index > 0 && entry.position - entries[index - 1].position > 1
+          ? '<div class="lb-gap">···</div>'
+          : '';
+        return `${gap}<div class="lb-row-flex lb-row ${posClass} ${tierClass} ${ownClass}">
     <div class="lb-col-pos lb-pos">${entry.position}</div>
     <div class="lb-col-name">${this.escapeHtml(entry.name)}</div>
     <div class="lb-col-car">${this.escapeHtml(entry.car)}</div>

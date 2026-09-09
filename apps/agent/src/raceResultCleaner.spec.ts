@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getLeaderboard, type RaceResultData } from './raceResultCleaner';
+import { getLeaderboard, selectResultsEntries, type RaceResultData } from './raceResultCleaner';
 
 describe('getLeaderboard', () => {
   it('uses the Race session when Practice and Qualifying precede it', () => {
@@ -38,5 +38,31 @@ describe('getLeaderboard', () => {
     };
 
     expect(getLeaderboard(result).map((entry) => entry.name)).toEqual(['Alice', 'Bob']);
+  });
+
+  it('keeps the podium and the immediate neighbours of a driver deep in the field', () => {
+    const entries = Array.from({ length: 65 }, (_, index) => ({
+      position: index + 1,
+      name: `Driver ${index + 1}`,
+      car: 'car',
+      laps: 10,
+      bestLapMs: 90000,
+    }));
+
+    expect(selectResultsEntries(entries, 64).map((entry) => entry.position)).toEqual([
+      1, 2, 3, 63, 64, 65,
+    ]);
+  });
+
+  it('does not duplicate podium rows when the driver is already on the podium', () => {
+    const entries = Array.from({ length: 6 }, (_, index) => ({
+      position: index + 1,
+      name: `Driver ${index + 1}`,
+      car: 'car',
+      laps: 10,
+      bestLapMs: 90000,
+    }));
+
+    expect(selectResultsEntries(entries, 3).map((entry) => entry.position)).toEqual([1, 2, 3, 4]);
   });
 });

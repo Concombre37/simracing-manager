@@ -117,13 +117,15 @@ export function cleanupRaceResult(resultData: unknown): CleanedRaceResult {
   return { valid: true, resultData: data };
 }
 
-export function getLeaderboard(resultData: RaceResultData): {
+export interface LeaderboardEntry {
   position: number;
   name: string;
   car: string;
   laps: number;
   bestLapMs: number;
-}[] {
+}
+
+export function getLeaderboard(resultData: RaceResultData): LeaderboardEntry[] {
   // AC writes one result block per enabled session. Prefer the final Race
   // block (identified by a raceResult), then a named Race block, and only
   // fall back to the last available block for Practice/Qualifying-only runs.
@@ -180,6 +182,26 @@ export function getLeaderboard(resultData: RaceResultData): {
   }
 
   return entries.sort((a, b) => a.position - b.position);
+}
+
+/**
+ * The results blanking screen has room for the podium and the driver's local
+ * context, not for a 64-row scrolling table. Keep the first three positions
+ * and the immediate predecessor/successor of the station's driver. The set
+ * removes duplicates when the driver is already in the podium.
+ */
+export function selectResultsEntries(
+  entries: LeaderboardEntry[],
+  ownPosition?: number,
+): LeaderboardEntry[] {
+  const positions = new Set([1, 2, 3]);
+  if (Number.isInteger(ownPosition) && (ownPosition as number) > 0) {
+    const position = ownPosition as number;
+    positions.add(Math.max(1, position - 1));
+    positions.add(position);
+    positions.add(position + 1);
+  }
+  return entries.filter((entry) => positions.has(entry.position));
 }
 
 function validLap(timeMs: number): number {

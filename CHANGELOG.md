@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.158 — Classement de fin ciblé autour du pilote
+
+- L'écran de fin affiche toujours les positions 1, 2 et 3, puis le pilote et ses voisins directs (`P-1` et `P+1`) quel que soit son rang.
+- Le pilote de la session est identifié sans tenir compte de la casse, des accents ou des espaces multiples et est surligné en bleu.
+- Les rangs masqués sont signalés par un séparateur, sans modifier le résultat conservé dans la base.
+
 ## v2.2.157 — Correctif démarrage backend Spectateur
 
 - Le module Spectateur importe désormais `StationsModule`, nécessaire à l'authentification des uploads agent (`/api/spectator/frame` et `/api/spectator/recordings/raw`).
