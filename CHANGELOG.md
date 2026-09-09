@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.161 — Repli historique par circuit
+
+- Si aucune session précédente ne contient de temps valide avec la voiture actuelle, l'agent recharge automatiquement le classement historique du circuit et du tracé, toutes voitures confondues.
+- Les temps restent limités aux sessions archivées avant le début de la session courante.
+
 ## v2.2.160 — Classement historique du blanking
 
 - Le classement de l'écran de fin est lu dans les sessions terminées archivées en BDD pour le circuit, le tracé et la voiture concernés.

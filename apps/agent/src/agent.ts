@@ -1339,20 +1339,43 @@ export class SimRacingAgent {
     if (!apiKey || !context.track) return [];
 
     try {
-      const response = await axios.get<
-        Array<{ position: number; driver: string; carAcId: string; timeMs: number }>
-      >(`${config.SERVER_URL}/api/leaderboard/history`, {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        params: {
-          track: context.track,
-          ...(context.trackLayout ? { trackLayout: context.trackLayout } : {}),
-          ...(context.carAcId ? { car: context.carAcId } : {}),
-          before: new Date(context.before).toISOString(),
-        },
-        timeout: 5000,
-      });
+      type HistoricalApiEntry = {
+        position: number;
+        driver: string;
+        carAcId: string;
+        timeMs: number;
+      };
+      const load = async (carAcId?: string): Promise<HistoricalApiEntry[]> => {
+        const response = await axios.get<HistoricalApiEntry[]>(
+          `${config.SERVER_URL}/api/leaderboard/history`,
+          {
+            headers: { Authorization: `Bearer ${apiKey}` },
+            params: {
+              track: context.track,
+              ...(context.trackLayout ? { trackLayout: context.trackLayout } : {}),
+              ...(carAcId ? { car: carAcId } : {}),
+              before: new Date(context.before).toISOString(),
+            },
+            timeout: 5000,
+          },
+        );
+        return response.data ?? [];
+      };
 
-      return (response.data ?? []).map((entry) => ({
+      let apiEntries = await load(context.carAcId);
+      if (apiEntries.length === 0 && context.carAcId) {
+        // A track can have valid archived laps from an earlier car while the
+        // current car has no history yet. Keep the historical screen useful by
+        // falling back to the circuit/tracé ranking instead of showing a
+        // misleading empty result.
+        this.logger.info(
+          { track: context.track, carAcId: context.carAcId },
+          'No archived laps for car; loading track-wide history',
+        );
+        apiEntries = await load();
+      }
+
+      return apiEntries.map((entry) => ({
         position: entry.position,
         name: entry.driver,
         car: entry.carAcId,

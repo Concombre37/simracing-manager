@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.160`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.161`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -791,3 +791,5 @@ Depuis v2.2.158, le blanking de fin affiche le podium puis le voisinage immédia
 Depuis v2.2.159, une session sans temps valide conserve l'ordre AC ou la liste des pilotes pour afficher le podium, avec le message `Aucun temps valide dans cette session`. Aucun temps artificiel n'est ajouté au résultat enregistré.
 
 Depuis v2.2.160, le classement final est chargé depuis les sessions terminées archivées en BDD via `GET /api/leaderboard/history`, avec une borne `before` fixée au début de la session courante. Le résultat `race_out.json` de la session qui vient de finir n'est jamais utilisé pour le classement affiché.
+
+Depuis v2.2.161, si le filtre voiture ne retourne aucun temps historique valide, l'agent recharge automatiquement l'historique du circuit et du tracé toutes voitures confondues avant d'afficher l'écran vide.
