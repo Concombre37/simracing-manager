@@ -10,6 +10,8 @@ import {
   FlipHorizontal,
   ImageOff,
   AlertTriangle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { contentLabelsApi, type KnownContentItem } from '../services/contentLabels';
 import { contentCategoriesApi, type ContentCategory } from '../services/contentCategories';
@@ -183,6 +185,7 @@ interface RowPayload {
   maxSpeedKmh?: number;
   mirrored?: boolean;
   visible?: boolean;
+  hiddenLayouts?: string[];
 }
 
 /** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
@@ -214,6 +217,7 @@ function ContentNameRow({
   const [maxSpeedKmh, setMaxSpeedKmh] = useState(item.maxSpeedKmh ? String(item.maxSpeedKmh) : '');
   const [mirrored, setMirrored] = useState(item.mirrored);
   const [visible, setVisible] = useState(item.visible);
+  const [hiddenLayouts, setHiddenLayouts] = useState<string[]>(item.hiddenLayouts ?? []);
 
   useEffect(() => {
     setName(item.displayName ?? '');
@@ -228,6 +232,7 @@ function ContentNameRow({
     setMaxSpeedKmh(item.maxSpeedKmh ? String(item.maxSpeedKmh) : '');
     setMirrored(item.mirrored);
     setVisible(item.visible);
+    setHiddenLayouts(item.hiddenLayouts ?? []);
   }, [
     item.displayName,
     item.category,
@@ -241,6 +246,7 @@ function ContentNameRow({
     item.maxSpeedKmh,
     item.mirrored,
     item.visible,
+    item.hiddenLayouts,
   ]);
 
   const mutation = useMutation({
@@ -261,6 +267,10 @@ function ContentNameRow({
   const parsedPowerHp = powerHp.trim() ? Number(powerHp.trim()) : null;
   const parsedWeightKg = weightKg.trim() ? Number(weightKg.trim()) : null;
   const parsedMaxSpeedKmh = maxSpeedKmh.trim() ? Number(maxSpeedKmh.trim()) : null;
+  const initialHiddenLayouts = item.hiddenLayouts ?? [];
+  const hiddenLayoutsChanged =
+    hiddenLayouts.length !== initialHiddenLayouts.length ||
+    hiddenLayouts.some((layout) => !initialHiddenLayouts.includes(layout));
   const hasChanged =
     trimmedName !== (item.displayName ?? '') ||
     trimmedCategory !== (item.category ?? '') ||
@@ -273,7 +283,8 @@ function ContentNameRow({
     parsedWeightKg !== item.weightKg ||
     parsedMaxSpeedKmh !== item.maxSpeedKmh ||
     mirrored !== item.mirrored ||
-    visible !== item.visible;
+    visible !== item.visible ||
+    hiddenLayoutsChanged;
   const hasOverride = Boolean(
     item.displayName ||
     item.category ||
@@ -286,7 +297,8 @@ function ContentNameRow({
     item.weightKg ||
     item.maxSpeedKmh ||
     item.mirrored ||
-    !item.visible,
+    !item.visible ||
+    hiddenLayouts.length > 0,
   );
 
   function save(overrides: Partial<RowPayload> = {}) {
@@ -303,6 +315,7 @@ function ContentNameRow({
       maxSpeedKmh: parsedMaxSpeedKmh ?? undefined,
       mirrored: mirrored || undefined,
       visible,
+      hiddenLayouts: item.type === 'track' ? hiddenLayouts : undefined,
       ...overrides,
     });
   }
@@ -377,6 +390,7 @@ function ContentNameRow({
                 setMaxSpeedKmh('');
                 setMirrored(false);
                 setVisible(true);
+                setHiddenLayouts([]);
                 save({
                   displayName: '',
                   category: undefined,
@@ -390,6 +404,7 @@ function ContentNameRow({
                   maxSpeedKmh: undefined,
                   mirrored: undefined,
                   visible: true,
+                  hiddenLayouts: [],
                 });
               }}
               title="Tout réinitialiser"
@@ -453,16 +468,46 @@ function ContentNameRow({
             className={item.layoutImages.length > 1 ? 'col-span-2' : undefined}
           >
             {item.layoutImages.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {item.layoutImages.map((l) => (
-                  <div
-                    key={l.name}
-                    className="flex h-9 w-12 flex-none items-center justify-center rounded-lg border border-dark-600 bg-black p-0.5"
-                    title={l.name}
-                  >
-                    <img src={l.url} alt={l.name} className="h-full w-full object-contain" />
-                  </div>
-                ))}
+              <div className="flex flex-wrap gap-2">
+                {item.layoutImages.map((l) => {
+                  const isHidden = hiddenLayouts.includes(l.name) || l.visible === false;
+                  return (
+                    <div
+                      key={l.name}
+                      className={`group relative flex h-16 w-24 flex-none flex-col overflow-hidden rounded-lg border bg-black transition-colors ${
+                        isHidden
+                          ? 'border-dark-700 opacity-45'
+                          : 'border-dark-600 hover:border-accent-orange/60'
+                      }`}
+                      title={isHidden ? `${l.name} — masqué sur la tablette` : l.name}
+                    >
+                      <img src={l.url} alt={l.name} className="min-h-0 flex-1 object-contain p-1" />
+                      <div className="flex items-center justify-between gap-1 border-t border-dark-700 bg-dark-900/90 px-1.5 py-1">
+                        <span className="min-w-0 truncate text-[9px] text-gray-300">{l.name}</span>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setHiddenLayouts((current) =>
+                              isHidden
+                                ? current.filter((name) => name !== l.name)
+                                : [...current, l.name],
+                            )
+                          }
+                          className="flex h-5 w-5 flex-none items-center justify-center rounded text-gray-400 transition-colors hover:bg-dark-700 hover:text-white"
+                          title={
+                            isHidden ? 'Réafficher sur la tablette' : 'Masquer sur la tablette'
+                          }
+                        >
+                          {isHidden ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : item.hiddenLayouts?.length ? (
+              <div className="flex h-9 items-center rounded-lg border border-dashed border-dark-600 px-2 text-[10px] text-gray-500">
+                {item.hiddenLayouts.length} layout(s) masqué(s)
               </div>
             ) : item.layoutImageUrl ? (
               <div

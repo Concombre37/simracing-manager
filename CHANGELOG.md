@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.166 — Masquage des layouts tablette
+
+- La section **Noms** permet maintenant de masquer ou réafficher chaque layout nommé d'un circuit.
+- Le choix est enregistré par circuit en base et filtre uniquement le catalogue `/tablet-menu` ; les scans agent restent conservés.
+- Les layouts masqués restent visibles dans l'administration avec leur état et un bouton de restauration.
+
 ## v2.2.165 — Groupes de classement robustes
 
 - Le blanking sépare explicitement le podium et le contexte local du pilote.

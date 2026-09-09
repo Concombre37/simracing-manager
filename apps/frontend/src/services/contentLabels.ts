@@ -23,7 +23,8 @@ export interface KnownContentItem {
   visible: boolean;
   previewUrl: string | null;
   layoutImageUrl: string | null;
-  layoutImages: { name: string; url: string }[];
+  layoutImages: { name: string; url: string; visible?: boolean }[];
+  hiddenLayouts: string[];
 }
 
 export const contentLabelsApi = {
@@ -46,6 +47,7 @@ export const contentLabelsApi = {
     maxSpeedKmh?: number;
     mirrored?: boolean;
     visible?: boolean;
+    hiddenLayouts?: string[];
   }) => api.put('/content/labels', params).then((res) => res.data),
 };
 

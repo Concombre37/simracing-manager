@@ -18,6 +18,7 @@ interface StationContentShape {
 export interface LayoutImage {
   name: string;
   url: string;
+  visible: boolean;
 }
 
 export interface KnownContentItem {
@@ -40,6 +41,7 @@ export interface KnownContentItem {
   previewUrl: string | null;
   layoutImageUrl: string | null;
   layoutImages: LayoutImage[];
+  hiddenLayouts: string[];
 }
 
 export interface CatalogItem {
@@ -125,13 +127,17 @@ export class ContentLabelsService {
     acId: string,
     layoutNames: string[] | undefined,
     previewByKey: Map<string, string>,
+    hiddenLayouts: string[] = [],
+    includeHidden = false,
   ): LayoutImage[] {
+    const hidden = new Set(hiddenLayouts);
     return (layoutNames ?? [])
-      .map((name) => ({
-        name,
-        url: previewByKey.get(`layout:${acId}:${name}`),
-      }))
-      .filter((l): l is LayoutImage => Boolean(l.url));
+      .map((name) => {
+        const url = previewByKey.get(`layout:${acId}:${name}`);
+        return url ? { name, url, visible: !hidden.has(name) } : null;
+      })
+      .filter((l): l is LayoutImage => l !== null)
+      .filter((l) => includeHidden || l.visible !== false);
   }
 
   async getKnown(): Promise<KnownContentItem[]> {
@@ -176,8 +182,11 @@ export class ContentLabelsService {
                   item.acId,
                   item.layoutNames,
                   previewByKey,
+                  label?.hiddenLayouts ?? [],
+                  true,
                 )
               : [],
+          hiddenLayouts: label?.hiddenLayouts ?? [],
         };
       })
       .sort((a, b) => {
@@ -241,6 +250,7 @@ export class ContentLabelsService {
                 item.acId,
                 item.layoutNames,
                 previewByKey,
+                label?.hiddenLayouts ?? [],
               )
             : [],
       };
@@ -287,6 +297,13 @@ export class ContentLabelsService {
     const maxSpeedKmh = dto.maxSpeedKmh ?? null;
     const mirrored = dto.mirrored ?? false;
     const visible = dto.visible ?? true;
+    const hiddenLayouts = Array.from(
+      new Set(
+        (dto.hiddenLayouts ?? [])
+          .map((layout) => layout.trim())
+          .filter(Boolean),
+      ),
+    );
 
     if (
       !displayName &&
@@ -300,7 +317,8 @@ export class ContentLabelsService {
       !weightKg &&
       !maxSpeedKmh &&
       !mirrored &&
-      visible
+      visible &&
+      hiddenLayouts.length === 0
     ) {
       await this.prisma.contentLabel.deleteMany({
         where: { type: dto.type, acId: dto.acId },
@@ -325,6 +343,7 @@ export class ContentLabelsService {
         maxSpeedKmh,
         mirrored,
         visible,
+        hiddenLayouts,
       },
       update: {
         displayName,
@@ -339,6 +358,7 @@ export class ContentLabelsService {
         maxSpeedKmh,
         mirrored,
         visible,
+        hiddenLayouts,
       },
     });
   }

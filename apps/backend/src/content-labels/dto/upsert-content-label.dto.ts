@@ -21,6 +21,7 @@ export const upsertContentLabelSchema = z.object({
   maxSpeedKmh: z.number().int().min(1).max(2000).optional(),
   mirrored: z.boolean().optional(),
   visible: z.boolean().optional(),
+  hiddenLayouts: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
 });
 
 export type UpsertContentLabelDto = z.infer<typeof upsertContentLabelSchema>;
