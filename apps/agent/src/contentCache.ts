@@ -18,7 +18,10 @@ interface CachedTrack extends Track {
 // v9: Track/TrackLayout gained `layoutImage` (outline.png circuit schema) —
 // a v8 cache entry has no such field at all (not just unset), so it must be
 // invalidated rather than silently treated as "scanned, no schema found".
-const CACHE_VERSION = 9;
+// v10: track layout files are part of the mtime fingerprint. Existing caches
+// must be rescanned once so layouts installed after the first scan are picked
+// up even when the track root itself did not change.
+const CACHE_VERSION = 10;
 
 interface CacheData {
   version?: number;

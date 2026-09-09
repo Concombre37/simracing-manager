@@ -1,6 +1,6 @@
 # SimRacing Manager — Project Notes
 
-Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.168`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
+Connaissance complète et exhaustive du monorepo `simracing-manager`, à jour au **`v2.2.169`**. Ce fichier est chargé automatiquement par Claude Code (contexte de projet) et sert de source de vérité — le tenir à jour à chaque changement d'architecture, d'endpoint, de contrat WebSocket, de build ou de déploiement.
 
 ## 1. Vue d'ensemble
 
@@ -499,6 +499,7 @@ Les trois façons pour une session suivie de se terminer (durée expirée, rédu
 - **Aperçus (previews)**: `contentScanner.ts` envoie les images en base64 brut (jusqu'à 2 Mo/image). DDS converties en PNG via ImageMagick si disponible.
 - **Photos de circuits manquantes (v2.2.56)** : un circuit multi-layout a son `ui_track.json`/`preview.png` par layout sous `<track>/ui/<layout>/` (convention standard), pas `<track>/<layout>/` (données 3D, référencées par `models_<layout>.ini`). L'ancien code ne vérifiait que ce dernier chemin. `discoverLayoutNames()`/`findLayoutPreview()` vérifient maintenant les trois conventions. Nécessite une resynchronisation de contenu par POD (bump de `CACHE_VERSION` la force automatiquement).
 - **Schéma de circuit scanné localement (v2.2.128)** : `findLayoutSchema()`/`findTrackLayoutSchema()`, mêmes conventions de recherche que `findLayoutPreview()`/`findTrackPreview()` ci-dessus, mais pour `outline.png` (le fichier standard AC utilisé par le menu de sélection de circuit du jeu pour dessiner le tracé vu du dessus — c'est ce que Content Manager affiche dans sa fiche circuit) plutôt que `preview.png`. `Track`/`TrackLayout` gagnent `layoutImage`. Un circuit sans `outline.png` (mod incomplet) garde simplement `layoutImage: undefined`, sans erreur — `CACHE_VERSION` 9 force la resynchronisation de tout circuit déjà en cache d'une version antérieure de l'agent.
+- **Layouts ajoutés après le premier scan (v2.2.169)** : `getTrackScanPaths()` inclut désormais les fichiers UI, previews et schémas de chaque layout nommé dans l'empreinte mtime. `CACHE_VERSION` 10 force la première resynchronisation et empêche un cache `layouts: []` de masquer un layout installé ensuite.
 - **Noms de voitures cassés (v2.2.57)** : même schéma que ci-dessus pour `ui_car.json` (`content/cars/<car>/ui/ui_car.json`, pas `content/cars/<car>/ui_car.json` à la racine). `formatCarName()` en dernier recours si toujours manquant.
 - **Gearbox découplé de la difficulté (v2.2.55)** : `configureAssistsIni()` prend un `gearbox: 'MANUAL'|'AUTO'` indépendant, pas juste lié au preset de difficulté. Seulement câblé pour le flow de join serveur dédié, pas le lancement direct.
 - **`currentSession.durationMinutes` peut être `null`** (join "Illimité", cas par défaut du frontend) — le suivi de session et l'écran de résultats démarrent quand même ; seul le timer de fin auto est conditionnel à une durée définie.
@@ -807,3 +808,4 @@ Depuis v2.2.166, la section Noms permet de masquer individuellement les layouts 
 Depuis v2.2.167, les inventaires de circuits et layouts sont fusionnés entre toutes les stations : un scan plus ancien ne peut plus effacer un circuit ou un layout découvert sur un autre poste.
 
 Depuis v2.2.168, la section Noms indique la présence/absence par station pour chaque voiture, circuit et layout, sans créer de doublons.
+Depuis v2.2.169, le cache de scan agent inclut les fichiers UI, previews et schémas de chaque layout nommé afin qu'un layout ajouté après le premier scan soit remonté au créateur de serveur.

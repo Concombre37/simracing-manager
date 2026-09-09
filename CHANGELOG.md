@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.169 — Rescan fiable des layouts Assetto Corsa
+
+- Le cache agent surveille maintenant les `ui_track.json`, previews et schémas de chaque layout nommé.
+- L’ajout d’un layout après le premier scan invalide correctement le cache au lieu de conserver `layouts: []`.
+- Les caches existants sont rescannés une fois avec la nouvelle version de cache.
+
 ## v2.2.168 — Présence du contenu par station
 
 - La liste **Noms** reste dédupliquée par voiture/circuit et affiche maintenant combien de postes possèdent chaque contenu.

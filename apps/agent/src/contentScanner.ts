@@ -288,6 +288,40 @@ async function discoverLayoutNames(trackDir: string): Promise<string[]> {
   return [...names];
 }
 
+/**
+ * Every file that can change a track or one of its named layouts. The cache
+ * used to watch only the track root, so installing a layout under `ui/<name>`
+ * after the first scan left the cached `layouts: []` in place forever.
+ * Discover the names before checking the cache and include each layout's UI,
+ * preview and outline files in the mtime fingerprint.
+ */
+export async function getTrackScanPaths(trackDir: string): Promise<string[]> {
+  const layoutNames = await discoverLayoutNames(trackDir);
+  const paths = [
+    path.join(trackDir, 'ui_track.json'),
+    path.join(trackDir, 'ui', 'ui_track.json'),
+    ...PREVIEW_NAMES.map((name) => path.join(trackDir, name)),
+    ...PREVIEW_NAMES.map((name) => path.join(trackDir, 'ui', name)),
+    ...LAYOUT_IMAGE_NAMES.map((name) => path.join(trackDir, name)),
+    ...LAYOUT_IMAGE_NAMES.map((name) => path.join(trackDir, 'ui', name)),
+  ];
+
+  for (const layout of layoutNames) {
+    const candidateDirs = [
+      path.join(trackDir, 'ui', layout),
+      path.join(trackDir, layout, 'ui'),
+      path.join(trackDir, layout),
+    ];
+    for (const dir of candidateDirs) {
+      paths.push(path.join(dir, 'ui_track.json'));
+      paths.push(...PREVIEW_NAMES.map((name) => path.join(dir, name)));
+      paths.push(...LAYOUT_IMAGE_NAMES.map((name) => path.join(dir, name)));
+    }
+  }
+
+  return paths;
+}
+
 async function findTrackPreview(
   logger: Logger,
   trackDir: string,
@@ -474,20 +508,15 @@ export class ContentScanner {
         if (!stat?.isDirectory()) continue;
 
         const uiPath = path.join(trackDir, 'ui_track.json');
-        const previewPaths = [
-          'preview.png',
-          'preview.jpg',
-          'preview.jpeg',
-          ...LAYOUT_IMAGE_NAMES,
-        ].map((n) => path.join(trackDir, n));
-        const updatedAt = await maxMtime(uiPath, ...previewPaths);
+        const scanPaths = await getTrackScanPaths(trackDir);
+        const updatedAt = await maxMtime(...scanPaths);
         const cached = this.cache.getTrack(entry);
 
         if (
           cached &&
           cached.updatedAt === updatedAt &&
           cached.preview !== undefined &&
-          cached.layoutImage !== undefined
+          'layoutImage' in cached
         ) {
           content.tracks.push({
             acId: cached.acId,
