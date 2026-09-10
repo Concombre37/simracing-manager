@@ -187,8 +187,8 @@ function MenuSection({
                   <p className="py-3 text-xs text-gray-500">Aucun article.</p>
                 ) : (
                   category.items.map((item, index) => (
-                    <div key={item.id} className="flex flex-wrap items-start gap-3 py-3">
-                      <div className="min-w-0 basis-full flex-1 lg:basis-0">
+                    <div key={item.id} className="flex flex-col gap-2 py-3">
+                      <div className="min-w-0">
                         <p className="text-sm leading-5 text-white break-words">{item.name}</p>
                         {item.description && (
                           <p className="text-xs leading-4 text-gray-500 break-words">
@@ -196,58 +196,60 @@ function MenuSection({
                           </p>
                         )}
                       </div>
-                      <div className="flex shrink-0 flex-wrap overflow-hidden rounded-md border border-dark-600 text-xs font-semibold">
-                        <span className="px-2 py-1 text-accent-orange">
-                          Public : {formatMenuPrice(item.price)}
-                        </span>
-                        {item.subscriberPrice && (
-                          <span className="border-l border-dark-600 px-2 py-1 text-emerald-300">
-                            Abonné : {formatMenuPrice(item.subscriberPrice)}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex shrink-0 overflow-hidden rounded-md border border-dark-600 text-xs font-semibold">
+                          <span className="px-2 py-1 text-accent-orange">
+                            Public : {formatMenuPrice(item.price)}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex shrink-0 items-center gap-0.5">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          title="Monter l'article"
-                          aria-label={`Monter ${item.name}`}
-                          disabled={index === 0 || reorderMutation.isPending}
-                          onClick={() =>
-                            reorderMutation.mutate({ category, from: index, to: index - 1 })
-                          }
-                        >
-                          <ChevronUp className="h-3.5 w-3.5" />
+                          {item.subscriberPrice && (
+                            <span className="border-l border-dark-600 px-2 py-1 text-emerald-300">
+                              Abonné : {formatMenuPrice(item.subscriberPrice)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Monter l'article"
+                            aria-label={`Monter ${item.name}`}
+                            disabled={index === 0 || reorderMutation.isPending}
+                            onClick={() =>
+                              reorderMutation.mutate({ category, from: index, to: index - 1 })
+                            }
+                          >
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            title="Descendre l'article"
+                            aria-label={`Descendre ${item.name}`}
+                            disabled={
+                              index === category.items.length - 1 || reorderMutation.isPending
+                            }
+                            onClick={() =>
+                              reorderMutation.mutate({ category, from: index, to: index + 1 })
+                            }
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                        <Button size="sm" variant="ghost" onClick={() => onEditItem(item)}>
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          title="Descendre l'article"
-                          aria-label={`Descendre ${item.name}`}
-                          disabled={
-                            index === category.items.length - 1 || reorderMutation.isPending
+                          onClick={() => removeItemMutation.mutate(item.id)}
+                          isLoading={
+                            removeItemMutation.isPending && removeItemMutation.variables === item.id
                           }
-                          onClick={() =>
-                            reorderMutation.mutate({ category, from: index, to: index + 1 })
-                          }
+                          className="text-accent-red hover:text-red-300"
                         >
-                          <ChevronDown className="h-3.5 w-3.5" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                      <Button size="sm" variant="ghost" onClick={() => onEditItem(item)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => removeItemMutation.mutate(item.id)}
-                        isLoading={
-                          removeItemMutation.isPending && removeItemMutation.variables === item.id
-                        }
-                        className="text-accent-red hover:text-red-300"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
                     </div>
                   ))
                 )}
