@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.172 — Présence flotte dans le catalogue
+
+- Le catalogue reste dédoublonné par voiture/circuit (`acId`), même si plusieurs postes possèdent le même contenu.
+- Chaque fiche expose les postes équipés et les postes où le contenu est manquant.
+- Ces données alimentent le futur écran de suivi des mods manquants.
+
 ## v2.2.171 — Tarifs limités à Cuisine/Bar
 
 - Les prix public et abonné sont gérés uniquement pour les articles du menu Cuisine/Bar.

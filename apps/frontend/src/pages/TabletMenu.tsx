@@ -940,6 +940,49 @@ function DifficultyDots({ value, showLabel }: { value: number; showLabel?: boole
   );
 }
 
+/** Présence réelle du contenu sur les postes : le catalogue reste dédoublonné
+ * par acId, mais la fiche indique exactement quels postes l'ont installé. */
+function FleetAvailability({ item, compact = false }: { item: CatalogItem; compact?: boolean }) {
+  if (item.stations.length === 0) return null;
+  const present = item.stations.filter((station) => station.present);
+  const missing = item.stations.filter((station) => !station.present);
+  const names = (stations: typeof item.stations) =>
+    stations.map((station) => station.name || station.stationId).join(', ');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 4 : 8 }}>
+      <span
+        style={{
+          fontSize: compact ? 9 : 11,
+          fontWeight: 800,
+          letterSpacing: '.16em',
+          textTransform: 'uppercase',
+          color: 'color-mix(in srgb, var(--tm-text) 48%, transparent)',
+        }}
+      >
+        Flotte · {present.length}/{item.stations.length} postes équipés
+      </span>
+      {!compact && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+          <span
+            title={names(present) || 'Aucun poste'}
+            style={{ color: 'color-mix(in srgb, #65d49a 82%, var(--tm-text))' }}
+          >
+            Disponibles : {names(present) || 'aucun poste'}
+          </span>
+          {missing.length > 0 && (
+            <span
+              title={names(missing)}
+              style={{ color: 'color-mix(in srgb, #ff9b71 82%, var(--tm-text))' }}
+            >
+              Manquantes : {names(missing)}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Carte catalogue — traitement différent voiture/circuit comme dans la
  * maquette v2 : une voiture montre sa vraie photo en duotone (voile bleu +
  * texture hachurée, contenu ancré en bas) ; un circuit montre son vrai
@@ -1085,6 +1128,7 @@ function CatalogCard({
               {subtitle}
             </div>
           )}
+          <FleetAvailability item={item} compact />
         </div>
       </div>
     );
@@ -1218,6 +1262,7 @@ function CatalogCard({
             </span>
           )}
         </div>
+        <FleetAvailability item={item} compact />
       </div>
     </div>
   );
@@ -1690,6 +1735,8 @@ function DetailModal({
           >
             {item.name}
           </h2>
+
+          <FleetAvailability item={item} />
 
           {(flag || item.country) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

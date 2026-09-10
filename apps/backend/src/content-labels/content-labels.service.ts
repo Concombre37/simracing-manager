@@ -143,6 +143,7 @@ export interface CatalogItem {
   weightKg: number | null;
   maxSpeedKmh: number | null;
   mirrored: boolean;
+  stations: ContentPresence[];
   layoutImageUrl: string | null;
   layoutImages: LayoutImage[];
 }
@@ -306,7 +307,7 @@ export class ContentLabelsService {
    * même agrégation que `getKnown()`, enrichie de l'image et triée par nom
    * affiché. */
   async getCatalog(): Promise<{ cars: CatalogItem[]; tracks: CatalogItem[] }> {
-    const [{ items: rawByKey }, labels, previewByKey] = await Promise.all([
+    const [{ items: rawByKey, stations: allStations }, labels, previewByKey] = await Promise.all([
       this.gatherRawContent(),
       this.prisma.contentLabel.findMany(),
       this.loadPreviewMap(['car', 'track', 'layout']),
@@ -342,6 +343,7 @@ export class ContentLabelsService {
         weightKg: label?.weightKg ?? null,
         maxSpeedKmh: label?.maxSpeedKmh ?? null,
         mirrored: label?.mirrored ?? false,
+        stations: presenceFor(allStations, item.stations),
         // Vrai schéma scanné (outline.png réel du circuit installé) préféré
         // au schéma web (Wikimedia) peuplé manuellement en v2.2.126 — celui-ci
         // ne reste utilisé qu'en repli, pour les circuits pas encore
