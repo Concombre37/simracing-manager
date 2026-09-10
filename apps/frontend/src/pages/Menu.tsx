@@ -447,9 +447,11 @@ function ItemFormModal({
             id="item-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="ex: Crème fraîche, oignons, lardons"
-            rows={2}
+            placeholder="ex: Vanille, Chocolat, Caramel..."
+            maxLength={1000}
+            rows={4}
           />
+          <p className="mt-1 text-right text-[11px] text-gray-500">{description.length}/1000</p>
         </div>
         <div>
           <Label htmlFor="item-price">Prix tout public</Label>
