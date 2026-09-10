@@ -6,12 +6,6 @@ export interface LayoutImage {
   url: string;
 }
 
-export interface ContentPresence {
-  stationId: string;
-  name: string;
-  present: boolean;
-}
-
 export interface CatalogItem {
   acId: string;
   name: string;
@@ -26,7 +20,6 @@ export interface CatalogItem {
   weightKg: number | null;
   maxSpeedKmh: number | null;
   mirrored: boolean;
-  stations: ContentPresence[];
   layoutImageUrl: string | null;
   layoutImages: LayoutImage[];
 }
