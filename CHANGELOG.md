@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.173 — Affichage des tarifs en ligne
+
+- Les tarifs Public et Abonné du menu sont regroupés dans un bloc horizontal à deux cellules.
+- Le même format est utilisé dans l’administration et sur la tablette pour éviter toute confusion.
+
 ## v2.2.172 — Présence flotte dans le catalogue
 
 - Le catalogue reste dédoublonné par voiture/circuit (`acId`), même si plusieurs postes possèdent le même contenu.

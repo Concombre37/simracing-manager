@@ -156,14 +156,14 @@ function MenuSection({
                           <p className="text-xs text-gray-500 truncate">{item.description}</p>
                         )}
                       </div>
-                      <span className="shrink-0 text-sm font-semibold text-accent-orange">
-                        Public : {item.price}
-                      </span>
-                      {item.subscriberPrice && (
-                        <span className="shrink-0 text-sm font-semibold text-emerald-300">
-                          Abonné : {item.subscriberPrice}
-                        </span>
-                      )}
+                      <div className="flex shrink-0 overflow-hidden rounded-md border border-dark-600 text-xs font-semibold">
+                        <span className="px-2 py-1 text-accent-orange">Public : {item.price}</span>
+                        {item.subscriberPrice && (
+                          <span className="border-l border-dark-600 px-2 py-1 text-emerald-300">
+                            Abonné : {item.subscriberPrice}
+                          </span>
+                        )}
+                      </div>
                       <Button size="sm" variant="ghost" onClick={() => onEditItem(item)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>

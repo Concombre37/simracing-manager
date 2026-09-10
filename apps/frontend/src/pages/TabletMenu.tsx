@@ -1539,17 +1539,36 @@ function MenuGroupCard({ group }: { group: MenuCategory }) {
               <div
                 style={{
                   flex: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'flex-end',
-                  gap: 4,
+                  display: 'grid',
+                  gridTemplateColumns: item.subscriberPrice ? 'auto auto' : 'auto',
+                  alignItems: 'stretch',
+                  border: '1px solid var(--tm-divider)',
+                  borderRadius: 8,
+                  overflow: 'hidden',
                   fontSize: 12,
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                <span style={{ fontWeight: 800 }}>Public · {item.price}</span>
+                <span
+                  style={{
+                    padding: '6px 9px',
+                    whiteSpace: 'nowrap',
+                    fontWeight: 800,
+                    color: 'var(--tm-text)',
+                  }}
+                >
+                  Public · {item.price}
+                </span>
                 {item.subscriberPrice && (
-                  <span style={{ color: 'var(--tm-accent-light)', fontWeight: 800 }}>
+                  <span
+                    style={{
+                      padding: '6px 9px',
+                      whiteSpace: 'nowrap',
+                      borderLeft: '1px solid var(--tm-divider)',
+                      color: 'var(--tm-accent-light)',
+                      fontWeight: 800,
+                    }}
+                  >
                     Abonné · {item.subscriberPrice}
                   </span>
                 )}
