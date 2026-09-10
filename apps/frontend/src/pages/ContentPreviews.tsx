@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { ImageIcon, Trash2, RefreshCw, Search, Monitor } from 'lucide-react';
-import { contentPreviewsApi } from '../services/contentPreviews';
+import { contentPreviewsApi, type ContentPreviewType } from '../services/contentPreviews';
 import { stationsApi } from '../services/stations';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
@@ -30,7 +30,8 @@ export function ContentPreviews() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => contentPreviewsApi.remove(id),
+    mutationFn: ({ type, acId }: { type: ContentPreviewType; acId: string }) =>
+      contentPreviewsApi.removeGroup(type, acId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contentPreviews'] }),
   });
 
@@ -45,7 +46,7 @@ export function ContentPreviews() {
       (p) =>
         p.name.toLowerCase().includes(term) ||
         p.acId.toLowerCase().includes(term) ||
-        p.station.name.toLowerCase().includes(term),
+        p.stations.some((station) => station.name.toLowerCase().includes(term)),
     );
   }, [previews, search]);
 
@@ -158,10 +159,14 @@ export function ContentPreviews() {
                   loading="lazy"
                 />
                 <button
-                  onClick={() => deleteMutation.mutate(preview.id)}
-                  disabled={deleteMutation.variables === preview.id && deleteMutation.isPending}
+                  onClick={() => deleteMutation.mutate({ type: preview.type, acId: preview.acId })}
+                  disabled={
+                    deleteMutation.isPending &&
+                    deleteMutation.variables?.type === preview.type &&
+                    deleteMutation.variables?.acId === preview.acId
+                  }
                   className="absolute top-2 right-2 p-1.5 bg-accent-red/90 hover:bg-accent-red text-white rounded-md opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Supprimer"
+                  title="Supprimer toutes les copies"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -169,9 +174,15 @@ export function ContentPreviews() {
               <div className="p-2.5 space-y-1">
                 <div className="flex items-center justify-between gap-2">
                   <Badge variant={preview.type === 'car' ? 'blue' : 'green'}>
-                    {preview.type === 'car' ? 'Voiture' : 'Circuit'}
+                    {preview.type === 'car'
+                      ? 'Voiture'
+                      : preview.type === 'track'
+                        ? 'Circuit'
+                        : 'Layout'}
                   </Badge>
-                  <span className="text-[10px] text-gray-500 truncate">{preview.station.name}</span>
+                  <span className="text-[10px] text-gray-500">
+                    {preview.previewCount} poste{preview.previewCount > 1 ? 's' : ''}
+                  </span>
                 </div>
                 <p className="text-xs font-medium text-white truncate" title={preview.name}>
                   {preview.name}
@@ -179,6 +190,17 @@ export function ContentPreviews() {
                 <p className="text-[10px] text-gray-500 truncate" title={preview.acId}>
                   {preview.acId}
                 </p>
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {preview.stations.map((station) => (
+                    <span
+                      key={station.id}
+                      className="rounded bg-dark-700 px-1.5 py-0.5 text-[10px] text-gray-300"
+                      title={station.stationId}
+                    >
+                      {station.name}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           ))}

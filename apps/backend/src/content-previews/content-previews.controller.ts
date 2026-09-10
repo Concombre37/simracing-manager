@@ -41,17 +41,66 @@ export class ContentPreviewsController {
       },
     });
 
-    return previews.map((p) => ({
-      id: p.id,
-      stationId: p.stationId,
-      station: p.station,
-      type: p.type,
-      acId: p.acId,
-      name: p.name,
-      url: `/api/content/previews/${p.id}`,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-    }));
+    const groups = new Map<
+      string,
+      {
+        representative: (typeof previews)[number];
+        stations: (typeof previews)[number]['station'][];
+      }
+    >();
+
+    for (const preview of previews) {
+      const key = `${preview.type}:${preview.acId}`;
+      const group = groups.get(key);
+      if (group) {
+        if (
+          !group.stations.some((station) => station.id === preview.station.id)
+        ) {
+          group.stations.push(preview.station);
+        }
+        continue;
+      }
+      groups.set(key, { representative: preview, stations: [preview.station] });
+    }
+
+    const counts = new Map<string, number>();
+    for (const preview of previews) {
+      const key = `${preview.type}:${preview.acId}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    return Array.from(groups.values())
+      .map(({ representative, stations }) => ({
+        id: representative.id,
+        type: representative.type,
+        acId: representative.acId,
+        name: representative.name,
+        url: `/api/content/previews/${representative.id}`,
+        stations,
+        previewCount:
+          counts.get(`${representative.type}:${representative.acId}`) ?? 1,
+        createdAt: representative.createdAt,
+        updatedAt: representative.updatedAt,
+      }))
+      .sort((a, b) =>
+        `${a.type}:${a.name}`.localeCompare(`${b.type}:${b.name}`),
+      );
+  }
+
+  @Delete('group')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  async removeGroup(
+    @Query('type') type?: string,
+    @Query('acId') acId?: string,
+  ) {
+    if (!type || !acId) {
+      throw new NotFoundException('Contenu à supprimer introuvable');
+    }
+    const result = await this.prisma.contentPreview.deleteMany({
+      where: { type, acId },
+    });
+    return { success: true, deleted: result.count };
   }
 
   @Get(':id')
