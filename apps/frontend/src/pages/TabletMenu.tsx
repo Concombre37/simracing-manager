@@ -1510,14 +1510,43 @@ function MenuGroupCard({ group }: { group: MenuCategory }) {
           Rien pour le moment.
         </p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingBottom: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0, paddingBottom: 6 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr) 64px 64px',
+              gap: 10,
+              alignItems: 'center',
+              padding: '0 0 7px',
+              borderBottom: '1px solid var(--tm-divider)',
+              fontSize: 9,
+              fontWeight: 800,
+              letterSpacing: '.14em',
+              textTransform: 'uppercase',
+              color: 'color-mix(in srgb, var(--tm-text) 42%, transparent)',
+            }}
+          >
+            <span />
+            <span style={{ textAlign: 'right' }}>Normal</span>
+            <span style={{ textAlign: 'right', color: 'var(--tm-accent-light)' }}>Abonné</span>
+          </div>
           {group.items.map((item) => (
-            <div key={item.id} style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div
+              key={item.id}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'minmax(0, 1fr) 64px 64px',
+                gap: 10,
+                alignItems: 'center',
+                padding: '10px 0',
+                borderBottom: '1px dotted color-mix(in srgb, var(--tm-text) 18%, transparent)',
+              }}
+            >
+              <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <span
                   style={{
                     fontWeight: 800,
-                    fontSize: 15.5,
+                    fontSize: 14,
                     letterSpacing: '.02em',
                     textTransform: 'uppercase',
                   }}
@@ -1526,9 +1555,9 @@ function MenuGroupCard({ group }: { group: MenuCategory }) {
                 </span>
                 {item.description && (
                   <span
-                    style={{
-                      fontSize: 13,
-                      lineHeight: 1.4,
+                  style={{
+                    fontSize: 13,
+                    lineHeight: 1.4,
                       color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
                     }}
                   >
@@ -1536,43 +1565,31 @@ function MenuGroupCard({ group }: { group: MenuCategory }) {
                   </span>
                 )}
               </div>
-              <div
+              <span
                 style={{
-                  flex: 'none',
-                  display: 'grid',
-                  gridTemplateColumns: item.subscriberPrice ? 'auto auto' : 'auto',
-                  alignItems: 'stretch',
-                  border: '1px solid var(--tm-divider)',
-                  borderRadius: 8,
-                  overflow: 'hidden',
+                  textAlign: 'right',
+                  whiteSpace: 'nowrap',
                   fontSize: 12,
+                  fontWeight: 800,
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                <span
-                  style={{
-                    padding: '6px 9px',
-                    whiteSpace: 'nowrap',
-                    fontWeight: 800,
-                    color: 'var(--tm-text)',
-                  }}
-                >
-                  Public · {item.price}
-                </span>
-                {item.subscriberPrice && (
-                  <span
-                    style={{
-                      padding: '6px 9px',
-                      whiteSpace: 'nowrap',
-                      borderLeft: '1px solid var(--tm-divider)',
-                      color: 'var(--tm-accent-light)',
-                      fontWeight: 800,
-                    }}
-                  >
-                    Abonné · {item.subscriberPrice}
-                  </span>
-                )}
-              </div>
+                {item.price}
+              </span>
+              <span
+                style={{
+                  textAlign: 'right',
+                  whiteSpace: 'nowrap',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  fontVariantNumeric: 'tabular-nums',
+                  color: item.subscriberPrice
+                    ? 'var(--tm-accent-light)'
+                    : 'color-mix(in srgb, var(--tm-text) 28%, transparent)',
+                }}
+              >
+                {item.subscriberPrice ?? '—'}
+              </span>
             </div>
           ))}
         </div>
