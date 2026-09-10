@@ -362,13 +362,16 @@ function CategoryFormModal({
           />
         </div>
         <div>
-          <Label htmlFor="cat-subtitle">Sous-titre (optionnel)</Label>
-          <Input
+          <Label htmlFor="cat-subtitle">Sous-titre / informations (optionnel)</Label>
+          <Textarea
             id="cat-subtitle"
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="ex: Pâte fine, cuite au feu de bois"
+            placeholder="ex: Vanille, Chocolat, Caramel..."
+            maxLength={1000}
+            rows={3}
           />
+          <p className="mt-1 text-right text-[11px] text-gray-500">{subtitle.length}/1000</p>
         </div>
         <div className="flex justify-end gap-3 border-t border-dark-600 pt-4">
           <Button type="button" variant="secondary" onClick={onClose}>
