@@ -241,10 +241,6 @@ model ContentLabel {
   powerHp     Int?     @map("power_hp")
   weightKg    Int?     @map("weight_kg")
   maxSpeedKmh Int?     @map("max_speed_kmh")
-  // Tarifs affichés sur le catalogue tablette — texte volontairement libre
-  // pour accepter aussi bien "20 €" que "20,00 €" ou une formule.
-  publicPrice     String? @map("public_price") @db.VarChar(30)
-  subscriberPrice String? @map("subscriber_price") @db.VarChar(30)
   // Miroir horizontal appliqué à la photo sur /tablet-menu (capot à droite,
   // photo brute inchangée en base) — décidé au cas par cas, jamais un
   // retournement systématique (certaines photos sont déjà orientées à

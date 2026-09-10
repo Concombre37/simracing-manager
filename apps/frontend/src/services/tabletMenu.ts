@@ -19,8 +19,6 @@ export interface CatalogItem {
   powerHp: number | null;
   weightKg: number | null;
   maxSpeedKmh: number | null;
-  publicPrice: string | null;
-  subscriberPrice: string | null;
   mirrored: boolean;
   layoutImageUrl: string | null;
   layoutImages: LayoutImage[];

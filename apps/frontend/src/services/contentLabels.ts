@@ -25,8 +25,6 @@ export interface KnownContentItem {
   powerHp: number | null;
   weightKg: number | null;
   maxSpeedKmh: number | null;
-  publicPrice: string | null;
-  subscriberPrice: string | null;
   mirrored: boolean;
   visible: boolean;
   previewUrl: string | null;
@@ -55,8 +53,6 @@ export const contentLabelsApi = {
     powerHp?: number;
     weightKg?: number;
     maxSpeedKmh?: number;
-    publicPrice?: string;
-    subscriberPrice?: string;
     mirrored?: boolean;
     visible?: boolean;
     hiddenLayouts?: string[];

@@ -1,10 +1,16 @@
 # Changelog
 
-## v2.2.170 — Tarifs public et abonné du catalogue tablette
+## v2.2.171 — Tarifs limités à Cuisine/Bar
 
-- Les voitures et circuits peuvent maintenant recevoir un prix tout public et un prix abonné depuis **Noms**.
-- Les deux tarifs sont exposés par l'API catalogue et affichés clairement sur chaque carte et sa fiche détaillée de la tablette.
-- La migration ajoute les champs de prix sans modifier les contenus déjà renseignés.
+- Les prix public et abonné sont gérés uniquement pour les articles du menu Cuisine/Bar.
+- Les champs et l’affichage de prix ont été retirés des voitures et circuits.
+- La migration nettoie les colonnes de prix inutilisées du catalogue de contenu.
+
+## v2.2.170 — Tarifs public et abonné du menu tablette
+
+- Les articles **Cuisine/Bar** peuvent maintenant recevoir un prix tout public et un prix abonné depuis **Menu**.
+- Les deux tarifs sont exposés par l'API du menu et affichés clairement sur la tablette.
+- Les champs de prix ne concernent pas les voitures ni les circuits.
 
 ## v2.2.169 — Rescan fiable des layouts Assetto Corsa
 

@@ -940,46 +940,6 @@ function DifficultyDots({ value, showLabel }: { value: number; showLabel?: boole
   );
 }
 
-/** Tarifs lisibles sur la tablette : le public et l'abonné restent visibles
- * côte à côte pour éviter toute ambiguïté au moment de choisir une session. */
-function CatalogPrices({ item, compact = false }: { item: CatalogItem; compact?: boolean }) {
-  if (!item.publicPrice && !item.subscriberPrice) return null;
-  const badgeStyle = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: compact ? '5px 9px' : '8px 12px',
-    borderRadius: 999,
-    border: '1px solid color-mix(in srgb, var(--tm-text) 18%, transparent)',
-    background: 'color-mix(in srgb, var(--tm-panel-2) 82%, transparent)',
-    fontSize: compact ? 10 : 12,
-    fontWeight: 800,
-    letterSpacing: '.05em',
-  } as const;
-  return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: compact ? 6 : 8 }}>
-      {item.publicPrice && (
-        <span style={badgeStyle}>
-          <span style={{ opacity: 0.62, textTransform: 'uppercase' }}>Public</span>
-          <span>{item.publicPrice}</span>
-        </span>
-      )}
-      {item.subscriberPrice && (
-        <span
-          style={{
-            ...badgeStyle,
-            borderColor: 'color-mix(in srgb, var(--tm-accent) 55%, transparent)',
-            background: 'color-mix(in srgb, var(--tm-accent) 16%, transparent)',
-          }}
-        >
-          <span style={{ opacity: 0.72, textTransform: 'uppercase' }}>Abonné</span>
-          <span>{item.subscriberPrice}</span>
-        </span>
-      )}
-    </div>
-  );
-}
-
 /** Carte catalogue — traitement différent voiture/circuit comme dans la
  * maquette v2 : une voiture montre sa vraie photo en duotone (voile bleu +
  * texture hachurée, contenu ancré en bas) ; un circuit montre son vrai
@@ -1125,7 +1085,6 @@ function CatalogCard({
               {subtitle}
             </div>
           )}
-          <CatalogPrices item={item} compact />
         </div>
       </div>
     );
@@ -1259,7 +1218,6 @@ function CatalogCard({
             </span>
           )}
         </div>
-        <CatalogPrices item={item} compact />
       </div>
     </div>
   );
@@ -1732,8 +1690,6 @@ function DetailModal({
           >
             {item.name}
           </h2>
-
-          <CatalogPrices item={item} />
 
           {(flag || item.country) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
