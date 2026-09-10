@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.170 — Tarifs public et abonné du catalogue tablette
+
+- Les voitures et circuits peuvent maintenant recevoir un prix tout public et un prix abonné depuis **Noms**.
+- Les deux tarifs sont exposés par l'API catalogue et affichés clairement sur chaque carte et sa fiche détaillée de la tablette.
+- La migration ajoute les champs de prix sans modifier les contenus déjà renseignés.
+
 ## v2.2.169 — Rescan fiable des layouts Assetto Corsa
 
 - Le cache agent surveille maintenant les `ui_track.json`, previews et schémas de chaque layout nommé.

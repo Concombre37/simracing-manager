@@ -6,6 +6,7 @@ export interface MenuItem {
   name: string;
   description: string | null;
   price: string;
+  subscriberPrice: string | null;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -34,6 +35,7 @@ export interface MenuItemInput {
   name: string;
   description?: string;
   price: string;
+  subscriberPrice?: string;
   sortOrder?: number;
 }
 

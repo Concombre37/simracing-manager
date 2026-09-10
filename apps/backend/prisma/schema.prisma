@@ -241,6 +241,10 @@ model ContentLabel {
   powerHp     Int?     @map("power_hp")
   weightKg    Int?     @map("weight_kg")
   maxSpeedKmh Int?     @map("max_speed_kmh")
+  // Tarifs affichés sur le catalogue tablette — texte volontairement libre
+  // pour accepter aussi bien "20 €" que "20,00 €" ou une formule.
+  publicPrice     String? @map("public_price") @db.VarChar(30)
+  subscriberPrice String? @map("subscriber_price") @db.VarChar(30)
   // Miroir horizontal appliqué à la photo sur /tablet-menu (capot à droite,
   // photo brute inchangée en base) — décidé au cas par cas, jamais un
   // retournement systématique (certaines photos sont déjà orientées à
@@ -306,6 +310,7 @@ model MenuItem {
   description String?
   // Texte libre ("9,50 €") — juste affiché sur la tablette, pas de calcul.
   price       String
+  subscriberPrice String? @map("subscriber_price") @db.VarChar(30)
   sortOrder   Int          @default(0) @map("sort_order")
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")

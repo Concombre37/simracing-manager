@@ -119,6 +119,8 @@ export interface KnownContentItem {
   powerHp: number | null;
   weightKg: number | null;
   maxSpeedKmh: number | null;
+  publicPrice: string | null;
+  subscriberPrice: string | null;
   mirrored: boolean;
   visible: boolean;
   previewUrl: string | null;
@@ -142,6 +144,8 @@ export interface CatalogItem {
   powerHp: number | null;
   weightKg: number | null;
   maxSpeedKmh: number | null;
+  publicPrice: string | null;
+  subscriberPrice: string | null;
   mirrored: boolean;
   layoutImageUrl: string | null;
   layoutImages: LayoutImage[];
@@ -266,6 +270,8 @@ export class ContentLabelsService {
           powerHp: label?.powerHp ?? null,
           weightKg: label?.weightKg ?? null,
           maxSpeedKmh: label?.maxSpeedKmh ?? null,
+          publicPrice: label?.publicPrice ?? null,
+          subscriberPrice: label?.subscriberPrice ?? null,
           mirrored: label?.mirrored ?? false,
           visible: label?.visible ?? true,
           previewUrl: previewByKey.get(`${item.type}:${item.acId}`) ?? null,
@@ -341,6 +347,8 @@ export class ContentLabelsService {
         powerHp: label?.powerHp ?? null,
         weightKg: label?.weightKg ?? null,
         maxSpeedKmh: label?.maxSpeedKmh ?? null,
+        publicPrice: label?.publicPrice ?? null,
+        subscriberPrice: label?.subscriberPrice ?? null,
         mirrored: label?.mirrored ?? false,
         // Vrai schéma scanné (outline.png réel du circuit installé) préféré
         // au schéma web (Wikimedia) peuplé manuellement en v2.2.126 — celui-ci
@@ -402,6 +410,8 @@ export class ContentLabelsService {
     const powerHp = dto.powerHp ?? null;
     const weightKg = dto.weightKg ?? null;
     const maxSpeedKmh = dto.maxSpeedKmh ?? null;
+    const publicPrice = dto.publicPrice?.trim() || null;
+    const subscriberPrice = dto.subscriberPrice?.trim() || null;
     const mirrored = dto.mirrored ?? false;
     const visible = dto.visible ?? true;
     const hiddenLayouts = Array.from(
@@ -423,6 +433,8 @@ export class ContentLabelsService {
       !powerHp &&
       !weightKg &&
       !maxSpeedKmh &&
+      !publicPrice &&
+      !subscriberPrice &&
       !mirrored &&
       visible &&
       hiddenLayouts.length === 0
@@ -448,6 +460,8 @@ export class ContentLabelsService {
         powerHp,
         weightKg,
         maxSpeedKmh,
+        publicPrice,
+        subscriberPrice,
         mirrored,
         visible,
         hiddenLayouts,
@@ -463,6 +477,8 @@ export class ContentLabelsService {
         powerHp,
         weightKg,
         maxSpeedKmh,
+        publicPrice,
+        subscriberPrice,
         mirrored,
         visible,
         hiddenLayouts,

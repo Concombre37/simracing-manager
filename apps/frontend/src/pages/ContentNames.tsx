@@ -41,7 +41,9 @@ function isMissingInfo(item: KnownContentItem): boolean {
     item.description ||
     item.powerHp ||
     item.weightKg ||
-    item.maxSpeedKmh
+    item.maxSpeedKmh ||
+    item.publicPrice ||
+    item.subscriberPrice
   );
 }
 
@@ -187,6 +189,8 @@ interface RowPayload {
   powerHp?: number;
   weightKg?: number;
   maxSpeedKmh?: number;
+  publicPrice?: string;
+  subscriberPrice?: string;
   mirrored?: boolean;
   visible?: boolean;
   hiddenLayouts?: string[];
@@ -219,6 +223,8 @@ function ContentNameRow({
   const [powerHp, setPowerHp] = useState(item.powerHp ? String(item.powerHp) : '');
   const [weightKg, setWeightKg] = useState(item.weightKg ? String(item.weightKg) : '');
   const [maxSpeedKmh, setMaxSpeedKmh] = useState(item.maxSpeedKmh ? String(item.maxSpeedKmh) : '');
+  const [publicPrice, setPublicPrice] = useState(item.publicPrice ?? '');
+  const [subscriberPrice, setSubscriberPrice] = useState(item.subscriberPrice ?? '');
   const [mirrored, setMirrored] = useState(item.mirrored);
   const [visible, setVisible] = useState(item.visible);
   const [hiddenLayouts, setHiddenLayouts] = useState<string[]>(item.hiddenLayouts ?? []);
@@ -234,6 +240,8 @@ function ContentNameRow({
     setPowerHp(item.powerHp ? String(item.powerHp) : '');
     setWeightKg(item.weightKg ? String(item.weightKg) : '');
     setMaxSpeedKmh(item.maxSpeedKmh ? String(item.maxSpeedKmh) : '');
+    setPublicPrice(item.publicPrice ?? '');
+    setSubscriberPrice(item.subscriberPrice ?? '');
     setMirrored(item.mirrored);
     setVisible(item.visible);
     setHiddenLayouts(item.hiddenLayouts ?? []);
@@ -248,6 +256,8 @@ function ContentNameRow({
     item.powerHp,
     item.weightKg,
     item.maxSpeedKmh,
+    item.publicPrice,
+    item.subscriberPrice,
     item.mirrored,
     item.visible,
     item.hiddenLayouts,
@@ -271,6 +281,8 @@ function ContentNameRow({
   const parsedPowerHp = powerHp.trim() ? Number(powerHp.trim()) : null;
   const parsedWeightKg = weightKg.trim() ? Number(weightKg.trim()) : null;
   const parsedMaxSpeedKmh = maxSpeedKmh.trim() ? Number(maxSpeedKmh.trim()) : null;
+  const trimmedPublicPrice = publicPrice.trim();
+  const trimmedSubscriberPrice = subscriberPrice.trim();
   const initialHiddenLayouts = item.hiddenLayouts ?? [];
   const hiddenLayoutsChanged =
     hiddenLayouts.length !== initialHiddenLayouts.length ||
@@ -286,6 +298,8 @@ function ContentNameRow({
     parsedPowerHp !== item.powerHp ||
     parsedWeightKg !== item.weightKg ||
     parsedMaxSpeedKmh !== item.maxSpeedKmh ||
+    trimmedPublicPrice !== (item.publicPrice ?? '') ||
+    trimmedSubscriberPrice !== (item.subscriberPrice ?? '') ||
     mirrored !== item.mirrored ||
     visible !== item.visible ||
     hiddenLayoutsChanged;
@@ -300,6 +314,8 @@ function ContentNameRow({
     item.powerHp ||
     item.weightKg ||
     item.maxSpeedKmh ||
+    item.publicPrice ||
+    item.subscriberPrice ||
     item.mirrored ||
     !item.visible ||
     hiddenLayouts.length > 0,
@@ -319,6 +335,8 @@ function ContentNameRow({
       powerHp: parsedPowerHp ?? undefined,
       weightKg: parsedWeightKg ?? undefined,
       maxSpeedKmh: parsedMaxSpeedKmh ?? undefined,
+      publicPrice: trimmedPublicPrice || undefined,
+      subscriberPrice: trimmedSubscriberPrice || undefined,
       mirrored: mirrored || undefined,
       visible,
       hiddenLayouts: item.type === 'track' ? hiddenLayouts : undefined,
@@ -396,6 +414,8 @@ function ContentNameRow({
                 setPowerHp('');
                 setWeightKg('');
                 setMaxSpeedKmh('');
+                setPublicPrice('');
+                setSubscriberPrice('');
                 setMirrored(false);
                 setVisible(true);
                 setHiddenLayouts([]);
@@ -410,6 +430,8 @@ function ContentNameRow({
                   powerHp: undefined,
                   weightKg: undefined,
                   maxSpeedKmh: undefined,
+                  publicPrice: undefined,
+                  subscriberPrice: undefined,
                   mirrored: undefined,
                   visible: true,
                   hiddenLayouts: [],
@@ -608,6 +630,24 @@ function ContentNameRow({
             onChange={(e) => setMaxSpeedKmh(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
             placeholder="ex: 300"
             inputMode="numeric"
+            className="w-full"
+          />
+        </Field>
+
+        <Field label="Prix public">
+          <Input
+            value={publicPrice}
+            onChange={(e) => setPublicPrice(e.target.value)}
+            placeholder="ex: 20 €"
+            className="w-full"
+          />
+        </Field>
+
+        <Field label="Prix abonné">
+          <Input
+            value={subscriberPrice}
+            onChange={(e) => setSubscriberPrice(e.target.value)}
+            placeholder="ex: 15 €"
             className="w-full"
           />
         </Field>

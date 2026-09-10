@@ -19,6 +19,8 @@ export const upsertContentLabelSchema = z.object({
   powerHp: z.number().int().min(1).max(20000).optional(),
   weightKg: z.number().int().min(1).max(20000).optional(),
   maxSpeedKmh: z.number().int().min(1).max(2000).optional(),
+  publicPrice: z.string().trim().max(30).optional(),
+  subscriberPrice: z.string().trim().max(30).optional(),
   mirrored: z.boolean().optional(),
   visible: z.boolean().optional(),
   hiddenLayouts: z.array(z.string().trim().min(1).max(120)).max(100).optional(),

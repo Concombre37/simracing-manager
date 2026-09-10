@@ -157,8 +157,13 @@ function MenuSection({
                         )}
                       </div>
                       <span className="shrink-0 text-sm font-semibold text-accent-orange">
-                        {item.price}
+                        Public : {item.price}
                       </span>
+                      {item.subscriberPrice && (
+                        <span className="shrink-0 text-sm font-semibold text-emerald-300">
+                          Abonné : {item.subscriberPrice}
+                        </span>
+                      )}
                       <Button size="sm" variant="ghost" onClick={() => onEditItem(item)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -278,6 +283,7 @@ function ItemFormModal({
   const [name, setName] = useState(item?.name ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
   const [price, setPrice] = useState(item?.price ?? '');
+  const [subscriberPrice, setSubscriberPrice] = useState(item?.subscriberPrice ?? '');
 
   const canSubmit = name.trim().length > 0 && price.trim().length > 0;
 
@@ -288,6 +294,7 @@ function ItemFormModal({
         name: name.trim(),
         description: description.trim() || undefined,
         price: price.trim(),
+        subscriberPrice: subscriberPrice.trim() || undefined,
       };
       return item ? menuApi.updateItem(item.id, payload) : menuApi.createItem(payload);
     },
@@ -327,13 +334,22 @@ function ItemFormModal({
           />
         </div>
         <div>
-          <Label htmlFor="item-price">Prix</Label>
+          <Label htmlFor="item-price">Prix tout public</Label>
           <Input
             id="item-price"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             placeholder="ex: 9,50 €"
             required
+          />
+        </div>
+        <div>
+          <Label htmlFor="item-subscriber-price">Prix abonné (optionnel)</Label>
+          <Input
+            id="item-subscriber-price"
+            value={subscriberPrice}
+            onChange={(e) => setSubscriberPrice(e.target.value)}
+            placeholder="ex: 7,50 €"
           />
         </div>
         <div className="flex justify-end gap-3 border-t border-dark-600 pt-4">
