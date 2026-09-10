@@ -151,14 +151,16 @@ function MenuSection({
           Aucune catégorie {section === 'food' ? 'cuisine' : 'bar'} pour le moment.
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
           {categories.map((category) => (
             <Card key={category.id} className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="text-base font-semibold text-white truncate">{category.title}</h3>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-base font-semibold text-white break-words">
+                    {category.title}
+                  </h3>
                   {category.subtitle && (
-                    <p className="text-xs text-gray-400 truncate">{category.subtitle}</p>
+                    <p className="text-xs text-gray-400 break-words">{category.subtitle}</p>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
@@ -185,14 +187,16 @@ function MenuSection({
                   <p className="py-3 text-xs text-gray-500">Aucun article.</p>
                 ) : (
                   category.items.map((item, index) => (
-                    <div key={item.id} className="flex items-center gap-2 py-2.5">
+                    <div key={item.id} className="flex items-start gap-3 py-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm text-white truncate">{item.name}</p>
+                        <p className="text-sm leading-5 text-white break-words">{item.name}</p>
                         {item.description && (
-                          <p className="text-xs text-gray-500 truncate">{item.description}</p>
+                          <p className="text-xs leading-4 text-gray-500 break-words">
+                            {item.description}
+                          </p>
                         )}
                       </div>
-                      <div className="flex shrink-0 overflow-hidden rounded-md border border-dark-600 text-xs font-semibold">
+                      <div className="flex shrink-0 flex-wrap overflow-hidden rounded-md border border-dark-600 text-xs font-semibold">
                         <span className="px-2 py-1 text-accent-orange">
                           Public : {formatMenuPrice(item.price)}
                         </span>
