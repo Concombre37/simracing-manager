@@ -5,6 +5,7 @@ export interface MenuItem {
   categoryId: string;
   name: string;
   description: string | null;
+  grams: number | null;
   price: string;
   subscriberPrice: string | null;
   sortOrder: number;
@@ -34,6 +35,7 @@ export interface MenuItemInput {
   categoryId: string;
   name: string;
   description?: string;
+  grams?: number | null;
   price: string;
   subscriberPrice?: string | null;
   sortOrder?: number;

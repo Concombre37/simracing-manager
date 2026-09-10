@@ -76,6 +76,10 @@ export function Menu() {
         <ItemFormModal
           item={editingItem.item}
           categoryId={editingItem.categoryId}
+          isFood={
+            categories.find((category) => category.id === editingItem.categoryId)?.section ===
+            'food'
+          }
           onClose={() => setEditingItem(null)}
         />
       )}
@@ -241,6 +245,9 @@ function MenuSection({
                             {item.description}
                           </p>
                         )}
+                        {section === 'food' && item.grams != null && (
+                          <p className="text-xs text-accent-orange/80">{item.grams} g</p>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="flex shrink-0 overflow-hidden rounded-md border border-dark-600 text-xs font-semibold">
@@ -394,15 +401,18 @@ function CategoryFormModal({
 function ItemFormModal({
   item,
   categoryId,
+  isFood,
   onClose,
 }: {
   item: MenuItem | null;
   categoryId: string;
+  isFood: boolean;
   onClose: () => void;
 }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState(item?.name ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
+  const [gramsInput, setGramsInput] = useState(item?.grams != null ? String(item.grams) : '');
   const [price, setPrice] = useState(item?.price ?? '');
   const [subscriberPrice, setSubscriberPrice] = useState(item?.subscriberPrice ?? '');
 
@@ -414,6 +424,7 @@ function ItemFormModal({
         categoryId,
         name: name.trim(),
         description: description.trim() || undefined,
+        grams: isFood && gramsInput.trim() ? Number(gramsInput) : isFood ? null : undefined,
         price: normalizePrice(price),
         subscriberPrice: normalizePrice(subscriberPrice) || (item ? null : undefined),
       };
@@ -467,6 +478,21 @@ function ItemFormModal({
             required
           />
         </div>
+        {isFood && (
+          <div>
+            <Label htmlFor="item-grams">Poids (grammes, optionnel)</Label>
+            <Input
+              id="item-grams"
+              type="number"
+              min={0}
+              max={100000}
+              step={1}
+              value={gramsInput}
+              onChange={(e) => setGramsInput(e.target.value)}
+              placeholder="ex: 300"
+            />
+          </div>
+        )}
         <div>
           <Label htmlFor="item-subscriber-price">Prix abonné (optionnel)</Label>
           <Input

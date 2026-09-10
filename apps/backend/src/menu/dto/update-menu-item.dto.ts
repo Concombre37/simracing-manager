@@ -7,6 +7,7 @@ export const updateMenuItemSchema = z
   .object({
     ...menuItemShape,
     subscriberPrice: z.string().max(30).nullable().optional(),
+    grams: z.number().int().min(0).max(100000).nullable().optional(),
   })
   .partial();
 

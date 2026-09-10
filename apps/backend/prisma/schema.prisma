@@ -305,6 +305,7 @@ model MenuItem {
   category    MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   name        String
   description String?
+  grams       Int?
   // Texte libre ("9,50 €") — juste affiché sur la tablette, pas de calcul.
   price       String
   subscriberPrice String? @map("subscriber_price") @db.VarChar(30)
