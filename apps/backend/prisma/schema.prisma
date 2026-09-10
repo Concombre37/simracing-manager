@@ -11,6 +11,7 @@ datasource db {
 model AppSettings {
   id                   String   @id @default("singleton")
   blankingDelaySeconds Int      @default(10) @map("blanking_delay_seconds")
+  tabletIdleSeconds    Int      @default(90) @map("tablet_idle_seconds")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   @@map("app_settings")

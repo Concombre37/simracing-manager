@@ -50,6 +50,10 @@ export interface CategoryTags {
   tracks: CategoryTag[];
 }
 
+export interface TabletSettings {
+  tabletIdleSeconds: number;
+}
+
 /** Attraction arcade configurée via /arcade (admin) — voir ArcadeService.
  * Photo optionnelle (aucune source de scan automatique pour ce contenu,
  * contrairement aux voitures/circuits). */
@@ -66,4 +70,5 @@ export const tabletMenuApi = {
   getCategories: () => externalApi.get<CategoryTags>('/categories').then((res) => res.data),
   getMenu: () => externalApi.get<MenuCategory[]>('/menu').then((res) => res.data),
   getArcade: () => externalApi.get<ArcadeAttraction[]>('/arcade').then((res) => res.data),
+  getSettings: () => externalApi.get<TabletSettings>('/settings').then((res) => res.data),
 };

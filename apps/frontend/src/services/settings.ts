@@ -3,11 +3,13 @@ import { api } from './api';
 export interface AppSettings {
   id: string;
   blankingDelaySeconds: number;
+  tabletIdleSeconds: number;
   updatedAt: string;
 }
 
 export interface UpdateSettingsData {
   blankingDelaySeconds: number;
+  tabletIdleSeconds?: number;
 }
 
 export const settingsApi = {

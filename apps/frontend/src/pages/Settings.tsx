@@ -22,6 +22,7 @@ import {
   Trash2,
   Ban,
   Check,
+  Tablet,
 } from 'lucide-react';
 
 type Feedback = { type: 'success' | 'error'; message: string } | null;
@@ -90,10 +91,12 @@ export function Settings() {
   });
 
   const [blankingDelayInput, setBlankingDelayInput] = useState('10');
+  const [tabletIdleInput, setTabletIdleInput] = useState('90');
 
   useEffect(() => {
     if (appSettings) {
       setBlankingDelayInput(String(appSettings.blankingDelaySeconds));
+      setTabletIdleInput(String(appSettings.tabletIdleSeconds ?? 90));
     }
   }, [appSettings]);
 
@@ -121,6 +124,21 @@ export function Settings() {
       return;
     }
     updateSettingsMutation.mutate({ blankingDelaySeconds: value });
+  }
+
+  function handleSaveTabletIdle() {
+    const value = Number(tabletIdleInput);
+    if (!Number.isInteger(value) || value < 5 || value > 3600) {
+      setFeedback({
+        type: 'error',
+        message: 'Le délai tablette doit être un nombre entier entre 5 et 3600 secondes.',
+      });
+      return;
+    }
+    updateSettingsMutation.mutate({
+      blankingDelaySeconds: appSettings?.blankingDelaySeconds ?? 10,
+      tabletIdleSeconds: value,
+    });
   }
 
   return (
@@ -173,6 +191,40 @@ export function Settings() {
           <Button
             variant="primary"
             onClick={handleSaveBlankingDelay}
+            isLoading={updateSettingsMutation.isPending}
+          >
+            Enregistrer
+          </Button>
+        </div>
+      </Card>
+
+      <Card className="max-w-xl">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="rounded-lg bg-accent-orange/10 p-2">
+            <Tablet className="h-5 w-5 text-accent-orange" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-white">Retour automatique de la tablette</h3>
+            <p className="text-xs text-gray-500">
+              Temps sans interaction avant de revenir à l'écran d'accueil.
+            </p>
+          </div>
+        </div>
+        <div className="flex items-end gap-3">
+          <div className="flex-1">
+            <Label htmlFor="tabletIdleSeconds">Délai (secondes)</Label>
+            <Input
+              id="tabletIdleSeconds"
+              type="number"
+              min={5}
+              max={3600}
+              value={tabletIdleInput}
+              onChange={(e) => setTabletIdleInput(e.target.value)}
+            />
+          </div>
+          <Button
+            variant="primary"
+            onClick={handleSaveTabletIdle}
             isLoading={updateSettingsMutation.isPending}
           >
             Enregistrer

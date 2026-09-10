@@ -6,6 +6,7 @@ import { ContentLabelsService } from '../content-labels/content-labels.service';
 import { ContentCategoriesService } from '../content-categories/content-categories.service';
 import { MenuService } from '../menu/menu.service';
 import { ArcadeService } from '../arcade/arcade.service';
+import { SettingsService } from '../settings/settings.service';
 
 /** Surface en lecture seule pensée pour un consommateur externe (site web,
  * bot Discord, la tablette client `/tablet-menu`, etc.) — authentifiée par
@@ -23,6 +24,7 @@ export class ExternalApiController {
     private readonly contentCategoriesService: ContentCategoriesService,
     private readonly menuService: MenuService,
     private readonly arcadeService: ArcadeService,
+    private readonly settingsService: SettingsService,
   ) {}
 
   @Get('leaderboard')
@@ -70,5 +72,11 @@ export class ExternalApiController {
   @Get('arcade')
   getArcade() {
     return this.arcadeService.list();
+  }
+
+  @Get('settings')
+  getPublicSettings() {
+    const settings = this.settingsService.get();
+    return settings.then(({ tabletIdleSeconds }) => ({ tabletIdleSeconds }));
   }
 }

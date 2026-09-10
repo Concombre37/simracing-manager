@@ -33,6 +33,7 @@ export class SettingsController {
     const settings = await this.settingsService.update(dto);
     this.eventEmitter.emit('settings.updated', {
       blankingDelaySeconds: settings.blankingDelaySeconds,
+      tabletIdleSeconds: settings.tabletIdleSeconds,
     });
     return settings;
   }

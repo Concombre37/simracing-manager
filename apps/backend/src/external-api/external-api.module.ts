@@ -7,6 +7,7 @@ import { ContentLabelsModule } from '../content-labels/content-labels.module';
 import { ContentCategoriesModule } from '../content-categories/content-categories.module';
 import { MenuModule } from '../menu/menu.module';
 import { ArcadeModule } from '../arcade/arcade.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ArcadeModule } from '../arcade/arcade.module';
     ContentCategoriesModule,
     MenuModule,
     ArcadeModule,
+    SettingsModule,
   ],
   controllers: [ExternalApiController],
 })

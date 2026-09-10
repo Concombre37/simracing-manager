@@ -36,7 +36,7 @@ const VENUE_WORD_1 = 'ELSASS';
 const VENUE_WORD_2 = 'SIMRACING';
 const VENUE_CITY = 'HAGUENAU';
 
-const IDLE_MS = 90_000;
+const DEFAULT_TABLET_IDLE_SECONDS = 90;
 const TAGLINE_INTERVAL_MS = 4600;
 
 type TabKey = 'cars' | 'tracks' | 'food' | 'drinks' | 'arcade';
@@ -187,6 +187,13 @@ export function TabletMenu() {
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,
   });
+  const { data: tabletSettings } = useQuery({
+    queryKey: ['tablet-settings'],
+    queryFn: tabletMenuApi.getSettings,
+    staleTime: 5 * 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+  const idleMs = (tabletSettings?.tabletIdleSeconds ?? DEFAULT_TABLET_IDLE_SECONDS) * 1000;
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -201,7 +208,7 @@ export function TabletMenu() {
 
   useEffect(() => {
     const id = setInterval(() => {
-      if (!idle && Date.now() - lastActivity.current > IDLE_MS) {
+      if (!idle && Date.now() - lastActivity.current > idleMs) {
         setIdle(true);
         setTab('cars');
         setFilter(null);
@@ -209,7 +216,7 @@ export function TabletMenu() {
       }
     }, 1000);
     return () => clearInterval(id);
-  }, [idle]);
+  }, [idle, idleMs]);
 
   useEffect(() => {
     const id = setInterval(() => setTaglineIdx((i) => (i + 1) % 3), TAGLINE_INTERVAL_MS);
