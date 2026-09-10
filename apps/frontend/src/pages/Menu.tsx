@@ -133,6 +133,20 @@ function MenuSection({
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['menu'] }),
   });
+  const reorderCategoryMutation = useMutation({
+    mutationFn: async ({ from, to }: { from: number; to: number }) => {
+      if (to < 0 || to >= categories.length || from === to) return;
+
+      const categoryIds = categories.map((category) => category.id);
+      const [movedId] = categoryIds.splice(from, 1);
+      categoryIds.splice(to, 0, movedId);
+
+      await Promise.all(
+        categoryIds.map((id, index) => menuApi.updateCategory(id, { sortOrder: index * 10 })),
+      );
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['menu'] }),
+  });
 
   return (
     <section>
@@ -152,7 +166,7 @@ function MenuSection({
         </Card>
       ) : (
         <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
-          {categories.map((category) => (
+          {categories.map((category, categoryIndex) => (
             <Card key={category.id} className="flex flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
@@ -163,7 +177,39 @@ function MenuSection({
                     <p className="text-xs text-gray-400 break-words">{category.subtitle}</p>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Monter la catégorie"
+                    aria-label={`Monter ${category.title}`}
+                    disabled={categoryIndex === 0 || reorderCategoryMutation.isPending}
+                    onClick={() => {
+                      reorderCategoryMutation.mutate({
+                        from: categoryIndex,
+                        to: categoryIndex - 1,
+                      });
+                    }}
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    title="Descendre la catégorie"
+                    aria-label={`Descendre ${category.title}`}
+                    disabled={
+                      categoryIndex === categories.length - 1 || reorderCategoryMutation.isPending
+                    }
+                    onClick={() => {
+                      reorderCategoryMutation.mutate({
+                        from: categoryIndex,
+                        to: categoryIndex + 1,
+                      });
+                    }}
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => onEditCategory(category)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
