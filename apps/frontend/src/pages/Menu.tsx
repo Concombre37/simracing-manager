@@ -1,7 +1,21 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Pencil, Trash2, UtensilsCrossed, GlassWater } from 'lucide-react';
-import { menuApi, type MenuCategory, type MenuItem, type MenuItemInput } from '../services/menu';
+import {
+  ChevronDown,
+  ChevronUp,
+  Plus,
+  Pencil,
+  Trash2,
+  UtensilsCrossed,
+  GlassWater,
+} from 'lucide-react';
+import {
+  formatMenuPrice,
+  menuApi,
+  type MenuCategory,
+  type MenuItem,
+  type MenuItemInput,
+} from '../services/menu';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -97,6 +111,28 @@ function MenuSection({
     mutationFn: menuApi.removeItem,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['menu'] }),
   });
+  const reorderMutation = useMutation({
+    mutationFn: async ({
+      category,
+      from,
+      to,
+    }: {
+      category: MenuCategory;
+      from: number;
+      to: number;
+    }) => {
+      if (to < 0 || to >= category.items.length || from === to) return;
+
+      const itemIds = category.items.map((item) => item.id);
+      const [movedId] = itemIds.splice(from, 1);
+      itemIds.splice(to, 0, movedId);
+
+      await Promise.all(
+        itemIds.map((id, index) => menuApi.updateItem(id, { sortOrder: index * 10 })),
+      );
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['menu'] }),
+  });
 
   return (
     <section>
@@ -148,7 +184,7 @@ function MenuSection({
                 {category.items.length === 0 ? (
                   <p className="py-3 text-xs text-gray-500">Aucun article.</p>
                 ) : (
-                  category.items.map((item) => (
+                  category.items.map((item, index) => (
                     <div key={item.id} className="flex items-center gap-2 py-2.5">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-white truncate">{item.name}</p>
@@ -157,12 +193,42 @@ function MenuSection({
                         )}
                       </div>
                       <div className="flex shrink-0 overflow-hidden rounded-md border border-dark-600 text-xs font-semibold">
-                        <span className="px-2 py-1 text-accent-orange">Public : {item.price}</span>
+                        <span className="px-2 py-1 text-accent-orange">
+                          Public : {formatMenuPrice(item.price)}
+                        </span>
                         {item.subscriberPrice && (
                           <span className="border-l border-dark-600 px-2 py-1 text-emerald-300">
-                            Abonné : {item.subscriberPrice}
+                            Abonné : {formatMenuPrice(item.subscriberPrice)}
                           </span>
                         )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Monter l'article"
+                          aria-label={`Monter ${item.name}`}
+                          disabled={index === 0 || reorderMutation.isPending}
+                          onClick={() =>
+                            reorderMutation.mutate({ category, from: index, to: index - 1 })
+                          }
+                        >
+                          <ChevronUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Descendre l'article"
+                          aria-label={`Descendre ${item.name}`}
+                          disabled={
+                            index === category.items.length - 1 || reorderMutation.isPending
+                          }
+                          onClick={() =>
+                            reorderMutation.mutate({ category, from: index, to: index + 1 })
+                          }
+                        >
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        </Button>
                       </div>
                       <Button size="sm" variant="ghost" onClick={() => onEditItem(item)}>
                         <Pencil className="h-3.5 w-3.5" />
@@ -293,8 +359,8 @@ function ItemFormModal({
         categoryId,
         name: name.trim(),
         description: description.trim() || undefined,
-        price: price.trim(),
-        subscriberPrice: subscriberPrice.trim() || (item ? null : undefined),
+        price: normalizePrice(price),
+        subscriberPrice: normalizePrice(subscriberPrice) || (item ? null : undefined),
       };
       return item ? menuApi.updateItem(item.id, payload) : menuApi.createItem(payload);
     },
@@ -339,6 +405,7 @@ function ItemFormModal({
             id="item-price"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
+            onBlur={() => setPrice(normalizePrice(price))}
             placeholder="ex: 9,50 €"
             required
           />
@@ -349,6 +416,7 @@ function ItemFormModal({
             id="item-subscriber-price"
             value={subscriberPrice}
             onChange={(e) => setSubscriberPrice(e.target.value)}
+            onBlur={() => setSubscriberPrice(normalizePrice(subscriberPrice))}
             placeholder="ex: 7,50 €"
           />
         </div>
@@ -368,4 +436,10 @@ function ItemFormModal({
       </form>
     </Modal>
   );
+}
+
+function normalizePrice(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || /[€$£]/.test(trimmed) || !/\d/.test(trimmed)) return trimmed;
+  return `${trimmed} €`;
 }

@@ -39,6 +39,18 @@ export interface MenuItemInput {
   sortOrder?: number;
 }
 
+/**
+ * Keep prices consistent in the admin and tablet menu while preserving text
+ * such as "gratuit" or "sur demande". Existing records without a currency
+ * symbol are formatted on display and normalized when they are saved.
+ */
+export function formatMenuPrice(value: string | null | undefined): string {
+  const trimmed = value?.trim() ?? '';
+  if (!trimmed) return '—';
+  if (/[€$£]/.test(trimmed) || !/\d/.test(trimmed)) return trimmed;
+  return `${trimmed} €`;
+}
+
 export const menuApi = {
   listGrouped: () => api.get<MenuCategory[]>('/menu').then((res) => res.data),
 

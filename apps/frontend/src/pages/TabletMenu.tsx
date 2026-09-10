@@ -8,7 +8,7 @@ import {
   type CategoryTag,
   type ArcadeAttraction,
 } from '../services/tabletMenu';
-import type { MenuCategory } from '../services/menu';
+import { formatMenuPrice, type MenuCategory } from '../services/menu';
 
 /** Emoji drapeau à partir d'un code ISO 3166-1 alpha-2 (ex: "FR" -> 🇫🇷) —
  * même principe que `ContentNames.tsx`, dupliqué ici (page publique
@@ -1555,9 +1555,9 @@ function MenuGroupCard({ group }: { group: MenuCategory }) {
                 </span>
                 {item.description && (
                   <span
-                  style={{
-                    fontSize: 13,
-                    lineHeight: 1.4,
+                    style={{
+                      fontSize: 13,
+                      lineHeight: 1.4,
                       color: 'color-mix(in srgb, var(--tm-text) 55%, transparent)',
                     }}
                   >
@@ -1574,7 +1574,7 @@ function MenuGroupCard({ group }: { group: MenuCategory }) {
                   fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                {item.price}
+                {formatMenuPrice(item.price)}
               </span>
               <span
                 style={{
@@ -1588,7 +1588,7 @@ function MenuGroupCard({ group }: { group: MenuCategory }) {
                     : 'color-mix(in srgb, var(--tm-text) 28%, transparent)',
                 }}
               >
-                {item.subscriberPrice ?? '—'}
+                {formatMenuPrice(item.subscriberPrice)}
               </span>
             </div>
           ))}
