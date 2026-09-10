@@ -35,7 +35,7 @@ export interface MenuItemInput {
   name: string;
   description?: string;
   price: string;
-  subscriberPrice?: string;
+  subscriberPrice?: string | null;
   sortOrder?: number;
 }
 

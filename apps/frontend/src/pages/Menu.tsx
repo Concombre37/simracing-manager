@@ -294,7 +294,7 @@ function ItemFormModal({
         name: name.trim(),
         description: description.trim() || undefined,
         price: price.trim(),
-        subscriberPrice: subscriberPrice.trim() || undefined,
+        subscriberPrice: subscriberPrice.trim() || (item ? null : undefined),
       };
       return item ? menuApi.updateItem(item.id, payload) : menuApi.createItem(payload);
     },
