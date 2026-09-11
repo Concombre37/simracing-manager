@@ -424,7 +424,7 @@ function ItemFormModal({
         categoryId,
         name: name.trim(),
         description: description.trim() || undefined,
-        grams: isFood && gramsInput.trim() ? Number(gramsInput) : isFood ? null : undefined,
+        grams: isFood && gramsInput.trim() ? Number(gramsInput) : item && isFood ? null : undefined,
         price: normalizePrice(price),
         subscriberPrice: normalizePrice(subscriberPrice) || (item ? null : undefined),
       };
