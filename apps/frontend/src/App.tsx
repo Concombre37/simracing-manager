@@ -42,6 +42,7 @@ const Kiosk = lazy(() => import('./pages/Kiosk').then((m) => ({ default: m.Kiosk
 const ContentPreviews = lazy(() =>
   import('./pages/ContentPreviews').then((m) => ({ default: m.ContentPreviews })),
 );
+const Mods = lazy(() => import('./pages/Mods').then((m) => ({ default: m.Mods })));
 const ContentNames = lazy(() =>
   import('./pages/ContentNames').then((m) => ({ default: m.ContentNames })),
 );
@@ -63,9 +64,7 @@ const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m
 const PodsControl = lazy(() =>
   import('./pages/PodsControl').then((m) => ({ default: m.PodsControl })),
 );
-const Spectator = lazy(() =>
-  import('./pages/Spectator').then((m) => ({ default: m.Spectator })),
-);
+const Spectator = lazy(() => import('./pages/Spectator').then((m) => ({ default: m.Spectator })));
 const SpectatorScreen = lazy(() =>
   import('./pages/SpectatorScreen').then((m) => ({ default: m.SpectatorScreen })),
 );
@@ -249,6 +248,14 @@ function AnimatedRoutes() {
             element={
               <ProtectedRoute adminOnly>
                 <ContentPreviews />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/mods"
+            element={
+              <ProtectedRoute adminOnly>
+                <Mods />
               </ProtectedRoute>
             }
           />
