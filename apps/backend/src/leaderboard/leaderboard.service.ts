@@ -13,7 +13,12 @@ interface RaceOutSession {
   laps?: RaceOutLap[];
 }
 
+interface RaceOutPlayer {
+  name?: string;
+}
+
 interface RaceOutResult {
+  players?: RaceOutPlayer[];
   sessions?: RaceOutSession[];
 }
 
@@ -83,14 +88,50 @@ function roundToCentiseconds(ms: number): number {
 /** Meilleur tour "propre" (sans coupure) d'une session, ou null si aucun
  * tour valide n'a été bouclé — un tour coupé n'a pas sa place dans un
  * classement. */
-function bestCleanLap(
+function normalizeDriverName(value: string | null | undefined): string {
+  return (value ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+
+/**
+ * Resolves the car index driven by the session owner. A race_out.json can
+ * contain every online driver, while the Session row represents only the
+ * person who launched that station. Without this mapping, selecting the
+ * fastest lap across all cars labels another driver's lap as the owner's.
+ */
+function resolveDriverCarIndex(
+  players: RaceOutPlayer[] | undefined,
+  clientName: string | null | undefined,
+): number | null {
+  if (!players?.length) return null;
+
+  const wanted = normalizeDriverName(clientName);
+  if (wanted) {
+    const exact = players.findIndex(
+      (player) => normalizeDriverName(player.name) === wanted,
+    );
+    if (exact >= 0) return exact;
+    // AC normally keeps the station driver at car 0 even when its displayed
+    // name differs slightly from the session client name.
+    return 0;
+  }
+
+  const firstNamed = players.findIndex(
+    (player) => normalizeDriverName(player.name).length > 0,
+  );
+  return firstNamed >= 0 ? firstNamed : 0;
+}
+
+export function bestCleanLap(
   result: unknown,
+  clientName?: string | null,
 ): { timeMs: number; sessionType: string | null } | null {
   const data = result as RaceOutResult | null | undefined;
   if (!data?.sessions?.length) return null;
+  const driverCarIndex = resolveDriverCarIndex(data.players, clientName);
   let best: { timeMs: number; sessionType: string | null } | null = null;
   for (const session of data.sessions) {
     for (const lap of session.laps ?? []) {
+      if (driverCarIndex !== null && lap.car !== driverCarIndex) continue;
       if ((lap.cuts ?? 0) > 0) continue;
       if (!lap.time || lap.time <= 0) continue;
       if (best === null || lap.time < best.timeMs) {
@@ -117,14 +158,15 @@ export class LeaderboardService {
   ): Promise<HistoricalLeaderboardEntry[]> {
     if (!query.track?.trim()) return [];
     const beforeDate = query.before ? new Date(query.before) : null;
-    const beforeFilter = beforeDate && Number.isFinite(beforeDate.getTime())
-      ? {
-          OR: [
-            { endedAt: { lt: beforeDate } },
-            { endedAt: null, createdAt: { lt: beforeDate } },
-          ],
-        }
-      : {};
+    const beforeFilter =
+      beforeDate && Number.isFinite(beforeDate.getTime())
+        ? {
+            OR: [
+              { endedAt: { lt: beforeDate } },
+              { endedAt: null, createdAt: { lt: beforeDate } },
+            ],
+          }
+        : {};
     const sessions = await this.prisma.session.findMany({
       where: {
         status: 'finished',
@@ -148,7 +190,7 @@ export class LeaderboardService {
 
     return sessions
       .map((session) => {
-        const lap = bestCleanLap(session.result);
+        const lap = bestCleanLap(session.result, session.clientName);
         if (!lap || !session.carAcId) return null;
         return {
           position: 0,
@@ -198,7 +240,7 @@ export class LeaderboardService {
     const buckets = new Map<string, Bucket>();
 
     for (const s of sessions) {
-      const lap = bestCleanLap(s.result);
+      const lap = bestCleanLap(s.result, s.clientName);
       if (lap === null || !s.track || !s.carAcId) continue;
 
       const trackLayout = s.trackLayout ?? '';
