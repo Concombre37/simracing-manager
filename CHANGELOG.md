@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.175 — Partage des mods depuis la flotte
+
+- Le back-office permet de trier les mods manquants, de filtrer un poste précis et d’afficher immédiatement où le contenu manque.
+- Un bouton **Propager** archive une voiture ou un circuit depuis un poste source, l’enregistre dans le catalogue serveur et déclenche l’installation sur les postes cibles.
+- Les agents récupèrent aussi les packages partagés au démarrage/reconnexion afin de rattraper une propagation effectuée pendant leur indisponibilité.
+
 ## v2.2.174 — Blankings sans bannière de sécurité
 
 - Le moteur WPF/IE des écrans blanking n'affiche plus la barre d'information de sécurité pour les pages HTML locales générées par l'agent.
