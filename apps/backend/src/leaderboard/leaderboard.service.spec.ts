@@ -38,4 +38,27 @@ describe('bestCleanLap', () => {
       sessionType: 'Practice',
     });
   });
+
+  it('resolves the owner correctly when a session contains many players', () => {
+    const result = {
+      players: Array.from({ length: 10 }, (_, index) => ({
+        name: `Pilote ${index + 1}`,
+      })),
+      sessions: [
+        {
+          name: 'Practice',
+          laps: [
+            { car: 2, time: 120000, cuts: 0 },
+            { car: 7, time: 98000, cuts: 0 },
+            { car: 9, time: 105000, cuts: 0 },
+          ],
+        },
+      ],
+    };
+
+    expect(bestCleanLap(result, 'Pilote 8')).toEqual({
+      timeMs: 98000,
+      sessionType: 'Practice',
+    });
+  });
 });
