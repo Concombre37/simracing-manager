@@ -6,6 +6,7 @@ export type ModType = 'car' | 'track';
 export interface ModStationPresence {
   stationId: string;
   name: string;
+  role: 'simulator' | 'admin';
   present: boolean;
 }
 
@@ -57,12 +58,18 @@ function labelName(
   return labels?.[type]?.[acId]?.trim() || fallback;
 }
 
-/** Builds one deduplicated mod row from every simulator station's last scan. */
+/** Builds one deduplicated mod row from every simulator/admin station's last scan. */
 export function collectModInventory(
   stations: Station[],
   labels?: ContentLabelMap,
 ): ModInventoryItem[] {
-  const simulators = stations.filter((station) => station.role === 'simulator');
+  // Admin stations host dedicated servers and therefore need the same
+  // content inventory as the driving pods. Spectator stations are excluded:
+  // they do not launch Assetto Corsa and their local files are unrelated to
+  // the fleet content that must be synchronized.
+  const fleetStations = stations.filter(
+    (station) => station.role === 'simulator' || station.role === 'admin',
+  );
   const byKey = new Map<
     string,
     {
@@ -75,7 +82,7 @@ export function collectModInventory(
     }
   >();
 
-  for (const station of simulators) {
+  for (const station of fleetStations) {
     const content = stationContent(station);
     for (const car of content.cars) {
       const acId = text(car.acId);
@@ -124,9 +131,10 @@ export function collectModInventory(
       name: row.name,
       category: row.category,
       layouts: [...row.layouts].sort((a, b) => a.localeCompare(b)),
-      stations: simulators.map((station) => ({
+      stations: fleetStations.map((station) => ({
         stationId: station.stationId,
         name: station.name || station.stationId,
+        role: station.role,
         present: row.present.has(station.stationId),
       })),
     }))

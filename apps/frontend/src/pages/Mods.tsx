@@ -30,8 +30,8 @@ export function Mods() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
   });
 
-  const simulatorStations = useMemo(
-    () => stations.filter((station) => station.role === 'simulator'),
+  const fleetStations = useMemo(
+    () => stations.filter((station) => station.role === 'simulator' || station.role === 'admin'),
     [stations],
   );
   const inventory = useMemo(() => collectModInventory(stations, labels), [stations, labels]);
@@ -119,9 +119,10 @@ export function Mods() {
               className="w-full rounded-lg border border-dark-600 bg-dark-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-orange"
             >
               <option value="">Tous les postes</option>
-              {simulatorStations.map((station) => (
+              {fleetStations.map((station) => (
                 <option key={station.stationId} value={station.stationId}>
-                  {station.name} ({station.stationId})
+                  {station.name} ({station.role === 'admin' ? 'Admin' : 'Pod'} · {station.stationId}
+                  )
                 </option>
               ))}
             </select>
@@ -137,7 +138,7 @@ export function Mods() {
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            {simulatorStations.map((station) => (
+            {fleetStations.map((station) => (
               <Button
                 key={station.id}
                 size="sm"
@@ -158,10 +159,12 @@ export function Mods() {
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent-orange/30 border-t-accent-orange" />
         </div>
-      ) : simulatorStations.length === 0 ? (
+      ) : fleetStations.length === 0 ? (
         <Card className="p-12 text-center">
           <Package className="mx-auto mb-4 h-12 w-12 text-gray-600" />
-          <p className="text-gray-400">Aucun poste simulateur n’a encore envoyé son inventaire.</p>
+          <p className="text-gray-400">
+            Aucun poste simulateur ou admin n’a encore envoyé son inventaire.
+          </p>
         </Card>
       ) : filtered.length === 0 ? (
         <Card className="p-12 text-center">
@@ -230,12 +233,15 @@ function ModRow({ item }: { item: ModInventoryItem }) {
               }`}
               title={
                 station.present
-                  ? `${station.name} possède ce mod`
-                  : `${station.name} n’a pas ce mod`
+                  ? `${station.name} (${station.role === 'admin' ? 'admin' : 'pod'}) possède ce mod`
+                  : `${station.name} (${station.role === 'admin' ? 'admin' : 'pod'}) n’a pas ce mod`
               }
             >
               {station.present ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
               {station.name}
+              <span className="text-[10px] uppercase tracking-wide opacity-70">
+                {station.role === 'admin' ? 'Admin' : 'Pod'}
+              </span>
             </span>
           ))}
         </div>
