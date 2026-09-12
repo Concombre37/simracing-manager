@@ -15,11 +15,26 @@ Add-Type -AssemblyName System.Windows.Forms
 # render correctly instead of falling back to unstyled text.
 try {
   $hostExe = [System.IO.Path]::GetFileName([System.Diagnostics.Process]::GetCurrentProcess().MainModule.FileName)
-  $regPath = 'HKCU:\Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION'
-  if (-not (Test-Path $regPath)) {
-    New-Item -Path $regPath -Force | Out-Null
+  $featureControlRoot = 'HKCU:\Software\Microsoft\Internet Explorer\Main\FeatureControl'
+  # The WPF WebBrowser control hosts MSHTML in the Local Machine zone and
+  # enables its lockdown features by default. That makes our local, agent-
+  # generated blanking page show IE's security information bar at startup.
+  # Scope the exceptions to this PowerShell host process only; no global IE
+  # or Windows security setting is changed. The page is entirely generated
+  # and written by the trusted local agent.
+  $hostFeatures = @{
+    FEATURE_BROWSER_EMULATION = 11001
+    FEATURE_LOCALMACHINE_LOCKDOWN = 0
+    FEATURE_BLOCK_LMZ_SCRIPT = 0
+    FEATURE_BLOCK_LMZ_OBJECT = 0
   }
-  New-ItemProperty -Path $regPath -Name $hostExe -Value 11001 -PropertyType DWord -Force | Out-Null
+  foreach ($feature in $hostFeatures.GetEnumerator()) {
+    $featurePath = Join-Path $featureControlRoot $feature.Key
+    if (-not (Test-Path $featurePath)) {
+      New-Item -Path $featurePath -Force | Out-Null
+    }
+    New-ItemProperty -Path $featurePath -Name $hostExe -Value $feature.Value -PropertyType DWord -Force | Out-Null
+  }
 } catch {
   Write-Warning "Failed to set IE emulation mode for results screen: $_"
 }

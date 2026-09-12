@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.174 — Blankings sans bannière de sécurité
+
+- Le moteur WPF/IE des écrans blanking n'affiche plus la barre d'information de sécurité pour les pages HTML locales générées par l'agent.
+- Les réglages IE sont limités au processus du blanking et ne modifient pas la sécurité générale de Windows.
+
 ## v2.2.173 — Affichage des tarifs en ligne
 
 - Les tarifs Public et Abonné du menu sont regroupés dans un bloc horizontal à deux cellules.
