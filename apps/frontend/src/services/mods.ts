@@ -134,7 +134,7 @@ export function collectModInventory(
       stations: fleetStations.map((station) => ({
         stationId: station.stationId,
         name: station.name || station.stationId,
-        role: station.role,
+        role: station.role === 'admin' ? 'admin' : 'simulator',
         present: row.present.has(station.stationId),
       })),
     }))
