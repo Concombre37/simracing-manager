@@ -451,6 +451,10 @@ export class SimRacingAgent {
       // essentially never changes while the agent keeps running. Content
       // added later (new mods) shows up on the next agent restart.
       void this.sendContent();
+      // Pull source-shared packages on every connection as well. This makes
+      // propagation durable for stations that were offline when the command
+      // was emitted; installed packages are skipped by ContentSync.
+      void this.handleContentSync();
       void this.blankingMediaSync.sync(config.STATION_ID, this.apiKey);
 
       this.acSharedMemoryReader = new AcSharedMemoryReader(
@@ -512,6 +516,7 @@ export class SimRacingAgent {
     this.socket.on('server:launch', (payload) => this.handleLaunchDedicatedServer(payload));
     this.socket.on('server:stop', (payload) => this.handleStopDedicatedServer(payload));
     this.socket.on('content:sync', () => this.handleContentSync());
+    this.socket.on('content:share', (payload) => this.handleContentShare(payload));
     this.socket.on('blanking:hide', () => this.blankingManager.hide());
     this.socket.on('blanking:show', () => this.blankingManager.show());
     this.socket.on('blanking:mediaUpdated', () => this.handleBlankingMediaUpdated());
@@ -1324,6 +1329,19 @@ export class SimRacingAgent {
     await this.acLauncher
       .pressEscapeKey()
       .catch((err) => this.logger.warn({ err }, 'Failed to open pause menu after session end'));
+  }
+
+  private async handleContentShare(payload: {
+    type: 'car' | 'track';
+    acId: string;
+    targets: string[];
+  }): Promise<void> {
+    this.logger.info({ type: payload.type, acId: payload.acId, targets: payload.targets }, 'Content share requested');
+    try {
+      await this.contentSync.share(payload.type, payload.acId, payload.targets);
+    } catch (err) {
+      this.logger.error({ err, type: payload.type, acId: payload.acId }, 'Content share failed');
+    }
   }
 
   /** Load the official leaderboard from sessions already archived in the

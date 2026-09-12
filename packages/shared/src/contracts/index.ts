@@ -14,6 +14,12 @@ export interface AgentToServerEvents {
   'agent:session:started': (payload: { sessionId: string }) => void;
   'agent:session:ended': (payload: { sessionId: string }) => void;
   'agent:content': (payload: { stationId: string; content: Record<string, unknown> }) => void;
+  /** A source station confirms that it has uploaded a shared content package. */
+  'agent:content:shared': (payload: {
+    stationId: string;
+    type: 'car' | 'track';
+    acId: string;
+  }) => void;
   'agent:telemetry': (payload: TelemetrySnapshot) => void;
   'agent:telemetry:csv': (payload: TelemetryCsvPayload) => void;
   'server:started': (payload: {
@@ -49,6 +55,12 @@ export interface ServerToAgentEvents {
   'system:shutdown': () => void;
   'wol:send': (payload: { targetMac: string; targetIp?: string }) => void;
   'content:sync': () => void;
+  /** Ask this station to archive one installed mod and upload it to the server. */
+  'content:share': (payload: {
+    type: 'car' | 'track';
+    acId: string;
+    targets: string[];
+  }) => void;
   'server:join': (payload: {
     host: string;
     port: number;

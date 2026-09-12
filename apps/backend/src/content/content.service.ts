@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateContentPackageDto } from './dto/create-content-package.dto';
 
@@ -12,6 +13,17 @@ export class ContentService {
 
   async findAll() {
     return this.prisma.contentPackage.findMany({
+      select: {
+        id: true,
+        type: true,
+        name: true,
+        version: true,
+        archiveUrl: true,
+        checksum: true,
+        isRequired: true,
+        createdAt: true,
+        updatedAt: true,
+      },
       orderBy: [{ type: 'asc' }, { name: 'asc' }],
     });
   }
@@ -34,5 +46,30 @@ export class ContentService {
 
   async findById(id: string) {
     return this.prisma.contentPackage.findUnique({ where: { id } });
+  }
+
+  async saveSourcePackage(input: {
+    type: 'car' | 'track';
+    acId: string;
+    archive: Buffer;
+  }) {
+    const checksum = createHash('sha256').update(input.archive).digest('hex');
+    // A source share is the canonical package for this mod. Reusing one
+    // version keeps repeated shares from filling the catalogue with copies.
+    return this.prisma.contentPackage.upsert({
+      where: {
+        type_name_version: { type: input.type, name: input.acId, version: 'source' },
+      },
+      create: {
+        type: input.type,
+        name: input.acId,
+        version: 'source',
+        archiveUrl: 'https://simracing.hytlabs.com/',
+        archiveData: input.archive,
+        checksum,
+        isRequired: false,
+      },
+      update: { archiveData: input.archive, checksum, updatedAt: new Date() },
+    });
   }
 }

@@ -136,6 +136,18 @@ export class AgentGateway
         this.server.emit('settings:updated', payload);
       },
     );
+
+    this.eventEmitter.on(
+      'content.shared',
+      async (payload: { targets: string[]; type: 'car' | 'track'; acId: string }) => {
+        for (const target of payload.targets) {
+          await this.emitContentSync(target);
+        }
+        this.logger.log(
+          `Propagated shared ${payload.type}:${payload.acId} to ${payload.targets.length} station(s)`,
+        );
+      },
+    );
   }
 
   async handleConnection(client: AuthenticatedSocket): Promise<void> {
@@ -505,6 +517,13 @@ export class AgentGateway
 
   async emitContentSync(stationId: string): Promise<void> {
     this.server.to(`station:${stationId}`).emit('content:sync');
+  }
+
+  async emitContentShare(
+    stationId: string,
+    payload: { type: 'car' | 'track'; acId: string; targets: string[] },
+  ): Promise<void> {
+    this.server.to(`station:${stationId}`).emit('content:share', payload);
   }
 
   async emitBlankingHide(stationId: string): Promise<void> {

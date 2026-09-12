@@ -178,6 +178,35 @@ export class StationsController {
     return { success: true };
   }
 
+  @Post(':id/share-content')
+  @Roles(UserRole.ADMIN)
+  async shareContent(
+    @Param('id') id: string,
+    @Body() body: { type?: string; acId?: string; targetStationIds?: unknown },
+  ) {
+    const station = await this.stationsService.findOne(id);
+    if (station.role !== StationRole.SIMULATOR && station.role !== StationRole.ADMIN) {
+      throw new BadRequestException('Only a simulator or admin station can share content');
+    }
+    if (body.type !== 'car' && body.type !== 'track') {
+      throw new BadRequestException('Invalid content type');
+    }
+    const acId = String(body.acId ?? '').trim();
+    if (!/^[a-zA-Z0-9_-]+$/.test(acId)) throw new BadRequestException('Invalid content id');
+    if (!Array.isArray(body.targetStationIds)) {
+      throw new BadRequestException('targetStationIds must be an array');
+    }
+    const targets = body.targetStationIds.filter(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0,
+    );
+    await this.agentGateway.emitContentShare(station.stationId, {
+      type: body.type,
+      acId,
+      targets: [...new Set(targets)],
+    });
+    return { success: true, sourceStationId: station.stationId, targets };
+  }
+
   @Get(':id/logs')
   @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
   async getLogs(@Param('id') id: string) {

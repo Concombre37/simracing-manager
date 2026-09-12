@@ -68,6 +68,8 @@ export const stationsApi = {
   stop: (id: string) => api.post(`/stations/${id}/stop`).then((res) => res.data),
   updateAgent: (id: string) => api.post(`/stations/${id}/update-agent`).then((res) => res.data),
   syncContent: (id: string) => api.post(`/stations/${id}/sync-content`).then((res) => res.data),
+  shareContent: (id: string, data: { type: 'car' | 'track'; acId: string; targetStationIds: string[] }) =>
+    api.post(`/stations/${id}/share-content`, data).then((res) => res.data),
   getLogs: (id: string) =>
     api.get<{ lines: string[] }>(`/stations/${id}/logs`).then((res) => res.data),
   getBlankingMedia: (id: string, category: BlankingMediaCategory = 'idle') =>

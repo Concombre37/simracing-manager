@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Check, CircleHelp, Package, RefreshCw, Search, X } from 'lucide-react';
+import { AlertTriangle, Check, CircleHelp, Package, RefreshCw, Search, Share2, X } from 'lucide-react';
 import { PageShell } from '../components/ui/PageShell';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -20,6 +20,9 @@ export function Mods() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'' | ModType>('');
   const [stationFilter, setStationFilter] = useState('');
+  const [missingOnly, setMissingOnly] = useState(false);
+  const [missingStationFilter, setMissingStationFilter] = useState('');
+  const [sortMode, setSortMode] = useState<'missing' | 'name' | 'complete'>('missing');
 
   const { data: stations = [], isLoading } = useQuery({
     queryKey: ['stations'],
@@ -27,6 +30,15 @@ export function Mods() {
   });
   const syncMutation = useMutation({
     mutationFn: (stationId: string) => stationsApi.syncContent(stationId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
+  });
+  const shareMutation = useMutation({
+    mutationFn: (input: { sourceDbId: string; type: ModType; acId: string; targets: string[] }) =>
+      stationsApi.shareContent(input.sourceDbId, {
+        type: input.type,
+        acId: input.acId,
+        targetStationIds: input.targets,
+      }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
   });
 
@@ -37,12 +49,17 @@ export function Mods() {
   const inventory = useMemo(() => collectModInventory(stations, labels), [stations, labels]);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return inventory.filter((item) => {
+    const rows = inventory.filter((item) => {
       if (typeFilter && item.type !== typeFilter) return false;
       if (
         stationFilter &&
         !item.stations.some((station) => station.stationId === stationFilter && station.present)
       ) {
+        return false;
+      }
+      const missingStations = item.stations.filter((station) => !station.present);
+      if (missingOnly && missingStations.length === 0) return false;
+      if (missingStationFilter && !missingStations.some((station) => station.stationId === missingStationFilter)) {
         return false;
       }
       if (!term) return true;
@@ -52,7 +69,14 @@ export function Mods() {
         item.layouts.some((layout) => layout.toLowerCase().includes(term))
       );
     });
-  }, [inventory, search, stationFilter, typeFilter]);
+    return rows.sort((a, b) => {
+      if (sortMode === 'name') return a.name.localeCompare(b.name, 'fr');
+      const aMissing = a.stations.filter((station) => !station.present).length;
+      const bMissing = b.stations.filter((station) => !station.present).length;
+      if (aMissing !== bMissing) return sortMode === 'missing' ? bMissing - aMissing : aMissing - bMissing;
+      return a.name.localeCompare(b.name, 'fr');
+    });
+  }, [inventory, missingOnly, missingStationFilter, search, sortMode, stationFilter, typeFilter]);
 
   const stats = useMemo(() => {
     const missing = inventory.reduce(
@@ -127,14 +151,45 @@ export function Mods() {
               ))}
             </select>
           </label>
+          <label className="xl:w-64">
+            <span className="mb-1 block text-xs font-medium text-gray-400">Manquant sur le poste</span>
+            <select
+              value={missingStationFilter}
+              onChange={(event) => setMissingStationFilter(event.target.value)}
+              className="w-full rounded-lg border border-dark-600 bg-dark-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-orange"
+            >
+              <option value="">Tous les postes</option>
+              {fleetStations.map((station) => (
+                <option key={station.stationId} value={station.stationId}>
+                  {station.name} ({station.role === 'admin' ? 'Admin' : 'Pod'})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="xl:w-52">
+            <span className="mb-1 block text-xs font-medium text-gray-400">Trier</span>
+            <select
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value as typeof sortMode)}
+              className="w-full rounded-lg border border-dark-600 bg-dark-900 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent-orange"
+            >
+              <option value="missing">Manquants d’abord</option>
+              <option value="complete">Complets d’abord</option>
+              <option value="name">Nom (A → Z)</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 pb-2 text-sm text-gray-300">
+            <input type="checkbox" checked={missingOnly} onChange={(event) => setMissingOnly(event.target.checked)} className="h-4 w-4 accent-orange-500" />
+            Manquants uniquement
+          </label>
         </div>
         <div className="flex flex-col gap-3 rounded-xl border border-accent-orange/20 bg-accent-orange/5 p-4 text-sm text-gray-300 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-start gap-3">
             <CircleHelp className="mt-0.5 h-5 w-5 shrink-0 text-accent-orange" />
-            <p>
-              Un scan est l’inventaire local remonté par l’agent. Pour amorcer une synchronisation,
-              demande au poste cible de récupérer les packages déjà disponibles dans le catalogue
-              serveur.
+              <p>
+              Un scan est l’inventaire local remonté par l’agent. Le bouton de partage archive le mod
+              depuis un poste qui le possède, le place dans le catalogue serveur, puis demande son
+              installation sur tous les postes où il manque.
             </p>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
@@ -185,7 +240,13 @@ export function Mods() {
               </thead>
               <tbody className="divide-y divide-dark-700/80">
                 {filtered.map((item) => (
-                  <ModRow key={`${item.type}:${item.acId}`} item={item} />
+                  <ModRow
+                    key={`${item.type}:${item.acId}`}
+                    item={item}
+                    fleetStations={fleetStations}
+                    onShare={(input) => shareMutation.mutate(input)}
+                    isSharing={shareMutation.isPending && shareMutation.variables?.acId === item.acId && shareMutation.variables?.type === item.type}
+                  />
                 ))}
               </tbody>
             </table>
@@ -196,9 +257,23 @@ export function Mods() {
   );
 }
 
-function ModRow({ item }: { item: ModInventoryItem }) {
+function ModRow({
+  item,
+  fleetStations,
+  onShare,
+  isSharing,
+}: {
+  item: ModInventoryItem;
+  fleetStations: Array<{ id: string; stationId: string; name: string }>;
+  onShare: (input: { sourceDbId: string; type: ModType; acId: string; targets: string[] }) => void;
+  isSharing: boolean;
+}) {
   const present = item.stations.filter((station) => station.present).length;
   const missing = item.stations.length - present;
+  const presentStations = item.stations.filter((station) => station.present);
+  const missingStations = item.stations.filter((station) => !station.present);
+  const source = presentStations[0];
+  const sourceDbId = source && fleetStations.find((station) => station.stationId === source.stationId)?.id;
   return (
     <tr className="align-top transition-colors hover:bg-dark-800/60">
       <td className="px-5 py-4">
@@ -245,6 +320,11 @@ function ModRow({ item }: { item: ModInventoryItem }) {
             </span>
           ))}
         </div>
+        {missingStations.length > 0 && (
+          <p className="mt-2 text-xs text-red-300/80">
+            Manquant sur : {missingStations.map((station) => station.name).join(', ')}
+          </p>
+        )}
       </td>
       <td className="px-5 py-4 text-right">
         <span className={`font-semibold ${missing > 0 ? 'text-yellow-300' : 'text-green-300'}`}>
@@ -253,6 +333,24 @@ function ModRow({ item }: { item: ModInventoryItem }) {
         <p className="mt-1 text-[11px] text-gray-500">
           {missing > 0 ? `${missing} manquant${missing > 1 ? 's' : ''}` : 'Complet'}
         </p>
+        {sourceDbId && missingStations.length > 0 && (
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-2 whitespace-nowrap"
+            isLoading={isSharing}
+            onClick={() => onShare({
+              sourceDbId,
+              type: item.type,
+              acId: item.acId,
+              targets: missingStations.map((station) => station.stationId),
+            })}
+            title={`Partager depuis ${source.name} vers les postes manquants`}
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            Propager
+          </Button>
+        )}
       </td>
     </tr>
   );

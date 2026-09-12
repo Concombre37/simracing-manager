@@ -134,6 +134,7 @@ model ContentPackage {
   name        String
   version     String
   archiveUrl  String   @map("archive_url")
+  archiveData Bytes?   @map("archive_data")
   checksum    String?
   isRequired  Boolean  @default(true) @map("is_required")
   createdAt   DateTime @default(now()) @map("created_at")
