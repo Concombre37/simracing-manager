@@ -420,10 +420,12 @@ function ItemFormModal({
 
   const mutation = useMutation({
     mutationFn: () => {
+      const normalizedDescription = description.trim();
       const payload: MenuItemInput = {
         categoryId,
         name: name.trim(),
-        description: description.trim() || undefined,
+        // An empty description must clear the persisted value when editing.
+        description: item ? normalizedDescription || null : normalizedDescription || undefined,
         grams: isFood && gramsInput.trim() ? Number(gramsInput) : item && isFood ? null : undefined,
         price: normalizePrice(price),
         subscriberPrice: normalizePrice(subscriberPrice) || (item ? null : undefined),

@@ -1,4 +1,5 @@
 import { createMenuItemSchema } from './create-menu-item.dto';
+import { updateMenuItemSchema } from './update-menu-item.dto';
 
 const validItem = {
   categoryId: 'f53d62b4-d3cc-4ef7-a71d-42dbe8c5806e',
@@ -17,5 +18,9 @@ describe('createMenuItemSchema', () => {
 
   it('still rejects an invalid weight', () => {
     expect(createMenuItemSchema.safeParse({ ...validItem, grams: -1 }).success).toBe(false);
+  });
+
+  it('allows clearing an existing description on update', () => {
+    expect(updateMenuItemSchema.safeParse({ description: null }).success).toBe(true);
   });
 });

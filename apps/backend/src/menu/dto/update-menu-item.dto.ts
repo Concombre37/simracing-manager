@@ -6,6 +6,8 @@ import { menuItemShape } from './create-menu-item.dto';
 export const updateMenuItemSchema = z
   .object({
     ...menuItemShape,
+    // `null` explicitly clears an existing description when an item is edited.
+    description: z.string().max(1000).nullable().optional(),
     subscriberPrice: z.string().max(30).nullable().optional(),
     grams: z.number().int().min(0).max(100000).nullable().optional(),
   })

@@ -34,7 +34,7 @@ export interface MenuCategoryInput {
 export interface MenuItemInput {
   categoryId: string;
   name: string;
-  description?: string;
+  description?: string | null;
   grams?: number | null;
   price: string;
   subscriberPrice?: string | null;
