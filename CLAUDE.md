@@ -9,7 +9,7 @@ Use this as the project operating guide. Treat the repository and GitHub as the 
 - Local workspace: C:/Users/Concombre/Documents/ChatGPT/simracing manager
 - Production URL: https://simracing.hytlabs.com
 - Production SSH alias: hytlabs; checkout: /root/sim-center-manager
-- Current main/tag: ba230a3, v2.2.175 (2026-09-12)
+- Current main/tag: 7a43bd3, v2.2.176 (2026-09-13)
 - Stack: NestJS 10 + Prisma/PostgreSQL 16, React/Vite/Tailwind, Windows Node agent packaged with pkg, npm workspaces.
 - Agent source: apps/agent; legacy reference only: agent-legacy.
 - Never commit or delete the existing untracked transfer archives, transfer-box/, ws2025.png, or ws2025.ppm unless the user explicitly asks.
