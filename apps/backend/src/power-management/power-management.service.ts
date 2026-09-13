@@ -42,7 +42,7 @@ export class PowerManagementService {
     const relay = await this.findRelay(target.id, targetSubnet);
     if (!relay) {
       throw new BadRequestException(
-        'No online station found on the same subnet to relay the Wake-on-LAN packet.',
+        'No online relay station found. Keep an admin agent connected on the network used by the PODs.',
       );
     }
 
@@ -90,11 +90,16 @@ export class PowerManagementService {
       where: {
         id: { not: targetId },
         status: { in: [StationStatus.ONLINE, StationStatus.IN_GAME] },
-        localIp: { not: null },
       },
-      select: { stationId: true, localIp: true },
+      select: { stationId: true, localIp: true, role: true },
     });
 
+    // Prefer the old exact-subnet match. If the relay is a dual-homed admin
+    // host, its heartbeat may expose the IP of its first NIC even though the
+    // second NIC is physically connected to the POD network. The agent itself
+    // can select the matching interface from targetIp, so an online admin is a
+    // safe fallback when the single-IP heartbeat cannot prove the subnet.
+    let adminFallback: { stationId: string } | null = null;
     for (const candidate of candidates) {
       if (
         candidate.localIp &&
@@ -102,9 +107,12 @@ export class PowerManagementService {
       ) {
         return { stationId: candidate.stationId };
       }
+      if (candidate.role === 'admin' && !adminFallback) {
+        adminFallback = { stationId: candidate.stationId };
+      }
     }
 
-    return null;
+    return adminFallback;
   }
 
   private getSubnet(ip: string | null): string | null {

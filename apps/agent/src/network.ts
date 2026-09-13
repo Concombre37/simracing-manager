@@ -32,7 +32,7 @@ export function calculateBroadcastAddress(ip: string, netmask: string): string |
   return uint32ToIpv4((ipValue | ~maskValue) >>> 0);
 }
 
-function findPrimaryInterface(targetIp?: string): NetworkInfo {
+function findInterfaces(targetIp?: string): NetworkInfo[] {
   const interfaces = networkInterfaces();
   const targetValue = targetIp ? ipv4ToUint32(targetIp) : null;
   const candidates = Object.values(interfaces)
@@ -59,17 +59,18 @@ function findPrimaryInterface(targetIp?: string): NetworkInfo {
       };
     });
 
-  // Si une cible est fournie, ne jamais retomber sur le broadcast dirigé
-  // d'une interface sans rapport. Le caller utilisera alors 255.255.255.255.
   if (targetIp) {
-    if (targetValue === null) return { ip: null, mac: null, broadcast: null };
+    if (targetValue === null) return [];
     const matches = candidates.filter((candidate) => candidate.matchesTarget);
     matches.sort((a, b) => b.prefixLength - a.prefixLength);
-    return matches[0]?.info ?? { ip: null, mac: null, broadcast: null };
+    return matches.map((candidate) => candidate.info);
   }
 
-  // Sans cible (heartbeat), conserver l'interface primaire historique.
-  return candidates[0]?.info ?? { ip: null, mac: null, broadcast: null };
+  return candidates.sort((a, b) => b.prefixLength - a.prefixLength).map((candidate) => candidate.info);
+}
+
+function findPrimaryInterface(targetIp?: string): NetworkInfo {
+  return findInterfaces(targetIp)[0] ?? { ip: null, mac: null, broadcast: null };
 }
 
 function countSetBits(value: number): number {
@@ -92,4 +93,20 @@ export function getMacAddress(): string | null {
 
 export function getBroadcastAddress(targetIp?: string): string | null {
   return findPrimaryInterface(targetIp).broadcast;
+}
+
+/** Returns every usable directed broadcast for a target. A dual-homed relay
+ * can expose the wrong NIC in its heartbeat, so WoL should try all matching
+ * interfaces and, when no subnet match is visible, each non-internal
+ * interface plus the limited broadcast as a final fallback. */
+export function getBroadcastAddresses(targetIp?: string): string[] {
+  const matching = findInterfaces(targetIp)
+    .map((info) => info.broadcast)
+    .filter((broadcast): broadcast is string => Boolean(broadcast));
+  if (matching.length > 0) return [...new Set(matching)];
+
+  const all = findInterfaces()
+    .map((info) => info.broadcast)
+    .filter((broadcast): broadcast is string => Boolean(broadcast));
+  return [...new Set([...all, '255.255.255.255'])];
 }

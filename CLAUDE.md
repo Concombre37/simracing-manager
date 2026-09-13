@@ -26,6 +26,7 @@ The agent release chain is cumulative. Do not remove an older fix because a late
 - v2.2.166–v2.2.169: hidden track layouts, merged layout inventories, per-station content presence and rescan cache invalidation.
 - v2.2.170–v2.2.174: menu public/subscriber prices limited to Cuisine/Bar, grams, reorderable categories/items, optional descriptions, tablet idle timeout and blanking security-bar fix.
 - v2.2.175: fleet Mods workflow, admin inventory visibility, leaderboard driver attribution fix, missing-mod sorting and source-to-station content propagation.
+- v2.2.176: dual-interface Wake-on-LAN relay and admin fallback for the Windows host.
 
 The complete historical detail lives in CHANGELOG.md and GitHub releases.
 
@@ -93,6 +94,7 @@ The agent catalog sync resolves relative archive URLs against SERVER_URL, sends 
 ## Agent/AC gotchas
 
 - Drive: the modern agent uses the packaged PressDriveKey.exe helper (ViGEmBus) plus Lua fallback. For a real POD diagnosis, inspect remote agent logs and Documents/Assetto Corsa/logs/pressdrivekey.log.
+- WoL: the backend prefers an exact-subnet relay, then an online admin station; the agent tries all matching/non-internal interface broadcasts so a dual-homed Windows host can relay to the POD network.
 - Content Manager is the normal launch path. Do not replace it with a local desktop-only workaround.
 - Blanking is role-gated and the delay comes from backend settings; do not hardcode a new timeout.
 - Content scans must preserve known-good inventories and invalidate track cache when layout UI/outline files change.

@@ -1,7 +1,7 @@
 import { promisify } from 'util';
 import { Logger } from 'pino';
 import wol from 'wake_on_lan';
-import { getBroadcastAddress } from './network';
+import { getBroadcastAddresses } from './network';
 
 const wake = promisify(wol.wake);
 
@@ -21,35 +21,42 @@ export async function sendWakeOnLan(
   // la carte réseau de la cible au niveau liaison ; seule la carte dont le
   // magic packet contient la bonne MAC réagit, donc rien de plus n'est
   // réveillé par erreur.
-  const address = getBroadcastAddress(targetIp) ?? '255.255.255.255';
+  const addresses = getBroadcastAddresses(targetIp);
 
-  logger.info({ macAddress: normalized, address, targetIp }, 'Sending Wake-on-LAN magic packet');
+  logger.info({ macAddress: normalized, addresses, targetIp }, 'Sending Wake-on-LAN magic packet');
 
   const errors: Error[] = [];
 
-  // Try standard port 9, then port 7, with multiple packets.
-  for (const port of [9, 7]) {
-    try {
-      await wake(normalized, {
-        address,
-        port,
-        num_packets: 5,
-        interval: 100,
-      });
-      logger.info({ macAddress: normalized, address, port }, 'Wake-on-LAN packet sent');
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      logger.warn(
-        { err: error, macAddress: normalized, address, port },
-        'Wake-on-LAN packet failed',
-      );
-      errors.push(error);
+  // Try standard port 9, then port 7, on every candidate interface. A
+  // successful send on one interface is enough; the remaining attempts are
+  // still useful when Windows has multiple active NICs and one route is
+  // temporarily unavailable.
+  let sent = false;
+  for (const address of addresses) {
+    for (const port of [9, 7]) {
+      try {
+        await wake(normalized, {
+          address,
+          port,
+          num_packets: 5,
+          interval: 100,
+        });
+        sent = true;
+        logger.info({ macAddress: normalized, address, port }, 'Wake-on-LAN packet sent');
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        logger.warn(
+          { err: error, macAddress: normalized, address, port },
+          'Wake-on-LAN packet failed',
+        );
+        errors.push(error);
+      }
     }
   }
 
-  if (errors.length === 2) {
+  if (!sent) {
     throw new Error(
-      `Failed to send Wake-on-LAN packets to ${address}: ${errors.map((e) => e.message).join('; ')}`,
+      `Failed to send Wake-on-LAN packets to ${addresses.join(', ')}: ${errors.map((e) => e.message).join('; ')}`,
     );
   }
 }

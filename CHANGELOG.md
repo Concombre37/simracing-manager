@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.176 — WoL dual-interface et relais admin
+
+- Le relais WoL peut maintenant utiliser un agent admin connecté même si son heartbeat remonte l’autre carte réseau.
+- L’agent essaie les broadcasts disponibles sur ses interfaces réseau pour les postes équipés de plusieurs cartes.
+- Les diagnostics et tests couvrent le relais dual-homed.
+
+
 ## v2.2.175 — Partage des mods depuis la flotte
 
 - Le back-office permet de trier les mods manquants, de filtrer un poste précis et d’afficher immédiatement où le contenu manque.

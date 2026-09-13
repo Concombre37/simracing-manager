@@ -1,6 +1,6 @@
 import { networkInterfaces } from 'os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { calculateBroadcastAddress, getBroadcastAddress } from './network';
+import { calculateBroadcastAddress, getBroadcastAddress, getBroadcastAddresses } from './network';
 
 vi.mock('os', () => ({ networkInterfaces: vi.fn() }));
 
@@ -48,5 +48,36 @@ describe('calculateBroadcastAddress', () => {
 
   it("ne réutilise pas le broadcast d'une interface sans rapport", () => {
     expect(getBroadcastAddress('10.0.0.12')).toBeNull();
+  });
+
+  it('essaie toutes les interfaces quand le relais est dual-homed', () => {
+    vi.mocked(networkInterfaces).mockReturnValue({
+      Ethernet: [
+        {
+          address: '192.168.1.63',
+          netmask: '255.255.255.0',
+          family: 'IPv4',
+          mac: '00:00:00:00:00:02',
+          internal: false,
+          cidr: '192.168.1.63/24',
+        },
+      ],
+      'Ethernet 2': [
+        {
+          address: '192.168.10.20',
+          netmask: '255.255.255.0',
+          family: 'IPv4',
+          mac: '00:00:00:00:00:03',
+          internal: false,
+          cidr: '192.168.10.20/24',
+        },
+      ],
+    });
+    expect(getBroadcastAddresses('192.168.10.101')).toEqual(['192.168.10.255']);
+    expect(getBroadcastAddresses('10.0.0.12')).toEqual([
+      '192.168.1.255',
+      '192.168.10.255',
+      '255.255.255.255',
+    ]);
   });
 });
