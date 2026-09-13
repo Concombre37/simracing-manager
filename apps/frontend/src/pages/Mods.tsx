@@ -50,10 +50,11 @@ export function Mods() {
       });
     },
     onSuccess: (_result, input) => {
-      setShareNotice({
-        kind: 'success',
-        message: `Envoi terminé : archive « ${input.acId} » reçue par le serveur. Synchronisation demandée vers ${input.targets.length} poste${input.targets.length > 1 ? 's' : ''}. Les postes apparaîtront à jour après leur prochain inventaire.`,
-      });
+      // Keep the progress state visible long enough for the operator to see it.
+      window.setTimeout(() => setShareNotice({
+          kind: 'success',
+          message: `Envoi terminé : archive « ${input.acId} » reçue par le serveur. Synchronisation demandée vers ${input.targets.length} poste${input.targets.length > 1 ? 's' : ''}. Les postes apparaîtront à jour après leur prochain inventaire.`,
+        }), 900);
       queryClient.invalidateQueries({ queryKey: ['stations'] });
     },
     onError: (error) => {
