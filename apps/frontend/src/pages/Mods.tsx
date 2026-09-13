@@ -23,7 +23,10 @@ export function Mods() {
   const [missingOnly, setMissingOnly] = useState(false);
   const [missingStationFilter, setMissingStationFilter] = useState('');
   const [sortMode, setSortMode] = useState<'missing' | 'name' | 'complete'>('missing');
-  const [shareNotice, setShareNotice] = useState<string | null>(null);
+  const [shareNotice, setShareNotice] = useState<{
+    kind: 'pending' | 'success' | 'error';
+    message: string;
+  } | null>(null);
 
   const { data: stations = [], isLoading } = useQuery({
     queryKey: ['stations'],
@@ -40,12 +43,24 @@ export function Mods() {
         acId: input.acId,
         targetStationIds: input.targets,
       }),
+    onMutate: (input) => {
+      setShareNotice({
+        kind: 'pending',
+        message: `Envoi de l’archive ${input.type === 'car' ? 'voiture' : 'circuit'} « ${input.acId} » en cours vers ${input.targets.length} poste${input.targets.length > 1 ? 's' : ''}…`,
+      });
+    },
     onSuccess: (_result, input) => {
-      setShareNotice(`Archive ${input.type === 'car' ? 'voiture' : 'circuit'} « ${input.acId} » envoyée. Synchronisation demandée vers ${input.targets.length} poste${input.targets.length > 1 ? 's' : ''}.`);
+      setShareNotice({
+        kind: 'success',
+        message: `Envoi terminé : archive « ${input.acId} » reçue par le serveur. Synchronisation demandée vers ${input.targets.length} poste${input.targets.length > 1 ? 's' : ''}. Les postes apparaîtront à jour après leur prochain inventaire.`,
+      });
       queryClient.invalidateQueries({ queryKey: ['stations'] });
     },
     onError: (error) => {
-      setShareNotice(`Échec du partage : ${error instanceof Error ? error.message : 'le serveur a refusé la demande'}.`);
+      setShareNotice({
+        kind: 'error',
+        message: `Échec du partage : ${error instanceof Error ? error.message : 'le serveur a refusé la demande'}.`,
+      });
     },
   });
 
@@ -216,8 +231,17 @@ export function Mods() {
           </div>
         </div>
         {shareNotice && (
-          <div className="rounded-lg border border-accent-orange/30 bg-dark-900/70 px-3 py-2 text-sm text-accent-orange">
-            {shareNotice}
+          <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+            shareNotice.kind === 'success'
+              ? 'border-green-500/30 bg-green-950/20 text-green-300'
+              : shareNotice.kind === 'error'
+                ? 'border-red-500/30 bg-red-950/20 text-red-300'
+                : 'border-accent-orange/30 bg-dark-900/70 text-accent-orange'
+          }`}>
+            {shareNotice.kind === 'pending' && <RefreshCw className="h-4 w-4 animate-spin shrink-0" />}
+            {shareNotice.kind === 'success' && <Check className="h-4 w-4 shrink-0" />}
+            {shareNotice.kind === 'error' && <X className="h-4 w-4 shrink-0" />}
+            <span>{shareNotice.message}</span>
           </div>
         )}
       </Card>
