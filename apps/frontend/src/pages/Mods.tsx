@@ -23,6 +23,7 @@ export function Mods() {
   const [missingOnly, setMissingOnly] = useState(false);
   const [missingStationFilter, setMissingStationFilter] = useState('');
   const [sortMode, setSortMode] = useState<'missing' | 'name' | 'complete'>('missing');
+  const [shareNotice, setShareNotice] = useState<string | null>(null);
 
   const { data: stations = [], isLoading } = useQuery({
     queryKey: ['stations'],
@@ -39,7 +40,13 @@ export function Mods() {
         acId: input.acId,
         targetStationIds: input.targets,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['stations'] }),
+    onSuccess: (_result, input) => {
+      setShareNotice(`Archive ${input.type === 'car' ? 'voiture' : 'circuit'} « ${input.acId} » envoyée. Synchronisation demandée vers ${input.targets.length} poste${input.targets.length > 1 ? 's' : ''}.`);
+      queryClient.invalidateQueries({ queryKey: ['stations'] });
+    },
+    onError: (error) => {
+      setShareNotice(`Échec du partage : ${error instanceof Error ? error.message : 'le serveur a refusé la demande'}.`);
+    },
   });
 
   const fleetStations = useMemo(
@@ -208,6 +215,11 @@ export function Mods() {
             ))}
           </div>
         </div>
+        {shareNotice && (
+          <div className="rounded-lg border border-accent-orange/30 bg-dark-900/70 px-3 py-2 text-sm text-accent-orange">
+            {shareNotice}
+          </div>
+        )}
       </Card>
 
       {isLoading ? (
