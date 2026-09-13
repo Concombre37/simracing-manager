@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, CircleHelp, Package, RefreshCw, Search, Share2, X } from 'lucide-react';
 import { PageShell } from '../components/ui/PageShell';
@@ -27,6 +27,11 @@ export function Mods() {
     kind: 'pending' | 'success' | 'error';
     message: string;
   } | null>(null);
+  const [shareTracking, setShareTracking] = useState<{
+    type: ModType;
+    acId: string;
+    targets: string[];
+  } | null>(null);
 
   const { data: stations = [], isLoading } = useQuery({
     queryKey: ['stations'],
@@ -50,6 +55,7 @@ export function Mods() {
       });
     },
     onSuccess: (_result, input) => {
+      setShareTracking(input);
       // Keep the progress state visible long enough for the operator to see it.
       window.setTimeout(() => setShareNotice({
           kind: 'success',
@@ -70,6 +76,27 @@ export function Mods() {
     [stations],
   );
   const inventory = useMemo(() => collectModInventory(stations, labels), [stations, labels]);
+
+  // The share endpoint acknowledges the upload before target agents finish
+  // installing it. Refresh the station inventories until every requested
+  // target reports the content, so the operator sees the real copy state.
+  useEffect(() => {
+    if (!shareTracking) return;
+    const row = inventory.find((item) => item.type === shareTracking.type && item.acId === shareTracking.acId);
+    const completed = shareTracking.targets.filter((target) =>
+      row?.stations.some((station) => station.stationId === target && station.present),
+    ).length;
+    if (completed === shareTracking.targets.length) {
+      setShareNotice({ kind: 'success', message: `Transfert terminé : ${shareTracking.acId} est présent sur ${completed}/${shareTracking.targets.length} poste${completed > 1 ? 's' : ''}.` });
+      setShareTracking(null);
+      return;
+    }
+    setShareNotice({ kind: 'pending', message: `Transfert en cours : ${completed}/${shareTracking.targets.length} poste${shareTracking.targets.length > 1 ? 's' : ''} ont reçu ${shareTracking.acId}…` });
+    const timer = window.setInterval(() => {
+      queryClient.refetchQueries({ queryKey: ['stations'] });
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [inventory, queryClient, shareTracking]);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     const rows = inventory.filter((item) => {
