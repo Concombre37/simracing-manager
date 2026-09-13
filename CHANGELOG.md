@@ -1,5 +1,6 @@
 # Changelog
 
+## v2.2.177 — Transfert réel des mods\n\n- Corrige l’URL des archives partagées afin que les agents téléchargent bien le ZIP authentifié.\n- Le suivi Mods attend maintenant l’inventaire de chaque poste cible avant d’indiquer le transfert terminé.\n\n
 ## v2.2.176 — WoL dual-interface et relais admin
 
 - Le relais WoL peut maintenant utiliser un agent admin connecté même si son heartbeat remonte l’autre carte réseau.
@@ -1449,3 +1450,4 @@ Vérifié directement en base : sur un POD déjà mis à jour en v2.2.56, les 21
 - Page `/telemetry` affichant vitesse, RPM, meilleur tour, position, progression piste.
 - Stream UDP local depuis l'app CSP Lua vers l'agent.
 - Fallback HTTP et fichier pour la télémétrie.
+

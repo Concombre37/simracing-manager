@@ -56,7 +56,7 @@ export class ContentService {
     const checksum = createHash('sha256').update(input.archive).digest('hex');
     // A source share is the canonical package for this mod. Reusing one
     // version keeps repeated shares from filling the catalogue with copies.
-    return this.prisma.contentPackage.upsert({
+    const pkg = await this.prisma.contentPackage.upsert({
       where: {
         type_name_version: { type: input.type, name: input.acId, version: 'source' },
       },
@@ -71,5 +71,16 @@ export class ContentService {
       },
       update: { archiveData: input.archive, checksum, updatedAt: new Date() },
     });
+    // Source uploads are also normal catalogue packages.  Keep the download
+    // URL pointing at the authenticated package endpoint; using the site root
+    // here made target agents download HTML instead of the ZIP archive.
+    const archiveUrl = `/api/content/packages/${pkg.id}/download`;
+    if (pkg.archiveUrl !== archiveUrl) {
+      return this.prisma.contentPackage.update({
+        where: { id: pkg.id },
+        data: { archiveUrl },
+      });
+    }
+    return pkg;
   }
 }
