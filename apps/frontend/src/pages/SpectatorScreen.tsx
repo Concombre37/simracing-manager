@@ -16,6 +16,7 @@ export function SpectatorScreen() {
   });
   const [sourceIndex, setSourceIndex] = useState(0);
   const [frameTick, setFrameTick] = useState(Date.now());
+  const liveSourceCount = liveSources?.length ?? 0;
 
   useEffect(() => {
     const interval = window.setInterval(() => setFrameTick(Date.now()), 700);
@@ -23,21 +24,21 @@ export function SpectatorScreen() {
   }, []);
 
   useEffect(() => {
-    if (!liveSources?.length) {
+    if (!liveSourceCount) {
       setSourceIndex(0);
       return;
     }
-    setSourceIndex((current) => Math.min(current, liveSources.length - 1));
-  }, [liveSources?.length]);
+    setSourceIndex((current) => Math.min(current, liveSourceCount - 1));
+  }, [liveSourceCount]);
 
   useEffect(() => {
-    if (!liveSources || liveSources.length < 2) return;
+    if (liveSourceCount < 2) return;
     const interval = window.setInterval(
-      () => setSourceIndex((current) => (current + 1) % liveSources.length),
+      () => setSourceIndex((current) => (current + 1) % liveSourceCount),
       10_000,
     );
     return () => window.clearInterval(interval);
-  }, [liveSources?.length]);
+  }, [liveSourceCount]);
 
   const liveSource = useMemo(
     () => liveSources?.[sourceIndex] ?? null,
