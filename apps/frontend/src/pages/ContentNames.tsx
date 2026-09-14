@@ -49,6 +49,8 @@ export function ContentNames() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [onlyMissing, setOnlyMissing] = useState(false);
+  const [page, setPage] = useState(0);
+  const pageSize = 40;
 
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['content-labels-known'],
@@ -74,6 +76,17 @@ export function ContentNames() {
       );
     });
   }, [items, search, typeFilter, onlyMissing]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const visibleItems = filtered.slice(page * pageSize, (page + 1) * pageSize);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, typeFilter, onlyMissing]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, pageCount - 1));
+  }, [pageCount]);
 
   const stats = useMemo(() => {
     const cars = items.filter((i) => i.type === 'car').length;
@@ -162,7 +175,7 @@ export function ContentNames() {
       ) : (
         <Card padding="none" className="overflow-hidden">
           <div className="divide-y divide-dark-700">
-            {filtered.map((item) => (
+            {visibleItems.map((item) => (
               <ContentNameRow
                 key={`${item.type}:${item.acId}`}
                 item={item}
@@ -171,6 +184,22 @@ export function ContentNames() {
             ))}
           </div>
         </Card>
+      )}
+      {filtered.length > pageSize && (
+        <div className="flex items-center justify-between rounded-lg border border-dark-700 bg-dark-800/60 px-3 py-2 text-xs text-gray-400">
+          <span>
+            {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filtered.length)} sur {filtered.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>
+              Précédent
+            </Button>
+            <span>Page {page + 1}/{pageCount}</span>
+            <Button size="sm" variant="secondary" disabled={page >= pageCount - 1} onClick={() => setPage((p) => p + 1)}>
+              Suivant
+            </Button>
+          </div>
+        </div>
       )}
     </PageShell>
   );
@@ -261,6 +290,11 @@ function ContentNameRow({
       void queryClient.invalidateQueries({ queryKey: ['content-labels-map'] });
     },
   });
+  const mutationError = mutation.error instanceof Error
+    ? mutation.error.message
+    : mutation.error
+      ? 'Enregistrement impossible — vérifie les valeurs saisies.'
+      : null;
 
   const trimmedName = name.trim();
   const trimmedCategory = category.trim();
@@ -622,6 +656,11 @@ function ContentNameRow({
           />
         </Field>
       </div>
+      {mutationError && (
+        <p className="text-xs text-red-300" role="alert">
+          {mutationError}
+        </p>
+      )}
     </div>
   );
 }

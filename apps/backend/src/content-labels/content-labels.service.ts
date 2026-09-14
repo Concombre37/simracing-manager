@@ -26,6 +26,23 @@ interface StationContentShape {
   tracks?: { acId: string; name?: string; layouts?: { name: string }[] }[];
 }
 
+/** Les agents ne sont pas tous sur la même version et un inventaire peut
+ * être lu pendant qu'il est encore écrit. Ne jamais faire confiance aux
+ * formes JSON reçues en base : une valeur partielle doit simplement être
+ * ignorée, pas faire tomber toute la page catalogue. */
+function arrayOfRecords(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter(
+        (entry): entry is Record<string, unknown> =>
+          Boolean(entry) && typeof entry === 'object' && !Array.isArray(entry),
+      )
+    : [];
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
 function uniqueStations(stations: StationInfo[]): StationInfo[] {
   const byId = new Map<string, StationInfo>();
   for (const station of stations) {
@@ -164,32 +181,38 @@ export class ContentLabelsService {
 
     const rawByKey = new Map<string, RawContentItem>();
     for (const station of stations) {
-      const content = station.content as StationContentShape | null;
+      const content =
+        station.content && typeof station.content === 'object'
+          ? (station.content as StationContentShape)
+          : null;
       const stationInfo = {
         stationId: station.stationId,
         name: station.name || station.stationId,
       };
-      for (const car of content?.cars ?? []) {
-        if (!car.acId) continue;
+      for (const car of arrayOfRecords(content?.cars)) {
+        const acId = stringValue(car.acId);
+        if (!acId) continue;
         mergeRawContentItem(rawByKey, {
           type: 'car',
-          acId: car.acId,
-          rawName: car.name?.trim() || car.acId,
+          acId,
+          rawName: stringValue(car.name) || acId,
           stations: [stationInfo],
         });
       }
-      for (const track of content?.tracks ?? []) {
-        if (!track.acId) continue;
+      for (const track of arrayOfRecords(content?.tracks)) {
+        const acId = stringValue(track.acId);
+        if (!acId) continue;
+        const layouts = arrayOfRecords(track.layouts)
+          .map((layout) => stringValue(layout.name))
+          .filter((name): name is string => Boolean(name));
         mergeRawContentItem(rawByKey, {
           type: 'track',
-          acId: track.acId,
-          rawName: track.name?.trim() || track.acId,
-          layoutNames: (track.layouts ?? []).map((l) => l.name).filter(Boolean),
+          acId,
+          rawName: stringValue(track.name) || acId,
+          layoutNames: layouts,
           stations: [stationInfo],
           layoutStations: Object.fromEntries(
-            (track.layouts ?? [])
-              .filter((layout) => Boolean(layout.name))
-              .map((layout) => [layout.name, [stationInfo]]),
+            layouts.map((name) => [name, [stationInfo]]),
           ),
         });
       }
