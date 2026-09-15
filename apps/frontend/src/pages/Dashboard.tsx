@@ -7,6 +7,7 @@ import { stationsApi, type Station } from '../services/stations';
 import { dedicatedServersApi, type DedicatedServer } from '../services/dedicatedServers';
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { findTrackName } from '../utils/track';
+import { sortStations } from '../utils/stations';
 import { useContentLabelMap, type ContentLabelMap } from '../services/contentLabels';
 import { Monitor, Server, Play, Zap, ArrowRight, Plus, Tv, AlertTriangle } from 'lucide-react';
 
@@ -147,9 +148,7 @@ export function Dashboard() {
 
   const simulatorStations = useMemo(
     () =>
-      (stations ?? [])
-        .filter((s) => s.role === 'simulator')
-        .sort((a, b) => a.name.localeCompare(b.name)),
+      sortStations((stations ?? []).filter((s) => s.role === 'simulator')),
     [stations],
   );
   const onlinePods = simulatorStations.filter((s) => s.status !== 'offline').length;

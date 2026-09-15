@@ -12,6 +12,7 @@ import {
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { useSocket } from '../hooks/useSocket';
 import { findCar, findTrackName, findTrackPreview, formatCarName } from '../utils/track';
+import { sortStations } from '../utils/stations';
 import { useContentLabelMap } from '../services/contentLabels';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -597,7 +598,7 @@ function StationsTab({
   // instead of reflowing as PODs connect/disconnect.
   const pods = useMemo(
     () =>
-      stations.filter((s) => s.role === 'simulator').sort((a, b) => a.name.localeCompare(b.name)),
+      sortStations(stations.filter((s) => s.role === 'simulator')),
     [stations],
   );
   const slots = Array.from({ length: MAX_PODS }, (_, i) => pods[i]);

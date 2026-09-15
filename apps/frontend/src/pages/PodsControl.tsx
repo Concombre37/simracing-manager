@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { stationsApi, type Station } from '../services/stations';
 import { bulkActionsApi, type BulkActionResult } from '../services/bulkActions';
 import { useSocket } from '../hooks/useSocket';
+import { sortStations } from '../utils/stations';
 import { PageShell } from '../components/ui/PageShell';
 import { Card, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -54,14 +55,7 @@ export function PodsControl() {
 
   const podStations = useMemo(
     () =>
-      (stations ?? [])
-        .filter((station) => station.role === 'simulator')
-        .sort((a, b) => {
-          return (
-            Number(isReachable(b)) - Number(isReachable(a)) ||
-            a.name.localeCompare(b.name, 'fr', { numeric: true })
-          );
-        }),
+      sortStations((stations ?? []).filter((station) => station.role === 'simulator')),
     [stations],
   );
   const onlineCount = podStations.filter(isReachable).length;

@@ -6,6 +6,7 @@ import { stationsApi, type Station } from '../services/stations';
 import { useSocket } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
 import { downloadEnvFile } from '../utils/downloadEnv';
+import { sortStations } from '../utils/stations';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { CreateStationModal } from '../components/CreateStationModal';
@@ -230,9 +231,10 @@ export function Stations() {
     [data, statusFilter, roleFilter],
   );
 
-  const simulatorRows = filtered.filter((s) => s.role === 'simulator');
-  const adminRows = filtered.filter((s) => s.role === 'admin');
-  const spectatorRows = filtered.filter((s) => s.role === 'spectator');
+  const ordered = sortStations(filtered);
+  const simulatorRows = ordered.filter((s) => s.role === 'simulator');
+  const adminRows = ordered.filter((s) => s.role === 'admin');
+  const spectatorRows = ordered.filter((s) => s.role === 'spectator');
 
   const rowProps = {
     isAdmin,

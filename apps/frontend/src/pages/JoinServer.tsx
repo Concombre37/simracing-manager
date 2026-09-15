@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { dedicatedServersApi, type Car as AcCar } from '../services/dedicatedServers';
 import { stationsApi, type Station } from '../services/stations';
 import { formatCarName } from '../utils/track';
+import { sortStations } from '../utils/stations';
 import { useContentLabelMap } from '../services/contentLabels';
 import { PageShell } from '../components/ui/PageShell';
 import { Button } from '../components/ui/Button';
@@ -100,11 +101,13 @@ export function JoinServer() {
 
   const onlineStations = useMemo(
     () =>
-      (stations ?? []).filter(
-        (s) =>
-          s.id !== server?.stationId &&
-          s.role === 'simulator' &&
-          (s.status === 'online' || s.status === 'in_game'),
+      sortStations(
+        (stations ?? []).filter(
+          (s) =>
+            s.id !== server?.stationId &&
+            s.role === 'simulator' &&
+            (s.status === 'online' || s.status === 'in_game'),
+        ),
       ),
     [stations, server],
   );

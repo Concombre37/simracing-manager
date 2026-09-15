@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Check, Eye, EyeOff, Power, PowerOff, RotateCw, Wifi, WifiOff } from 'lucide-react';
 import { bulkActionsApi, type BulkActionResult } from '../services/bulkActions';
 import type { Station } from '../services/stations';
+import { sortStations } from '../utils/stations';
 
 type ActionName = 'wake' | 'restart' | 'shutdown' | 'blanking-hide' | 'blanking-show';
 type Feedback = { type: 'success' | 'error'; message: string } | null;
@@ -15,13 +16,7 @@ export function FleetQuickControl({ stations }: { stations: Station[] }) {
   const queryClient = useQueryClient();
   const pods = useMemo(
     () =>
-      stations
-        .filter((station) => station.role === 'simulator')
-        .sort(
-          (a, b) =>
-            Number(isReachable(b)) - Number(isReachable(a)) ||
-            a.name.localeCompare(b.name, 'fr', { numeric: true }),
-        ),
+      sortStations(stations.filter((station) => station.role === 'simulator')),
     [stations],
   );
   const [selected, setSelected] = useState<Set<string> | null>(null);
