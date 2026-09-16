@@ -52,13 +52,28 @@ export function ContentNames() {
   const [page, setPage] = useState(0);
   const pageSize = 40;
 
-  const { data: items = [], isLoading } = useQuery({
+  const {
+    data: items = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['content-labels-known'],
     queryFn: contentLabelsApi.getKnown,
+    staleTime: 30_000,
+    retry: 2,
   });
-  const { data: categories = [] } = useQuery({
+  const {
+    data: categories = [],
+    isError: categoriesError,
+    refetch: refetchCategories,
+  } = useQuery({
     queryKey: ['content-categories'],
     queryFn: () => contentCategoriesApi.list(),
+    staleTime: 60_000,
+    retry: 2,
   });
   const carCategories = useMemo(() => categories.filter((c) => c.type === 'car'), [categories]);
   const trackCategories = useMemo(() => categories.filter((c) => c.type === 'track'), [categories]);
@@ -157,10 +172,27 @@ export function ContentNames() {
         </div>
       </Card>
 
-      {isLoading ? (
+      {isLoading && items.length === 0 ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-8 h-8 border-2 border-accent-orange/30 border-t-accent-orange rounded-full animate-spin" />
         </div>
+      ) : isError ? (
+        <Card className="p-10 text-center">
+          <AlertTriangle className="w-12 h-12 text-accent-orange mx-auto mb-4" />
+          <p className="text-white font-medium">Impossible de charger les noms du contenu</p>
+          <p className="text-sm text-gray-400 mt-2">
+            Le serveur n'a pas répondu correctement. Les données existantes restent protégées.
+          </p>
+          <Button
+            className="mt-5"
+            size="sm"
+            variant="secondary"
+            isLoading={isFetching}
+            onClick={() => void refetch()}
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Réessayer
+          </Button>
+        </Card>
       ) : filtered.length === 0 ? (
         <Card className="p-12 text-center">
           <Tag className="w-12 h-12 text-gray-600 mx-auto mb-4" />
@@ -184,6 +216,14 @@ export function ContentNames() {
             ))}
           </div>
         </Card>
+      )}
+      {categoriesError && !isError && (
+        <div className="flex items-center justify-between rounded-lg border border-accent-orange/30 bg-accent-orange/5 px-4 py-3 text-sm text-gray-300">
+          <span>Les catégories sont temporairement indisponibles. Les noms restent modifiables.</span>
+          <Button size="sm" variant="ghost" onClick={() => void refetchCategories()}>
+            <RotateCcw className="h-3.5 w-3.5" /> Réessayer
+          </Button>
+        </div>
       )}
       {filtered.length > pageSize && (
         <div className="flex items-center justify-between rounded-lg border border-dark-700 bg-dark-800/60 px-3 py-2 text-xs text-gray-400">

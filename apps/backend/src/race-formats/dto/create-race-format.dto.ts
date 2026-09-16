@@ -14,6 +14,7 @@ export const raceFormatShape = {
   raceLaps: z.number().int().min(1).max(500).default(5),
   raceMinutes: z.number().int().min(1).max(360).default(20),
   gridType: z.nativeEnum(GridType).default(GridType.NORMAL),
+  timeOfDay: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default('16:30'),
   weatherGraphics: z.array(z.string().min(1)).min(1).default(['3_clear']),
 };
 

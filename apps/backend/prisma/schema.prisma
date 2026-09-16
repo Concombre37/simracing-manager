@@ -194,6 +194,7 @@ model RaceFormat {
   raceMinutes       Int      @default(20) @map("race_minutes")
   // GridType — same String convention as raceMode above.
   gridType          String   @default("NORMAL") @map("grid_type")
+  timeOfDay         String   @default("16:30") @map("time_of_day")
   weatherGraphics   String[] @map("weather_graphics")
   createdById       String?  @map("created_by_id") @db.Uuid
   createdBy         User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)

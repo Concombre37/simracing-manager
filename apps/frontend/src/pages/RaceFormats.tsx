@@ -40,6 +40,7 @@ const DEFAULT_INPUT: RaceFormatInput = {
   raceLaps: 5,
   raceMinutes: 20,
   gridType: GridType.NORMAL,
+  timeOfDay: '16:30',
   weatherGraphics: ['3_clear'],
 };
 
@@ -193,7 +194,7 @@ function RaceFormatCard({
         )}
         <span className="inline-flex items-center gap-1">
           <CloudSun className="h-3.5 w-3.5" />
-          {format.weatherGraphics.join(', ')}
+          {format.weatherGraphics.join(', ')} · {format.timeOfDay ?? '16:30'}
         </span>
       </div>
     </Card>
@@ -229,6 +230,7 @@ function RaceFormatFormModal({
           raceLaps: format.raceLaps,
           raceMinutes: format.raceMinutes,
           gridType: format.gridType,
+          timeOfDay: format.timeOfDay ?? '16:30',
           weatherGraphics: format.weatherGraphics,
         }
       : DEFAULT_INPUT,
@@ -414,6 +416,18 @@ function RaceFormatFormModal({
         </SessionToggleSection>
 
         <div>
+          <Label htmlFor="rf-time">Heure sur le serveur</Label>
+          <Input
+            id="rf-time"
+            type="time"
+            value={input.timeOfDay}
+            onChange={(e) => setInput({ ...input, timeOfDay: e.target.value })}
+            className="max-w-48"
+          />
+          <p className="mt-1 text-xs text-gray-500">16:30 par défaut. Conversion automatique pour Assetto Corsa.</p>
+        </div>
+
+        <div>
           <Label htmlFor="rf-weather">Météo</Label>
           <Input
             id="rf-weather"
@@ -421,6 +435,7 @@ function RaceFormatFormModal({
             onChange={(e) => setWeatherText(e.target.value)}
             placeholder="3_clear, 3_mid_clouds, rain"
           />
+          <p className="mt-1 text-xs text-gray-500">IDs séparés par des virgules : pluie, brouillard, neige, etc.</p>
           <p className="mt-1 text-xs text-gray-500">
             Un ou plusieurs identifiants météo AC séparés par des virgules — le serveur alterne
             entre eux d'un lancement à l'autre s'il y en a plusieurs.

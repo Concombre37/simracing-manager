@@ -71,6 +71,7 @@ export class RaceFormatsService {
       raceLaps: format.raceLaps,
       raceMinutes: format.raceMinutes,
       gridType: format.gridType as GridType,
+      timeOfDay: format.timeOfDay ?? '16:30',
       weatherGraphics: format.weatherGraphics,
     };
   }

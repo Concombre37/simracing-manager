@@ -17,6 +17,7 @@ export interface RaceFormat {
   raceLaps: number;
   raceMinutes: number;
   gridType: GridType;
+  timeOfDay: string;
   weatherGraphics: string[];
   createdAt: string;
   updatedAt: string;
@@ -36,6 +37,7 @@ export interface RaceFormatInput {
   raceLaps: number;
   raceMinutes: number;
   gridType: GridType;
+  timeOfDay: string;
   weatherGraphics: string[];
 }
 

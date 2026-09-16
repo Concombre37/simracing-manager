@@ -34,6 +34,7 @@ const DEFAULT_RACE_FORMAT: RaceFormatConfig = {
   raceLaps: 5,
   raceMinutes: 20,
   gridType: GridType.NORMAL,
+  timeOfDay: '16:30',
   weatherGraphics: ['3_clear'],
 };
 
@@ -478,15 +479,11 @@ export class ServerLauncher {
       `HTTP_PORT=${httpPort}`,
       `SERVER_IP=0.0.0.0`,
       // Requested default for every dedicated server: clear weather
-      // (already covered below by [WEATHER_0] GRAPHICS=3_clear) at ~17:00.
+      // (already covered below by [WEATHER_0] GRAPHICS=3_clear) at 16:30.
       // AC has no direct "hour" field, only this sun-angle-from-solar-noon
       // value. Calibrated live: SUN_ANGLE=48 showed as ~15:00 in-game,
       // i.e. 48 units = 3h past noon (SUN_ANGLE=0) => ~16 units/hour =>
-      // 80 units for 17:00 (5h past noon). Track-dependent (real solar
-      // position varies with each track's location), so treat as a close
-      // approximation rather than an exact clock — nudge by ~16/hour if a
-      // specific track still looks noticeably off.
-      'SUN_ANGLE=80',
+      `SUN_ANGLE=${sunAngleFromTime(payload.raceFormat?.timeOfDay ?? DEFAULT_RACE_FORMAT.timeOfDay)}`,
       'PICKUP_MODE_ENABLED=1',
       'LOOP_MODE=1',
       'SLEEP_TIME=1',
@@ -599,6 +596,17 @@ export class ServerLauncher {
     });
     return lines;
   }
+}
+
+/** Assetto Corsa expresses time as a sun angle, roughly 16 units per hour
+ * after solar noon. Keep the friendly HH:mm setting in the dashboard and
+ * convert it only when writing server_cfg.ini. */
+function sunAngleFromTime(value: string): number {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return 72; // 16:30 fallback
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  return Math.round((hours + minutes / 60 - 12) * 16);
 }
 
 /** Parses one `tasklist /FO CSV` line (comma-separated, double-quoted

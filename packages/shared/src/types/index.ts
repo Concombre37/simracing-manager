@@ -93,6 +93,8 @@ export interface RaceFormatConfig {
   raceLaps: number;
   raceMinutes: number;
   gridType: GridType;
+  /** Heure locale simulée dans Assetto Corsa (HH:mm). */
+  timeOfDay: string;
   /** One or more AC weather graphics ids (e.g. `3_clear`, `rain`) —
    * `acServer.exe` writes one `[WEATHER_N]` section per entry and rotates
    * between them across session/server restarts when more than one is
