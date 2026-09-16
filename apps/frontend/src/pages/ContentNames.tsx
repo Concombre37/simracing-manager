@@ -56,7 +56,6 @@ export function ContentNames() {
     data: items = [],
     isLoading,
     isError,
-    error,
     refetch,
     isFetching,
   } = useQuery({
