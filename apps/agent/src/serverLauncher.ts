@@ -581,7 +581,9 @@ export class ServerLauncher {
    * (there is no per-session-type weather assignment in the dedicated
    * server protocol). */
   private buildWeatherSections(format: RaceFormatConfig): string[] {
-    const graphics = format.weatherGraphics.length > 0 ? format.weatherGraphics : ['3_clear'];
+    const graphics = Array.isArray(format.weatherGraphics) && format.weatherGraphics.length > 0
+      ? format.weatherGraphics
+      : ['3_clear'];
     const lines: string[] = [];
     graphics.forEach((id, index) => {
       lines.push(

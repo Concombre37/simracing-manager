@@ -72,7 +72,9 @@ export class RaceFormatsService {
       raceMinutes: format.raceMinutes,
       gridType: format.gridType as GridType,
       timeOfDay: format.timeOfDay ?? '16:30',
-      weatherGraphics: format.weatherGraphics,
+      weatherGraphics: Array.isArray(format.weatherGraphics) && format.weatherGraphics.length > 0
+        ? format.weatherGraphics
+        : ['3_clear'],
     };
   }
 }

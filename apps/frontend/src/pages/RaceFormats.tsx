@@ -194,7 +194,7 @@ function RaceFormatCard({
         )}
         <span className="inline-flex items-center gap-1">
           <CloudSun className="h-3.5 w-3.5" />
-          {format.weatherGraphics.join(', ')} · {format.timeOfDay ?? '16:30'}
+          {(format.weatherGraphics ?? ['3_clear']).join(', ')} · {format.timeOfDay ?? '16:30'}
         </span>
       </div>
     </Card>
@@ -231,7 +231,7 @@ function RaceFormatFormModal({
           raceMinutes: format.raceMinutes,
           gridType: format.gridType,
           timeOfDay: format.timeOfDay ?? '16:30',
-          weatherGraphics: format.weatherGraphics,
+          weatherGraphics: format.weatherGraphics ?? ['3_clear'],
         }
       : DEFAULT_INPUT,
   );
