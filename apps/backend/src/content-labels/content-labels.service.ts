@@ -46,8 +46,16 @@ function stringValue(value: unknown): string | undefined {
 function uniqueStations(stations: StationInfo[]): StationInfo[] {
   const byId = new Map<string, StationInfo>();
   for (const station of stations) {
-    if (station.stationId && !byId.has(station.stationId))
-      byId.set(station.stationId, station);
+    if (station.stationId && !byId.has(station.stationId)) {
+      // Some callers pass the full Prisma station row (including the large
+      // inventory JSON). Keep only the public presence fields; otherwise each
+      // content item would repeat the complete inventory in the response and
+      // JSON.stringify could fail with "Invalid string length".
+      byId.set(station.stationId, {
+        stationId: station.stationId,
+        name: station.name || station.stationId,
+      });
+    }
   }
   return [...byId.values()];
 }
