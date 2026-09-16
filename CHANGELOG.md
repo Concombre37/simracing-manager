@@ -1451,3 +1451,4 @@ Vérifié directement en base : sur un POD déjà mis à jour en v2.2.56, les 21
 - Stream UDP local depuis l'app CSP Lua vers l'agent.
 - Fallback HTTP et fichier pour la télémétrie.
 
+
