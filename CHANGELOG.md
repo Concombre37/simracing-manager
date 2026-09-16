@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.2.178 — Noms robustes et configuration météo/heure
+
+- La page Noms affiche une reprise claire en cas de chargement incomplet et conserve les données déjà disponibles.
+- Les formats de course permettent de choisir l’heure simulée (16:30 par défaut) et les effets météo Assetto Corsa.
+- L’agent convertit l’heure choisie en SUN_ANGLE lors de la génération du serveur dédié.
+
+
+
 ## v2.2.177 — Transfert réel des mods\n\n- Corrige l’URL des archives partagées afin que les agents téléchargent bien le ZIP authentifié.\n- Le suivi Mods attend maintenant l’inventaire de chaque poste cible avant d’indiquer le transfert terminé.\n\n
 ## v2.2.176 — WoL dual-interface et relais admin
 
