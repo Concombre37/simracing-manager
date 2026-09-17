@@ -3,7 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { PageTransition } from '../components/PageTransition';
 import { Modal } from '../components/ui/Modal';
-import { dedicatedServersApi, type DedicatedServer } from '../services/dedicatedServers';
+import {
+  dedicatedServersApi,
+  type DedicatedServer,
+  type SpectatorAssignment,
+} from '../services/dedicatedServers';
 import { sessionsApi } from '../services/sessions';
 import { spectatorApi, type ScreenRecording } from '../services/spectator';
 import { stationsApi } from '../services/stations';
@@ -19,6 +23,7 @@ import {
   Play,
   Radio,
   Server,
+  Square,
   Trash2,
   Users,
   Wifi,
@@ -34,7 +39,6 @@ export function Spectator() {
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [spectatorLaunchMessage, setSpectatorLaunchMessage] = useState<string | null>(null);
   const [spectatorLaunchError, setSpectatorLaunchError] = useState<string | null>(null);
-  const [spectatingServerId, setSpectatingServerId] = useState<string | null>(null);
   const [confirmServer, setConfirmServer] = useState<DedicatedServer | null>(null);
   const [title, setTitle] = useState('Capture spectator');
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -59,6 +63,11 @@ export function Spectator() {
   const recordings = useQuery({
     queryKey: ['spectator-recordings'],
     queryFn: spectatorApi.listRecordings,
+  });
+  const spectatorAssignments = useQuery({
+    queryKey: ['spectator-assignments'],
+    queryFn: dedicatedServersApi.getSpectateStatus,
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
@@ -87,12 +96,12 @@ export function Spectator() {
   const spectateMutation = useMutation({
     mutationFn: (serverId: string) => dedicatedServersApi.spectate(serverId),
     onSuccess: (result, serverId) => {
-      setSpectatingServerId(serverId);
       setSpectatorLaunchError(null);
       setSpectatorLaunchMessage(
         `Le poste ${result.spectatorStationId} rejoint le serveur avec la voiture du slot ${result.reservedSlot}. La capture démarre automatiquement.`,
       );
       void queryClient.invalidateQueries({ queryKey: ['stations'] });
+      void queryClient.invalidateQueries({ queryKey: ['spectator-assignments'] });
     },
     onError: (error: unknown) => {
       const responseMessage = (error as { response?: { data?: { message?: string | string[] } } })
@@ -105,6 +114,16 @@ export function Spectator() {
       );
     },
   });
+  const stopSpectatingMutation = useMutation({
+    mutationFn: dedicatedServersApi.stopSpectating,
+    onSuccess: () => {
+      setSpectatorLaunchError(null);
+      setSpectatorLaunchMessage('Le poste spectateur a quitté le serveur. Assetto et la capture sont arrêtés.');
+      void queryClient.invalidateQueries({ queryKey: ['spectator-assignments'] });
+      void queryClient.invalidateQueries({ queryKey: ['stations'] });
+    },
+    onError: () => setSpectatorLaunchError('Impossible de retirer le poste spectateur du serveur.'),
+  });
 
   const activeServers = useMemo(
     () => (servers.data ?? []).filter((server) => server.status === 'running'),
@@ -116,7 +135,7 @@ export function Spectator() {
   );
 
   function requestSpectatorLaunch(server: DedicatedServer) {
-    if (spectatingServerId === server.id) {
+    if (spectatorAssignments.data?.some((assignment) => assignment.server.id === server.id)) {
       setConfirmServer(server);
       return;
     }
@@ -289,6 +308,13 @@ export function Spectator() {
             {recordings.data?.length === 0 && <p className="col-span-full rounded-lg border border-dashed border-white/10 p-8 text-center text-sm text-gray-500">Aucune rediffusion enregistrée.</p>}
           </div>
         </section>
+
+        <SpectatorActivity
+          assignments={spectatorAssignments.data ?? []}
+          isLoading={spectatorAssignments.isLoading}
+          isStopping={stopSpectatingMutation.isPending}
+          onStop={(assignmentId) => stopSpectatingMutation.mutate(assignmentId)}
+        />
       </div>
     </PageTransition>
   );
@@ -296,6 +322,58 @@ export function Spectator() {
 
 function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number }) {
   return <div className="rounded-lg border border-white/10 bg-dark-900/60 px-4 py-3"><div className="flex items-center gap-2 text-xs text-gray-500"><Icon className="h-4 w-4 text-racing-cyan" />{label}</div><p className="mt-1 font-hud text-3xl font-bold text-white">{value}</p></div>;
+}
+
+function SpectatorActivity({
+  assignments,
+  isLoading,
+  isStopping,
+  onStop,
+}: {
+  assignments: SpectatorAssignment[];
+  isLoading: boolean;
+  isStopping: boolean;
+  onStop: (assignmentId: string) => void;
+}) {
+  return (
+    <section className="rounded-xl border border-racing-cyan/20 bg-gradient-to-r from-racing-cyan/[0.08] to-dark-900/60 p-5">
+      <div className="flex items-center gap-2">
+        <MonitorPlay className="h-5 w-5 text-racing-cyan" />
+        <div>
+          <h2 className="font-hud text-xl font-bold text-white">Spectateur actif</h2>
+          <p className="mt-0.5 text-xs text-gray-400">État enregistré et mis à jour automatiquement.</p>
+        </div>
+      </div>
+      {isLoading ? (
+        <p className="mt-4 text-sm text-gray-500">Chargement de l’état…</p>
+      ) : assignments.length === 0 ? (
+        <p className="mt-4 rounded-lg border border-dashed border-white/10 px-4 py-5 text-sm text-gray-500">Aucun poste spectateur n’est actuellement sur un serveur.</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {assignments.map((assignment) => (
+            <div key={assignment.id} className="flex flex-wrap items-center gap-4 rounded-lg border border-racing-cyan/20 bg-black/20 p-4">
+              <div className="grid h-10 w-10 place-items-center rounded-md bg-racing-cyan/10 text-racing-cyan"><Radio className="h-4 w-4" /></div>
+              <div className="min-w-[180px] flex-1">
+                <p className="font-hud font-bold text-white">{assignment.server.name}</p>
+                <p className="mt-1 font-hud-mono text-[11px] text-gray-400">
+                  {assignment.station.name} · {assignment.server.track}{assignment.server.trackLayout ? ` (${assignment.server.trackLayout})` : ''} · {assignment.carAcId}
+                </p>
+              </div>
+              <span className="rounded border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 font-hud-mono text-[11px] text-emerald-200">ACTIF</span>
+              <button
+                type="button"
+                onClick={() => onStop(assignment.id)}
+                disabled={isStopping}
+                className="flex items-center gap-1.5 rounded border border-red-400/40 px-3 py-2 text-xs font-bold text-red-200 hover:bg-red-500/10 disabled:opacity-40"
+              >
+                <Square className="h-3.5 w-3.5" /> Retirer du serveur
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function RecordingCard({ recording, onDelete }: { recording: ScreenRecording; onDelete: () => void }) {

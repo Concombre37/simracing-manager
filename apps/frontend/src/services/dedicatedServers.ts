@@ -75,6 +75,20 @@ export interface SpectatorLaunchResult {
   reservedSlot: number;
 }
 
+export interface SpectatorAssignment {
+  id: string;
+  carAcId: string;
+  startedAt: string;
+  station: { id: string; stationId: string; name: string; status: string };
+  server: {
+    id: string;
+    name: string;
+    track: string;
+    trackLayout: string | null;
+    status: string;
+  };
+}
+
 export const dedicatedServersApi = {
   getAll: () => api.get<DedicatedServer[]>('/dedicated-servers').then((res) => res.data),
   getById: (id: string) =>
@@ -99,4 +113,8 @@ export const dedicatedServersApi = {
   ) => api.post(`/dedicated-servers/${id}/join`, { pods }).then((res) => res.data),
   spectate: (id: string) =>
     api.post<SpectatorLaunchResult>(`/dedicated-servers/${id}/spectate`).then((res) => res.data),
+  getSpectateStatus: () =>
+    api.get<SpectatorAssignment[]>('/dedicated-servers/spectate-status').then((res) => res.data),
+  stopSpectating: (assignmentId: string) =>
+    api.post('/dedicated-servers/spectate/stop', { assignmentId }).then((res) => res.data),
 };

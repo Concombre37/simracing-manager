@@ -52,6 +52,7 @@ model Station {
   dedicatedServers DedicatedServer[]
   contentPreviews ContentPreview[]
   blankingMedia   BlankingMedia[]
+  spectatorAssignment SpectatorAssignment?
 
   @@map("stations")
 }
@@ -168,7 +169,26 @@ model DedicatedServer {
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 
+  spectatorAssignments SpectatorAssignment[]
+
   @@map("dedicated_servers")
+}
+
+/// Current dedicated-server target for a physical spectator station. It is
+/// separate from player sessions, so spectator laps can never affect results.
+model SpectatorAssignment {
+  id        String   @id @default(uuid()) @db.Uuid
+  stationId String   @unique @map("station_id") @db.Uuid
+  serverId  String   @map("server_id") @db.Uuid
+  carAcId   String   @map("car_ac_id")
+  startedAt DateTime @default(now()) @map("started_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  station Station         @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  server  DedicatedServer @relation(fields: [serverId], references: [id], onDelete: Cascade)
+
+  @@index([serverId])
+  @@map("spectator_assignments")
 }
 
 // Reusable Practice/Qualifying/Race preset for dedicated servers — created

@@ -5,6 +5,7 @@
 - La page Spectateur permet désormais de lancer directement le poste spectateur sur n'importe quel serveur actif.
 - Le poste sélectionne automatiquement la première voiture configurée du serveur, correspondant au slot spectateur réservé lors d'une création à 11 slots.
 - La connexion spectateur ne crée ni session pilote ni résultat, afin que la capture et le classement des clients restent séparés.
+- L’état du ou des postes spectateurs actifs est conservé en base, affiché en bas de la page et peut être arrêté proprement depuis cette même interface.
 
 ## v2.2.178 — Noms robustes et configuration météo/heure
 

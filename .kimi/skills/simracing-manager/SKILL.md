@@ -32,7 +32,7 @@ The agent release chain is cumulative. Do not remove an older fix because a late
 - v2.2.175: fleet Mods workflow, admin inventory visibility, leaderboard driver attribution fix, missing-mod sorting and source-to-station content propagation.
 - v2.2.176: dual-interface Wake-on-LAN relay and admin fallback for the Windows host.
 - v2.2.177–v2.2.178: reliable Mods archive URLs/status, resilient content-name loading, configurable race time and weather.
-- v2.2.179: the Spectator dashboard can send the online spectator station to any running dedicated server using its deterministic first-car slot. This is a backend/frontend deployment; it requires no new agent artifact.
+- v2.2.179: the Spectator dashboard can send the online spectator station to any running dedicated server using its deterministic first-car slot, shows its persisted active target, and can stop it cleanly. This is a backend/frontend deployment; it requires no new agent artifact.
 
 The complete historical detail lives in CHANGELOG.md and GitHub releases.
 
@@ -69,7 +69,7 @@ All backend routes use the global /api prefix unless stated otherwise.
 - Mods propagation (v2.2.175): admin calls POST /stations/:id/share-content with {type, acId, targetStationIds}. The source agent receives Socket.IO content:share, archives only the validated AC folder, and uploads multipart to POST /content/source-upload. The server stores the archive in ContentPackage.archiveData and emits content:sync to targets. Migration: 20260912160000_add_content_package_data.
 - Agent namespace: /agent. Shared events include content:sync, content:share, agent:content, agent:results, status/heartbeat, launch/join, blanking, power and logs.
 - Results/leaderboard: GET /leaderboard and GET /leaderboard/history. A multi-driver result must attribute each clean lap to its driver/car index; never use the session client name blindly.
-- Spectator: `/spectator` dashboard, public `/spectator/screen`, recording/live capture endpoints, and `POST /dedicated-servers/:id/spectate`. The endpoint selects the first connected spectator station and sends it to the server with `cars[0]`; do not create a player Session or publish spectator results.
+- Spectator: `/spectator` dashboard, public `/spectator/screen`, recording/live capture endpoints, `POST /dedicated-servers/:id/spectate`, `GET /dedicated-servers/spectate-status`, and `POST /dedicated-servers/spectate/stop`. Assignments persist in `spectator_assignments`; do not create a player Session or publish spectator results.
 - Tablet: /tablet-menu is handled by TabletMenuHtmlController, outside the normal static fallback. Do not break its modulepreload injection.
 
 ## Content and Mods rules

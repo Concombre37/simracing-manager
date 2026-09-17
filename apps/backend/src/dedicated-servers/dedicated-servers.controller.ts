@@ -91,6 +91,20 @@ export class DedicatedServersController {
     return this.dedicatedServersService.findAll();
   }
 
+  @Get('spectate-status')
+  @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
+  getSpectateStatus() {
+    return this.prisma.spectatorAssignment.findMany({
+      orderBy: { startedAt: 'asc' },
+      include: {
+        station: { select: { id: true, stationId: true, name: true, status: true } },
+        server: {
+          select: { id: true, name: true, track: true, trackLayout: true, status: true },
+        },
+      },
+    });
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
   findOne(@Param('id') id: string) {
@@ -290,11 +304,33 @@ export class DedicatedServersController {
       // session. The agent still opens AC and starts live capture.
     });
 
+    await this.prisma.spectatorAssignment.upsert({
+      where: { stationId: spectator.id },
+      create: { stationId: spectator.id, serverId: server.id, carAcId },
+      update: { serverId: server.id, carAcId, startedAt: new Date() },
+    });
+
     return {
       success: true,
       spectatorStationId: spectator.stationId,
       carAcId,
       reservedSlot: 1,
     };
+  }
+
+  @Post('spectate/stop')
+  @Roles(UserRole.ADMIN)
+  async stopSpectating(@Body() body: { assignmentId?: string }) {
+    const assignmentId = String(body.assignmentId ?? '').trim();
+    if (!assignmentId) throw new BadRequestException('Spectator assignment is required');
+    const assignment = await this.prisma.spectatorAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { station: true },
+    });
+    if (!assignment) throw new BadRequestException('Spectator assignment not found');
+
+    await this.agentGateway.emitStop(assignment.station.stationId);
+    await this.prisma.spectatorAssignment.delete({ where: { id: assignment.id } });
+    return { success: true, spectatorStationId: assignment.station.stationId };
   }
 }
