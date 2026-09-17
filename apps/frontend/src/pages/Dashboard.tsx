@@ -4,7 +4,11 @@ import { Link } from 'react-router-dom';
 import { PageTransition } from '../components/PageTransition';
 import { FleetQuickControl } from '../components/FleetQuickControl';
 import { stationsApi, type Station } from '../services/stations';
-import { dedicatedServersApi, type DedicatedServer } from '../services/dedicatedServers';
+import {
+  dedicatedServersApi,
+  type DedicatedServer,
+  type SpectatorAssignment,
+} from '../services/dedicatedServers';
 import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { findTrackName } from '../utils/track';
 import { sortStations } from '../utils/stations';
@@ -139,6 +143,11 @@ export function Dashboard() {
     queryFn: sessionsApi.getActive,
     refetchInterval: 10000,
   });
+  const { data: spectatorAssignments } = useQuery({
+    queryKey: ['spectator-assignments'],
+    queryFn: dedicatedServersApi.getSpectateStatus,
+    refetchInterval: 5000,
+  });
 
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -149,6 +158,10 @@ export function Dashboard() {
   const simulatorStations = useMemo(
     () =>
       sortStations((stations ?? []).filter((s) => s.role === 'simulator')),
+    [stations],
+  );
+  const spectatorStations = useMemo(
+    () => (stations ?? []).filter((station) => station.role === 'spectator'),
     [stations],
   );
   const onlinePods = simulatorStations.filter((s) => s.status !== 'offline').length;
@@ -345,6 +358,12 @@ export function Dashboard() {
 
         <FleetQuickControl stations={stations ?? []} />
 
+        <SpectatorControl
+          stations={spectatorStations}
+          assignments={spectatorAssignments ?? []}
+          labelMap={labelMap}
+        />
+
         <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1.85fr)_minmax(280px,1fr)]">
           {/* PARC */}
           <div className="flex min-w-0 flex-col gap-7">
@@ -452,6 +471,114 @@ export function Dashboard() {
         </div>
       </div>
     </PageTransition>
+  );
+}
+
+function SpectatorControl({
+  stations,
+  assignments,
+  labelMap,
+}: {
+  stations: Station[];
+  assignments: SpectatorAssignment[];
+  labelMap: ContentLabelMap;
+}) {
+  const assignment = assignments[0];
+  const station = assignment
+    ? stations.find((item) => item.id === assignment.station.id) ?? assignment.station
+    : stations[0];
+  const isLive = Boolean(assignment);
+  const stationOnline = station && station.status !== 'offline';
+  const statusLabel = isLive ? 'En direct' : stationOnline ? 'Disponible' : 'Hors ligne';
+  const statusClass = isLive
+    ? 'text-racing-cyan'
+    : stationOnline
+      ? 'text-emerald-400'
+      : 'text-orange-400';
+  const trackName = assignment
+    ? findTrackName(assignment.server.track, undefined, labelMap)
+    : null;
+
+  return (
+    <section className="relative overflow-hidden rounded-2xl border border-violet-400/25 bg-gradient-to-br from-violet-500/[0.12] via-dark-900/80 to-dark-950 p-4 shadow-[0_0_40px_rgba(139,92,246,0.1)] sm:p-6">
+      <span className="absolute left-0 top-0 h-px w-full bg-gradient-to-r from-transparent via-violet-300/70 to-transparent" />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid h-11 w-11 flex-none place-items-center rounded-lg border border-violet-300/30 bg-violet-400/10 text-violet-200">
+            <Tv className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className="font-hud text-xl font-bold tracking-wide text-white">Régie spectateur</h2>
+              <span className={`font-hud-mono text-[11px] font-bold uppercase tracking-wider ${statusClass}`}>
+                {statusLabel}
+              </span>
+            </div>
+            <p className="mt-0.5 font-hud-mono text-[11px] text-gray-500">
+              {stations.length === 0
+                ? 'Aucun poste spectateur configuré'
+                : `${stations.length} poste${stations.length > 1 ? 's' : ''} dédié${stations.length > 1 ? 's' : ''} à la diffusion`}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/spectator"
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-violet-300/25 bg-violet-400/10 px-3.5 font-hud text-sm font-bold text-violet-100 transition-colors hover:border-violet-300/55 hover:bg-violet-400/15"
+          >
+            Gérer <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+          <Link
+            to="/spectator/screen"
+            className="inline-flex h-10 items-center gap-2 rounded-md bg-gradient-to-r from-violet-400 to-racing-cyan px-3.5 font-hud text-sm font-bold text-dark-950 transition-opacity hover:opacity-90"
+          >
+            <Play className="h-3.5 w-3.5" /> Écran
+          </Link>
+        </div>
+      </div>
+
+      {isLive && assignment ? (
+        <div className="mt-5 grid gap-px overflow-hidden rounded-xl border border-violet-300/15 bg-violet-300/15 sm:grid-cols-3">
+          <SpectatorMetric label="Poste" value={assignment.station.name} />
+          <SpectatorMetric label="Serveur suivi" value={assignment.server.name} accent />
+          <SpectatorMetric
+            label="Circuit"
+            value={trackName ?? assignment.server.track}
+            detail={assignment.server.trackLayout ?? undefined}
+          />
+        </div>
+      ) : stations.length > 0 ? (
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-dashed border-violet-300/20 bg-black/10 px-4 py-3 text-sm text-gray-400">
+          <span className={`h-2 w-2 rounded-full ${stationOnline ? 'bg-emerald-400 shadow-[0_0_8px_#24d17e]' : 'bg-orange-400'}`} />
+          <span>
+            {station?.name ?? 'Poste spectateur'} {stationOnline ? 'est prêt à rejoindre un serveur.' : 'est hors ligne.'}
+          </span>
+          <Link to="/spectator" className="font-hud text-sm font-bold text-violet-200 hover:text-white">
+            Choisir un serveur
+          </Link>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SpectatorMetric({
+  label,
+  value,
+  detail,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  detail?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="min-w-0 bg-dark-950/65 px-4 py-3.5">
+      <p className="font-hud text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-500">{label}</p>
+      <p className={`mt-1 truncate font-hud text-base font-bold ${accent ? 'text-racing-cyan' : 'text-white'}`}>{value}</p>
+      {detail && <p className="mt-0.5 truncate font-hud-mono text-[10px] text-gray-500">{detail}</p>}
+    </div>
   );
 }
 
