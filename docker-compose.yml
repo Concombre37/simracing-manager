@@ -33,7 +33,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
-      DATABASE_URL: postgresql://simracing:simracing@postgres:5432/simracing?schema=public
+      # Cap Prisma's pool: this host has many CPU cores, so its automatic pool can
+      # otherwise consume all PostgreSQL connections under concurrent dashboard polling.
+      DATABASE_URL: postgresql://simracing:simracing@postgres:5432/simracing?schema=public&connection_limit=20&pool_timeout=10
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       JWT_EXPIRES_IN: 7d
       CORS_ORIGIN: ${CORS_ORIGIN:-https://simracing.hytlabs.com}
