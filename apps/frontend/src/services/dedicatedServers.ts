@@ -68,6 +68,13 @@ export interface UpdateDedicatedServerData {
   rconPassword?: string;
 }
 
+export interface SpectatorLaunchResult {
+  success: boolean;
+  spectatorStationId: string;
+  carAcId: string;
+  reservedSlot: number;
+}
+
 export const dedicatedServersApi = {
   getAll: () => api.get<DedicatedServer[]>('/dedicated-servers').then((res) => res.data),
   getById: (id: string) =>
@@ -90,4 +97,6 @@ export const dedicatedServersApi = {
       durationMinutes?: number;
     }[],
   ) => api.post(`/dedicated-servers/${id}/join`, { pods }).then((res) => res.data),
+  spectate: (id: string) =>
+    api.post<SpectatorLaunchResult>(`/dedicated-servers/${id}/spectate`).then((res) => res.data),
 };

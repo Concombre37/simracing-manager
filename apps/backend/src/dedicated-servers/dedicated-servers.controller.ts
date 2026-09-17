@@ -224,4 +224,76 @@ export class DedicatedServersController {
 
     return { success: true, sessions };
   }
+
+  /**
+   * Sends one configured spectator station to a running dedicated server.
+   *
+   * A spectator deliberately has no Session row: it is a capture source,
+   * not a driver. This prevents its laps or race_out.json from polluting the
+   * customer leaderboard while still letting the Windows agent launch AC and
+   * start its automatic FFmpeg capture.
+   */
+  @Post(':id/spectate')
+  @Roles(UserRole.ADMIN)
+  async spectate(@Param('id') id: string) {
+    const server = await this.dedicatedServersService.findOne(id);
+    if (server.status !== 'running') {
+      throw new BadRequestException('The dedicated server is not running');
+    }
+
+    // CAR_0 in the generated entry list is always the first configured car.
+    // Keeping this choice deterministic gives the spectator its dedicated,
+    // predictable vehicle on the 11-slot server instead of a random car.
+    const carAcId = server.cars[0];
+    if (!carAcId) {
+      throw new BadRequestException('The dedicated server has no configured car');
+    }
+
+    const connected = new Set(this.agentGateway.getConnectedStationIds());
+    const spectators = await this.prisma.station.findMany({
+      where: { role: StationRole.SPECTATOR },
+      orderBy: { createdAt: 'asc' },
+    });
+    const spectator = spectators.find((station) => connected.has(station.stationId));
+    if (!spectator) {
+      throw new BadRequestException('No spectator station is online');
+    }
+
+    const host = server.station.localIp ?? '127.0.0.1';
+    const labelMap = await this.contentLabelsService.getMap();
+    const hostContent = server.station.content as StationContentShape | null;
+    const carName = formatCarName(
+      hostContent?.cars?.find((car) => car.acId === carAcId)?.name,
+      carAcId,
+      labelMap,
+    );
+    const trackName = formatTrackName(
+      hostContent?.tracks?.find((track) => track.acId === server.track)?.name,
+      server.track,
+      labelMap,
+    );
+
+    await this.agentGateway.emitJoinServer(spectator.stationId, {
+      host,
+      port: server.tcpPort ?? 9600,
+      httpPort: server.httpPort ?? 8081,
+      password: server.password ?? undefined,
+      carAcId,
+      carName,
+      track: server.track,
+      trackName,
+      trackLayout: server.trackLayout ?? undefined,
+      serverName: server.name,
+      clientName: 'Spectateur',
+      // No sessionId on purpose: this is a live capture, not a player's
+      // session. The agent still opens AC and starts live capture.
+    });
+
+    return {
+      success: true,
+      spectatorStationId: spectator.stationId,
+      carAcId,
+      reservedSlot: 1,
+    };
+  }
 }

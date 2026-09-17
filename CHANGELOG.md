@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.179 — Lancement spectateur immédiat
+
+- La page Spectateur permet désormais de lancer directement le poste spectateur sur n'importe quel serveur actif.
+- Le poste sélectionne automatiquement la première voiture configurée du serveur, correspondant au slot spectateur réservé lors d'une création à 11 slots.
+- La connexion spectateur ne crée ni session pilote ni résultat, afin que la capture et le classement des clients restent séparés.
+
 ## v2.2.178 — Noms robustes et configuration météo/heure
 
 - La page Noms affiche une reprise claire en cas de chargement incomplet et conserve les données déjà disponibles.

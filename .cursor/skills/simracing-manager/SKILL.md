@@ -13,7 +13,7 @@ Use this as the project operating guide. Treat the repository and GitHub as the 
 - Local workspace: C:/Users/Concombre/Documents/ChatGPT/simracing manager
 - Production URL: https://simracing.hytlabs.com
 - Production SSH alias: hytlabs; checkout: /root/sim-center-manager
-- Current main/tag: 7a43bd3, v2.2.176 (2026-09-13)
+- Current agent release: v2.2.178. Check GitHub/main before relying on a commit hash.
 - Stack: NestJS 10 + Prisma/PostgreSQL 16, React/Vite/Tailwind, Windows Node agent packaged with pkg, npm workspaces.
 - Agent source: apps/agent; legacy reference only: agent-legacy.
 - Never commit or delete the existing untracked transfer archives, transfer-box/, ws2025.png, or ws2025.ppm unless the user explicitly asks.
@@ -31,6 +31,8 @@ The agent release chain is cumulative. Do not remove an older fix because a late
 - v2.2.170–v2.2.174: menu public/subscriber prices limited to Cuisine/Bar, grams, reorderable categories/items, optional descriptions, tablet idle timeout and blanking security-bar fix.
 - v2.2.175: fleet Mods workflow, admin inventory visibility, leaderboard driver attribution fix, missing-mod sorting and source-to-station content propagation.
 - v2.2.176: dual-interface Wake-on-LAN relay and admin fallback for the Windows host.
+- v2.2.177–v2.2.178: reliable Mods archive URLs/status, resilient content-name loading, configurable race time and weather.
+- v2.2.179: the Spectator dashboard can send the online spectator station to any running dedicated server using its deterministic first-car slot. This is a backend/frontend deployment; it requires no new agent artifact.
 
 The complete historical detail lives in CHANGELOG.md and GitHub releases.
 
@@ -52,7 +54,7 @@ Station roles are simulator, admin, and spectator.
 
 - Simulator: player POD; may launch direct sessions and join dedicated servers.
 - Admin: hosting/control machine; may host dedicated servers and appear in Mods inventory, but must never be a player target.
-- Spectator: display/capture station; excluded from driving, fleet content comparison, joins and blanking commands unless a feature explicitly says otherwise.
+- Spectator: display/capture station; excluded from driving, fleet content comparison, player joins and blanking commands. The only exception is `POST /dedicated-servers/:id/spectate`, which launches it as a non-player capture source.
 
 Apply role checks in both frontend and backend. Never trust a UI filter as authorization.
 
@@ -67,7 +69,7 @@ All backend routes use the global /api prefix unless stated otherwise.
 - Mods propagation (v2.2.175): admin calls POST /stations/:id/share-content with {type, acId, targetStationIds}. The source agent receives Socket.IO content:share, archives only the validated AC folder, and uploads multipart to POST /content/source-upload. The server stores the archive in ContentPackage.archiveData and emits content:sync to targets. Migration: 20260912160000_add_content_package_data.
 - Agent namespace: /agent. Shared events include content:sync, content:share, agent:content, agent:results, status/heartbeat, launch/join, blanking, power and logs.
 - Results/leaderboard: GET /leaderboard and GET /leaderboard/history. A multi-driver result must attribute each clean lap to its driver/car index; never use the session client name blindly.
-- Spectator: /spectator dashboard, public /spectator/screen, recording/live capture endpoints documented in the backend module.
+- Spectator: `/spectator` dashboard, public `/spectator/screen`, recording/live capture endpoints, and `POST /dedicated-servers/:id/spectate`. The endpoint selects the first connected spectator station and sends it to the server with `cars[0]`; do not create a player Session or publish spectator results.
 - Tablet: /tablet-menu is handled by TabletMenuHtmlController, outside the normal static fallback. Do not break its modulepreload injection.
 
 ## Content and Mods rules
