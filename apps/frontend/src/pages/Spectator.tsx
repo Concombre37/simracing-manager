@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { PageTransition } from '../components/PageTransition';
-import { dedicatedServersApi } from '../services/dedicatedServers';
+import { Modal } from '../components/ui/Modal';
+import { dedicatedServersApi, type DedicatedServer } from '../services/dedicatedServers';
 import { sessionsApi } from '../services/sessions';
 import { spectatorApi, type ScreenRecording } from '../services/spectator';
 import { stationsApi } from '../services/stations';
@@ -33,6 +34,8 @@ export function Spectator() {
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [spectatorLaunchMessage, setSpectatorLaunchMessage] = useState<string | null>(null);
   const [spectatorLaunchError, setSpectatorLaunchError] = useState<string | null>(null);
+  const [spectatingServerId, setSpectatingServerId] = useState<string | null>(null);
+  const [confirmServer, setConfirmServer] = useState<DedicatedServer | null>(null);
   const [title, setTitle] = useState('Capture spectator');
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -83,7 +86,8 @@ export function Spectator() {
   });
   const spectateMutation = useMutation({
     mutationFn: (serverId: string) => dedicatedServersApi.spectate(serverId),
-    onSuccess: (result) => {
+    onSuccess: (result, serverId) => {
+      setSpectatingServerId(serverId);
       setSpectatorLaunchError(null);
       setSpectatorLaunchMessage(
         `Le poste ${result.spectatorStationId} rejoint le serveur avec la voiture du slot ${result.reservedSlot}. La capture démarre automatiquement.`,
@@ -110,6 +114,14 @@ export function Spectator() {
     () => (stations.data ?? []).filter((station) => station.role === 'spectator'),
     [stations.data],
   );
+
+  function requestSpectatorLaunch(server: DedicatedServer) {
+    if (spectatingServerId === server.id) {
+      setConfirmServer(server);
+      return;
+    }
+    spectateMutation.mutate(server.id);
+  }
 
   function startRecording() {
     setRecordingError(null);
@@ -170,6 +182,33 @@ export function Spectator() {
   return (
     <PageTransition>
       <div className="space-y-6">
+        {confirmServer && (
+          <Modal title="Relancer le spectateur ?" onClose={() => setConfirmServer(null)} size="sm">
+            <p className="text-sm leading-6 text-gray-300">
+              Le poste spectateur est déjà envoyé sur <strong className="text-white">{confirmServer.name}</strong>.
+              Relancer la connexion redémarrera sa vue et sa capture.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmServer(null)}
+                className="rounded border border-white/10 px-3 py-2 text-sm font-semibold text-gray-300 hover:text-white"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  spectateMutation.mutate(confirmServer.id);
+                  setConfirmServer(null);
+                }}
+                className="rounded bg-gradient-to-r from-racing-blue to-racing-cyan px-3 py-2 text-sm font-bold text-dark-950"
+              >
+                Confirmer
+              </button>
+            </div>
+          </Modal>
+        )}
         <div className="flex flex-wrap items-end gap-5">
           <div className="min-w-[260px] flex-1">
             <div className="mb-2 flex items-center gap-2 font-hud text-xs font-semibold uppercase tracking-[0.16em] text-racing-cyan">
@@ -215,7 +254,7 @@ export function Spectator() {
                     <span className="font-hud-mono text-xs text-emerald-300">{occupants}/{server.maxClients} pilotes</span>
                     <button
                       type="button"
-                      onClick={() => spectateMutation.mutate(server.id)}
+                      onClick={() => requestSpectatorLaunch(server)}
                       disabled={spectateMutation.isPending || spectatorStations.length === 0}
                       className="flex items-center gap-1.5 rounded bg-gradient-to-r from-racing-blue to-racing-cyan px-3 py-1.5 text-xs font-bold text-dark-950 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                       title={spectatorStations.length === 0 ? 'Aucun poste spectateur configuré' : 'Lancer le poste spectateur sur ce serveur'}
