@@ -241,6 +241,27 @@ export class DedicatedServersController {
   }
 
   /**
+   * Stops the spectator before the dynamic `:id/spectate` route below.
+   * Nest/Express otherwise reads "spectate" as a server UUID for the URL
+   * `/spectate/stop` and the stop command can never reach the agent.
+   */
+  @Post('spectate/stop')
+  @Roles(UserRole.ADMIN)
+  async stopSpectating(@Body() body: { assignmentId?: string }) {
+    const assignmentId = String(body.assignmentId ?? '').trim();
+    if (!assignmentId) throw new BadRequestException('Spectator assignment is required');
+    const assignment = await this.prisma.spectatorAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { station: true },
+    });
+    if (!assignment) throw new BadRequestException('Spectator assignment not found');
+
+    await this.agentGateway.emitStop(assignment.station.stationId);
+    await this.prisma.spectatorAssignment.delete({ where: { id: assignment.id } });
+    return { success: true, spectatorStationId: assignment.station.stationId };
+  }
+
+  /**
    * Sends one configured spectator station to a running dedicated server.
    *
    * A spectator deliberately has no Session row: it is a capture source,
@@ -319,19 +340,4 @@ export class DedicatedServersController {
     };
   }
 
-  @Post('spectate/stop')
-  @Roles(UserRole.ADMIN)
-  async stopSpectating(@Body() body: { assignmentId?: string }) {
-    const assignmentId = String(body.assignmentId ?? '').trim();
-    if (!assignmentId) throw new BadRequestException('Spectator assignment is required');
-    const assignment = await this.prisma.spectatorAssignment.findUnique({
-      where: { id: assignmentId },
-      include: { station: true },
-    });
-    if (!assignment) throw new BadRequestException('Spectator assignment not found');
-
-    await this.agentGateway.emitStop(assignment.station.stationId);
-    await this.prisma.spectatorAssignment.delete({ where: { id: assignment.id } });
-    return { success: true, spectatorStationId: assignment.station.stationId };
-  }
 }

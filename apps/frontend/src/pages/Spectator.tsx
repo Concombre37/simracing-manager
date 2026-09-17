@@ -122,7 +122,15 @@ export function Spectator() {
       void queryClient.invalidateQueries({ queryKey: ['spectator-assignments'] });
       void queryClient.invalidateQueries({ queryKey: ['stations'] });
     },
-    onError: () => setSpectatorLaunchError('Impossible de retirer le poste spectateur du serveur.'),
+    onError: (error: unknown) => {
+      const responseMessage = (error as { response?: { data?: { message?: string | string[] } } })
+        .response?.data?.message;
+      setSpectatorLaunchError(
+        Array.isArray(responseMessage)
+          ? responseMessage.join(', ')
+          : responseMessage ?? 'Impossible de retirer le poste spectateur du serveur.',
+      );
+    },
   });
 
   const activeServers = useMemo(
