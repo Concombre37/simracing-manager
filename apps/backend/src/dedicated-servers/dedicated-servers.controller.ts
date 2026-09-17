@@ -8,6 +8,7 @@ import {
   Param,
   UseGuards,
   Logger,
+  BadRequestException,
 } from '@nestjs/common';
 import { DedicatedServersService } from './dedicated-servers.service';
 import {
