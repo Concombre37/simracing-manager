@@ -1153,7 +1153,7 @@ export class SimRacingAgent {
     this.logger.info('Received shutdown command');
     try {
       if (process.platform === 'win32') {
-        execFile('shutdown', ['/s', '/t', '0']);
+        this.requestWindowsPowerAction('/s', 'shutdown');
       } else {
         this.logger.warn('Shutdown command is only implemented on Windows');
       }
@@ -1166,7 +1166,7 @@ export class SimRacingAgent {
     this.logger.info('Received restart command');
     try {
       if (process.platform === 'win32') {
-        execFile('shutdown', ['/r', '/t', '0']);
+        this.requestWindowsPowerAction('/r', 'restart');
       } else {
         this.logger.warn('Restart command is only implemented on Windows');
       }
@@ -1363,6 +1363,26 @@ export class SimRacingAgent {
     } catch (err) {
       this.logger.error({ err, type: payload.type, acId: payload.acId }, 'Content share failed');
     }
+  }
+
+  /**
+   * Use Windows' native executable and force-close pending applications.
+   * Without /f, Assetto Corsa, Content Manager, or an unattended dialog can
+   * veto the request silently, leaving the dashboard to report a command that
+   * never changes the station's state. The callback also captures failures
+   * that happen asynchronously after execFile has returned.
+   */
+  private requestWindowsPowerAction(action: '/s' | '/r', label: 'shutdown' | 'restart'): void {
+    const shutdownExe = process.env.SystemRoot
+      ? path.join(process.env.SystemRoot, 'System32', 'shutdown.exe')
+      : 'shutdown.exe';
+    execFile(shutdownExe, [action, '/f', '/t', '0'], (error, _stdout, stderr) => {
+      if (error) {
+        this.logger.error({ err: error, stderr }, `Windows ${label} command failed`);
+        return;
+      }
+      this.logger.info(`Windows ${label} command accepted`);
+    });
   }
 
   /** Load the official leaderboard from sessions already archived in the

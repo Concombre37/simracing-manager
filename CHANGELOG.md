@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.181 — Commandes d’alimentation fiables
+
+- Les commandes d’arrêt et de redémarrage Windows ferment désormais explicitement Assetto Corsa, Content Manager et les fenêtres bloquantes avant d’éteindre ou redémarrer le poste.
+- L’agent utilise l’exécutable Windows natif et consigne les éventuelles erreurs de lancement afin qu’elles soient visibles dans les logs de la station.
+
 ## v2.2.180 — Transition visuelle spectateur
 
 - Le poste spectateur affiche désormais l’écran de lancement animé pendant chaque changement de serveur.
