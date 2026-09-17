@@ -2,6 +2,12 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: simracing-postgres
+    command:
+      - postgres
+      - -c
+      - max_connections=300
+      - -c
+      - superuser_reserved_connections=10
     privileged: true
     restart: unless-stopped
     environment:
