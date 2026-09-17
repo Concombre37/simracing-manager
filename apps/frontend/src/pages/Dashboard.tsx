@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { PageTransition } from '../components/PageTransition';
 import { FleetQuickControl } from '../components/FleetQuickControl';
@@ -13,7 +13,19 @@ import { sessionsApi, type ActiveSession } from '../services/sessions';
 import { findTrackName } from '../utils/track';
 import { sortStations } from '../utils/stations';
 import { useContentLabelMap, type ContentLabelMap } from '../services/contentLabels';
-import { Monitor, Server, Play, Zap, ArrowRight, Plus, Tv, AlertTriangle } from 'lucide-react';
+import {
+  Monitor,
+  Server,
+  Play,
+  Zap,
+  ArrowRight,
+  Plus,
+  Tv,
+  AlertTriangle,
+  Power,
+  PowerOff,
+  RotateCw,
+} from 'lucide-react';
 
 function useCountUp(target: number, duration = 900) {
   const [value, setValue] = useState(0);
@@ -483,6 +495,7 @@ function SpectatorControl({
   assignments: SpectatorAssignment[];
   labelMap: ContentLabelMap;
 }) {
+  const queryClient = useQueryClient();
   const assignment = assignments[0];
   const station = assignment
     ? stations.find((item) => item.id === assignment.station.id) ?? assignment.station
@@ -498,6 +511,56 @@ function SpectatorControl({
   const trackName = assignment
     ? findTrackName(assignment.server.track, undefined, labelMap)
     : null;
+  const [powerFeedback, setPowerFeedback] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+  const powerMutation = useMutation({
+    mutationFn: async (action: 'wake' | 'restart' | 'shutdown') => {
+      if (!station) throw new Error('Aucun poste spectateur configuré.');
+      if (action === 'wake') return stationsApi.wake(station.id);
+      if (action === 'restart') return stationsApi.restart(station.id);
+      return stationsApi.shutdown(station.id);
+    },
+    onSuccess: (_result, action) => {
+      setPowerFeedback({
+        type: 'success',
+        message:
+          action === 'wake'
+            ? 'Demande d’allumage envoyée au poste spectateur.'
+            : action === 'restart'
+              ? 'Redémarrage envoyé au poste spectateur.'
+              : 'Extinction envoyée au poste spectateur.',
+      });
+    },
+    onError: (error) => {
+      const apiError = error as { response?: { data?: { message?: string } }; message?: string };
+      setPowerFeedback({
+        type: 'error',
+        message: apiError.response?.data?.message ?? apiError.message ?? 'Commande impossible.',
+      });
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['stations'] });
+      void queryClient.invalidateQueries({ queryKey: ['spectator-assignments'] });
+    },
+  });
+
+  function sendPowerAction(action: 'wake' | 'restart' | 'shutdown') {
+    if (powerMutation.isPending || !station) return;
+    if (
+      action !== 'wake' &&
+      !window.confirm(
+        action === 'restart'
+          ? 'Redémarrer le poste spectateur ? La diffusion en cours sera interrompue.'
+          : 'Éteindre le poste spectateur ? La diffusion en cours sera interrompue.',
+      )
+    ) {
+      return;
+    }
+    setPowerFeedback(null);
+    powerMutation.mutate(action);
+  }
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-violet-400/25 bg-gradient-to-br from-violet-500/[0.12] via-dark-900/80 to-dark-950 p-4 shadow-[0_0_40px_rgba(139,92,246,0.1)] sm:p-6">
@@ -558,7 +621,83 @@ function SpectatorControl({
           </Link>
         </div>
       ) : null}
+
+      {stations.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-violet-300/15 pt-4">
+          <span className="mr-1 font-hud-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-500">
+            Alimentation
+          </span>
+          <SpectatorPowerButton
+            icon={Power}
+            label="Allumer"
+            tone="success"
+            loading={powerMutation.isPending && powerMutation.variables === 'wake'}
+            disabled={powerMutation.isPending || Boolean(stationOnline)}
+            onClick={() => sendPowerAction('wake')}
+          />
+          <SpectatorPowerButton
+            icon={RotateCw}
+            label="Redémarrer"
+            loading={powerMutation.isPending && powerMutation.variables === 'restart'}
+            disabled={powerMutation.isPending || !stationOnline}
+            onClick={() => sendPowerAction('restart')}
+          />
+          <SpectatorPowerButton
+            icon={PowerOff}
+            label="Éteindre"
+            tone="danger"
+            loading={powerMutation.isPending && powerMutation.variables === 'shutdown'}
+            disabled={powerMutation.isPending || !stationOnline}
+            onClick={() => sendPowerAction('shutdown')}
+          />
+        </div>
+      )}
+
+      {powerFeedback && (
+        <p
+          className={`mt-3 rounded-lg border px-3 py-2 text-xs ${powerFeedback.type === 'success' ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200' : 'border-red-500/30 bg-red-500/10 text-red-300'}`}
+        >
+          {powerFeedback.message}
+        </p>
+      )}
     </section>
+  );
+}
+
+function SpectatorPowerButton({
+  icon: Icon,
+  label,
+  tone = 'neutral',
+  loading,
+  disabled,
+  onClick,
+}: {
+  icon: React.ElementType;
+  label: string;
+  tone?: 'neutral' | 'success' | 'danger';
+  loading: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const toneClass = {
+    neutral: 'border-violet-300/25 bg-violet-400/[0.07] text-violet-100 hover:border-violet-300/50 hover:bg-violet-400/15',
+    success: 'border-emerald-500/25 bg-emerald-500/[0.08] text-emerald-200 hover:border-emerald-400/50 hover:bg-emerald-500/15',
+    danger: 'border-red-500/25 bg-red-500/[0.08] text-red-200 hover:border-red-400/50 hover:bg-red-500/15',
+  }[tone];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 font-hud text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-35 ${toneClass}`}
+    >
+      {loading ? (
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        <Icon className="h-3.5 w-3.5" />
+      )}
+      {label}
+    </button>
   );
 }
 
