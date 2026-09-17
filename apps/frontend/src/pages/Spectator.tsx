@@ -95,7 +95,7 @@ export function Spectator() {
   });
   const spectateMutation = useMutation({
     mutationFn: (serverId: string) => dedicatedServersApi.spectate(serverId),
-    onSuccess: (result, serverId) => {
+    onSuccess: (result) => {
       setSpectatorLaunchError(null);
       setSpectatorLaunchMessage(
         `Le poste ${result.spectatorStationId} rejoint le serveur avec la voiture du slot ${result.reservedSlot}. La capture démarre automatiquement.`,
