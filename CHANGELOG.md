@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.180 — Transition visuelle spectateur
+
+- Le poste spectateur affiche désormais l’écran de lancement animé pendant chaque changement de serveur.
+- L’écran reste présent pendant le chargement puis se retire dès qu’Assetto Corsa est réellement prêt ; le mur de diffusion revient ensuite automatiquement.
+
 ## v2.2.179 — Lancement spectateur immédiat
 
 - La page Spectateur permet désormais de lancer directement le poste spectateur sur n'importe quel serveur actif.

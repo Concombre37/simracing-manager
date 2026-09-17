@@ -87,6 +87,8 @@ export class SimRacingAgent {
     bestInvalidLapMs?: number;
     lastSeenLapCount?: number;
   } | null = null;
+  /** Enabled only while the spectator switches between dedicated servers. */
+  private spectatorTransitionActive = false;
   private resultsTimeout: NodeJS.Timeout | null = null;
   /** Bumped by every new session start (handleLaunch/handleJoinServer).
    * endSession()'s teardown spans several long awaits (acLauncher.quit() —
@@ -948,6 +950,11 @@ export class SimRacingAgent {
    * eat 10-15s that would otherwise silently come out of the session length.
    */
   private handleSessionRevealed(): void {
+    if (this.spectatorTransitionActive) {
+      this.spectatorTransitionActive = false;
+      this.blankingManager.setEnabled(false);
+      return;
+    }
     if (!this.currentSession || this.currentSession.revealed) return;
     this.currentSession.revealed = true;
     this.currentSession.startedAt = Date.now();
@@ -1232,11 +1239,21 @@ export class SimRacingAgent {
     difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
     gearbox?: 'MANUAL' | 'AUTO';
     sessionId?: string;
+    spectator?: boolean;
   }): Promise<void> {
     this.logger.info(payload, 'Received join server command');
     this.sessionGeneration += 1;
     this.clearResultsTimeout();
     this.clearCurrentSession();
+    const isSpectatorTransition = payload.spectator === true;
+    if (isSpectatorTransition) {
+      this.spectatorTransitionActive = true;
+      // A previous server can still expose shared memory while AC is being
+      // replaced. Reset it so it cannot reveal the new loading screen.
+      this.blankingManager.setAcRunning(false);
+      this.blankingManager.setAcLoaded(false);
+      this.blankingManager.setEnabled(true);
+    }
     // Shown immediately, before AC/Content Manager is even spawned below: any
     // restart this causes (dropping the plain waiting screen for this one)
     // happens in isolation, before the launcher's own window exists to race
@@ -1307,6 +1324,10 @@ export class SimRacingAgent {
       // Otherwise the POD is left stuck on the launching screen forever —
       // there was never a game to reveal it from.
       this.blankingManager.setAuto();
+      if (isSpectatorTransition) {
+        this.spectatorTransitionActive = false;
+        this.blankingManager.setEnabled(false);
+      }
     }
   }
 

@@ -82,6 +82,7 @@ export interface ServerToAgentEvents {
     difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
     gearbox?: 'MANUAL' | 'AUTO';
     sessionId?: string;
+    spectator?: boolean;
   }) => void;
   'server:launch': (payload: LaunchDedicatedServerPayload) => void;
   'server:stop': (payload: { serverId: string }) => void;

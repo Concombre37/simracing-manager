@@ -300,6 +300,7 @@ export class DedicatedServersController {
       trackLayout: server.trackLayout ?? undefined,
       serverName: server.name,
       clientName: 'Spectateur',
+      spectator: true,
       // No sessionId on purpose: this is a live capture, not a player's
       // session. The agent still opens AC and starts live capture.
     });

@@ -579,6 +579,7 @@ export class AgentGateway
       difficulty?: 'EASY' | 'PRO' | 'CUSTOM';
       gearbox?: 'MANUAL' | 'AUTO';
       sessionId?: string;
+      spectator?: boolean;
     },
   ): Promise<void> {
     const room = `station:${stationId}`;

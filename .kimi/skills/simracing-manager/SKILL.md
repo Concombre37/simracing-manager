@@ -13,7 +13,7 @@ Use this as the project operating guide. Treat the repository and GitHub as the 
 - Local workspace: C:/Users/Concombre/Documents/ChatGPT/simracing manager
 - Production URL: https://simracing.hytlabs.com
 - Production SSH alias: hytlabs; checkout: /root/sim-center-manager
-- Current agent release: v2.2.178. Check GitHub/main before relying on a commit hash.
+- Current agent release: v2.2.180. Check GitHub/main before relying on a commit hash.
 - Stack: NestJS 10 + Prisma/PostgreSQL 16, React/Vite/Tailwind, Windows Node agent packaged with pkg, npm workspaces.
 - Agent source: apps/agent; legacy reference only: agent-legacy.
 - Never commit or delete the existing untracked transfer archives, transfer-box/, ws2025.png, or ws2025.ppm unless the user explicitly asks.
@@ -33,6 +33,7 @@ The agent release chain is cumulative. Do not remove an older fix because a late
 - v2.2.176: dual-interface Wake-on-LAN relay and admin fallback for the Windows host.
 - v2.2.177–v2.2.178: reliable Mods archive URLs/status, resilient content-name loading, configurable race time and weather.
 - v2.2.179: the Spectator dashboard can send the online spectator station to any running dedicated server using its deterministic first-car slot, shows its persisted active target, and can stop it cleanly. This is a backend/frontend deployment; it requires no new agent artifact.
+- v2.2.180: spectator server switches show the themed launching blanking until AC is ready, then restore the broadcast wall.
 
 The complete historical detail lives in CHANGELOG.md and GitHub releases.
 
