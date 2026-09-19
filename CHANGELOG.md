@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.184 — Skins réellement aléatoires
+
+- Chaque emplacement de serveur choisit maintenant un skin existant dans le dossier de la voiture.
+
 ## v2.2.183 — Noms personnalisés des voitures dans les résultats
 
 - Le classement de fin de session utilise désormais le même nom de voiture personnalisé que l’en-tête du résultat.

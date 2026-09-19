@@ -175,7 +175,7 @@ export class ServerLauncher {
     const entryListPath = path.join(serverDir, 'entry_list.ini');
     const logPath = path.join(serverDir, 'server.log');
 
-    await this.writeServerConfig(serverDir, payload, mainPort, httpPort);
+    await this.writeServerConfig(acPath, serverDir, payload, mainPort, httpPort);
 
     const child = spawn(serverExe, ['-c', cfgPath, '-e', entryListPath], {
       cwd: path.dirname(serverExe),
@@ -450,6 +450,7 @@ export class ServerLauncher {
   }
 
   private async writeServerConfig(
+    acPath: string,
     serverDir: string,
     payload: LaunchDedicatedServerPayload,
     mainPort: number,
@@ -526,9 +527,20 @@ export class ServerLauncher {
       ...this.buildWeatherSections(payload.raceFormat ?? DEFAULT_RACE_FORMAT),
     ].join('\n');
 
+    // Resolve skins once per car for this launch.  `SKIN=random` is not
+    // consistently honoured by every AC server build, so write an actual
+    // skin folder name that exists on this station instead.
+    const skinsByCar = new Map<string, string[]>();
+    for (const carId of uniqueCarIds) {
+      skinsByCar.set(carId, await listCarSkins(acPath, carId));
+    }
+
     let entryList = '';
     for (let i = 0; i < payload.maxClients; i++) {
-      entryList += `[CAR_${i}]\nMODEL=${carIds[i % carIds.length]}\nSKIN=random\nSPECTATOR_MODE=0\nDRIVERNAME=\nTEAM=\nGUID=\nBALLAST=0\n`;
+      const carId = carIds[i % carIds.length];
+      const skins = skinsByCar.get(carId) ?? [];
+      const skin = skins.length > 0 ? skins[Math.floor(Math.random() * skins.length)] : 'random';
+      entryList += `[CAR_${i}]\nMODEL=${carId}\nSKIN=${skin}\nSPECTATOR_MODE=0\nDRIVERNAME=\nTEAM=\nGUID=\nBALLAST=0\n`;
     }
 
     await fs.writeFile(serverCfgPath, serverCfg, 'utf-8');
@@ -614,6 +626,22 @@ function sunAngleFromTime(value: string): number {
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
   return Math.round((hours + minutes / 60 - 12) * 16);
+}
+
+/** Returns the real skin directory names installed for an AC car. */
+async function listCarSkins(acPath: string, carId: string): Promise<string[]> {
+  const skinsPath = path.join(acPath, 'content', 'cars', carId, 'skins');
+  try {
+    const entries = await fs.readdir(skinsPath, { withFileTypes: true });
+    return entries
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+      .map((entry) => entry.name)
+      .filter(Boolean);
+  } catch {
+    // A missing/incomplete mod must not prevent the dedicated server from
+    // starting; AC can still resolve its default/random skin in this case.
+    return [];
+  }
 }
 
 /** Parses one `tasklist /FO CSV` line (comma-separated, double-quoted
