@@ -8,7 +8,7 @@ import { sessionsApi } from '../services/sessions';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { Input, Label } from '../components/ui/Input';
-import { findTrackName } from '../utils/track';
+import { findTrackName, formatCarName } from '../utils/track';
 import { useContentLabelMap } from '../services/contentLabels';
 import {
   Server,
@@ -316,6 +316,48 @@ export function DedicatedServers() {
                               {server.rconPassword}
                             </span>
                           )}
+                        </div>
+                        <div className="rounded-md border border-white/[0.07] bg-dark-950/35 p-2.5">
+                          <div className="mb-2 flex items-center gap-1.5 font-hud text-[10px] font-bold uppercase tracking-[0.14em] text-gray-500">
+                            <Car className="h-3.5 w-3.5 text-racing-cyan" />
+                            Voitures disponibles
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {server.cars.map((carAcId) => {
+                              const car = (
+                                server.station.content as
+                                  | { cars?: { acId: string; name?: string; preview?: string }[] }
+                                  | undefined
+                              )?.cars?.find((item) => item.acId === carAcId);
+                              const carName = formatCarName(car?.name, carAcId, labelMap);
+                              return (
+                                <div
+                                  key={carAcId}
+                                  className="flex min-w-0 items-center gap-2 rounded border border-white/10 bg-white/[0.025] px-2 py-1.5"
+                                  title={carAcId}
+                                >
+                                  {car?.preview ? (
+                                    <img
+                                      src={car.preview}
+                                      alt=""
+                                      className="h-7 w-10 shrink-0 rounded object-cover"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <span className="flex h-7 w-10 shrink-0 items-center justify-center rounded bg-dark-800">
+                                      <Car className="h-3.5 w-3.5 text-gray-500" />
+                                    </span>
+                                  )}
+                                  <span className="max-w-[180px] truncate font-hud text-xs font-semibold text-gray-200">
+                                    {carName}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {server.cars.length === 0 && (
+                              <span className="font-hud-mono text-xs text-gray-600">Aucune voiture configurée</span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
