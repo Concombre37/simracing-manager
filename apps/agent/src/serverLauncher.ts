@@ -38,6 +38,11 @@ const DEFAULT_RACE_FORMAT: RaceFormatConfig = {
   weatherGraphics: ['3_clear'],
 };
 
+// Dedicated servers must always open in a predictable, bright daytime
+// setting.  The race-format editor still keeps its value for display and
+// future use, but it must not make a server unexpectedly start at night.
+const FIXED_SERVER_TIME = '16:30';
+
 /** AC's `REVERSED_GRID_RACE_POSITIONS` ([RACE] section): 0 disables it,
  * -1 fully reverses the grid, N reverses only the top N qualifying
  * positions. */
@@ -483,7 +488,7 @@ export class ServerLauncher {
       // AC has no direct "hour" field, only this sun-angle-from-solar-noon
       // value. Calibrated live: SUN_ANGLE=48 showed as ~15:00 in-game,
       // i.e. 48 units = 3h past noon (SUN_ANGLE=0) => ~16 units/hour =>
-      `SUN_ANGLE=${sunAngleFromTime(payload.raceFormat?.timeOfDay ?? DEFAULT_RACE_FORMAT.timeOfDay)}`,
+      `SUN_ANGLE=${sunAngleFromTime(FIXED_SERVER_TIME)}`,
       'PICKUP_MODE_ENABLED=1',
       'LOOP_MODE=1',
       'SLEEP_TIME=1',

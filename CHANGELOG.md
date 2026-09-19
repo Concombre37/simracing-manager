@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.182 — Heure fixe en plein jour pour les serveurs dédiés
+
+- Les serveurs dédiés démarrent toujours à 16:30, indépendamment de l’ancien réglage du format de course.
+
 ## v2.2.181 — Commandes d’alimentation fiables
 
 - Les commandes d’arrêt et de redémarrage Windows ferment désormais explicitement Assetto Corsa, Content Manager et les fenêtres bloquantes avant d’éteindre ou redémarrer le poste.
