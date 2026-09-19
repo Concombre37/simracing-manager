@@ -58,6 +58,10 @@ export function PodsControl() {
       sortStations((stations ?? []).filter((station) => station.role === 'simulator')),
     [stations],
   );
+  const spectatorStations = useMemo(
+    () => (stations ?? []).filter((station) => station.role === 'spectator'),
+    [stations],
+  );
   const onlineCount = podStations.filter(isReachable).length;
   const offlineCount = podStations.length - onlineCount;
 
@@ -129,8 +133,9 @@ export function PodsControl() {
     label: string,
     fn: (ids: string[]) => Promise<BulkActionResult>,
     confirmMessage?: string,
+    targetIds: string[] = selectedIds,
   ) {
-    if (selectedIds.length === 0) {
+    if (targetIds.length === 0) {
       setFeedback({ type: 'error', message: 'Sélectionnez au moins un poste.' });
       return;
     }
@@ -139,7 +144,7 @@ export function PodsControl() {
     setPendingAction(action);
     setFeedback(null);
     try {
-      const result = await fn(selectedIds);
+      const result = await fn(targetIds);
       const names = new Map(stations?.map((s) => [s.id, s.name]));
       if (result.failed.length === 0) {
         setFeedback({
@@ -366,6 +371,23 @@ export function PodsControl() {
             >
               <Download className="w-4 h-4" />
               Mettre à jour la sélection
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                runBulk(
+                  'update-spectator',
+                  'Mise à jour du spectateur',
+                  bulkActionsApi.updateAgent,
+                  undefined,
+                  spectatorStations.filter(isReachable).map((station) => station.id),
+                )
+              }
+              isLoading={pendingAction === 'update-spectator'}
+              disabled={pendingAction !== null || spectatorStations.every((station) => !isReachable(station))}
+            >
+              <Monitor className="w-4 h-4" />
+              Mettre à jour le spectateur
             </Button>
             <Button
               variant="secondary"
