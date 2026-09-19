@@ -13,6 +13,7 @@ import { Logger } from 'pino';
  */
 export class KioskManager {
   private scriptPath: string | null = null;
+  private refreshTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly logger: Logger) {}
 
@@ -37,6 +38,16 @@ export class KioskManager {
   enter(gameProcessName = 'acs'): void {
     this.logger.info({ gameProcessName }, 'Entering kiosk mode');
     this.run(['-Action', 'Enter', '-GameProcessName', gameProcessName]);
+
+    // Windows occasionally restores the shell taskbar when Content Manager,
+    // AC or a driver dialog changes the foreground window.  Keep the kiosk
+    // state alive for the whole session instead of relying on a one-shot hide.
+    if (!this.refreshTimer) {
+      this.refreshTimer = setInterval(() => {
+        this.run(['-Action', 'Refresh', '-GameProcessName', gameProcessName]);
+      }, 1500);
+      this.refreshTimer.unref();
+    }
   }
 
   /** Re-sweeps stray windows and brings the game window to the foreground,
@@ -53,6 +64,10 @@ export class KioskManager {
   /** Restores the taskbar when a session ends. */
   exit(): void {
     this.logger.info('Exiting kiosk mode');
+    if (this.refreshTimer) {
+      clearInterval(this.refreshTimer);
+      this.refreshTimer = null;
+    }
     this.run(['-Action', 'Exit']);
   }
 

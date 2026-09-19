@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.187 — Maintien du mode kiosque Windows
+
+- La barre des tâches est remasquée automatiquement pendant toute la session de jeu si Windows la fait réapparaître.
+
 ## v2.2.186 — Association stricte des tours au pilote
 
 - Un tour n’est plus attribué au premier véhicule par défaut lorsque le pilote ne peut pas être identifié dans un résultat multi-joueurs.

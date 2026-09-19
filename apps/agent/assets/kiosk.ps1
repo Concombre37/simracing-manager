@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('Enter', 'Foreground', 'Exit')]
+  [ValidateSet('Enter', 'Refresh', 'Foreground', 'Exit')]
   [string]$Action = 'Enter',
   [string]$GameProcessName = 'acs',
   [string]$SkipTitle = 'SimRacingBlanking',
@@ -193,6 +193,12 @@ switch ($Action) {
     # (Action 'Foreground') once the agent actually hides blanking.
     Hide-Taskbar
     Minimize-OtherWindows -SkipTitle $SkipTitle -GameProcessName $GameProcessName
+  }
+  'Refresh' {
+    # Shell/foreground changes can make Windows show the taskbar again while
+    # a session is running. This action is intentionally limited to the
+    # taskbar so it can run repeatedly without minimizing the game.
+    Hide-Taskbar
   }
   'Foreground' {
     # Re-sweep right before revealing, not just once at session start: a
