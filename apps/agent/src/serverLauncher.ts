@@ -540,6 +540,10 @@ export class ServerLauncher {
       const carId = carIds[i % carIds.length];
       const skins = skinsByCar.get(carId) ?? [];
       const skin = skins.length > 0 ? skins[Math.floor(Math.random() * skins.length)] : 'random';
+      this.logger.info(
+        { serverId: payload.serverId, slot: i, carId, skin },
+        'Dedicated server skin selected',
+      );
       entryList += `[CAR_${i}]\nMODEL=${carId}\nSKIN=${skin}\nSPECTATOR_MODE=0\nDRIVERNAME=\nTEAM=\nGUID=\nBALLAST=0\n`;
     }
 

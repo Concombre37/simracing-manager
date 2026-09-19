@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.185 — Skin sélectionné visible dans les logs admin
+
+- Chaque skin choisi au lancement est journalisé avec sa voiture et son emplacement pour vérification depuis l’administration.
+
 ## v2.2.184 — Skins réellement aléatoires
 
 - Chaque emplacement de serveur choisit maintenant un skin existant dans le dossier de la voiture.
