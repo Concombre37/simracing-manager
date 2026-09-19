@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, Eye, EyeOff, Power, PowerOff, RotateCw, Wifi, WifiOff } from 'lucide-react';
+import { Check, Eye, EyeOff, MonitorUp, Power, PowerOff, RotateCw, Wifi, WifiOff } from 'lucide-react';
 import { bulkActionsApi, type BulkActionResult } from '../services/bulkActions';
 import type { Station } from '../services/stations';
 import { sortStations } from '../utils/stations';
 
-type ActionName = 'wake' | 'restart' | 'shutdown' | 'blanking-hide' | 'blanking-show';
+type ActionName = 'wake' | 'restart' | 'shutdown' | 'blanking-hide' | 'blanking-show' | 'update';
 type Feedback = { type: 'success' | 'error'; message: string } | null;
 
 function isReachable(station: Station) {
@@ -17,6 +17,10 @@ export function FleetQuickControl({ stations }: { stations: Station[] }) {
   const pods = useMemo(
     () =>
       sortStations(stations.filter((station) => station.role === 'simulator')),
+    [stations],
+  );
+  const spectators = useMemo(
+    () => stations.filter((station) => station.role === 'spectator'),
     [stations],
   );
   const [selected, setSelected] = useState<Set<string> | null>(null);
@@ -76,7 +80,7 @@ export function FleetQuickControl({ stations }: { stations: Station[] }) {
     setFeedback(null);
     try {
       const result = await call(targets.map((pod) => pod.id));
-      const names = new Map(pods.map((pod) => [pod.id, pod.name]));
+      const names = new Map(stations.map((station) => [station.id, station.name]));
       if (result.failed.length === 0) {
         setFeedback({
           type: 'success',
@@ -280,6 +284,28 @@ export function FleetQuickControl({ stations }: { stations: Station[] }) {
           />
         </div>
       </div>
+
+      {spectators.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-violet-400/20 bg-violet-500/[0.06] px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <MonitorUp className="h-4 w-4 text-violet-300" />
+            <span className="font-hud text-xs font-bold text-violet-100">Spectateur</span>
+            <span className="font-hud-mono text-[10px] text-gray-400">
+              {spectators.map((station) => station.name).join(' · ')}
+            </span>
+          </div>
+          <ActionButton
+            icon={MonitorUp}
+            label="Mettre à jour"
+            count={spectators.filter(isReachable).length}
+            loading={pending === 'update'}
+            disabled={pending !== null || spectators.every((station) => !isReachable(station))}
+            onClick={() =>
+              runAction('update', 'Mise à jour du spectateur', spectators.filter(isReachable), bulkActionsApi.updateAgent)
+            }
+          />
+        </div>
+      )}
 
       {feedback && (
         <div

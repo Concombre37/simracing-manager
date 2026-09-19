@@ -62,10 +62,17 @@ export class BulkActionsService {
 
   async updateAgent(stationIds: string[]): Promise<BulkActionResult> {
     return this.run(stationIds, (id) =>
-      this.withPodBusinessId(id, (stationId) =>
-        this.agentGateway.emitUpdateAgent(stationId),
-      ),
+      this.withUpdateBusinessId(id, (stationId) => this.agentGateway.emitUpdateAgent(stationId)),
     );
+  }
+
+  /** Updates are safe for simulator and spectator agents; admin stations stay excluded. */
+  private async withUpdateBusinessId(id: string, fn: (stationId: string) => Promise<void>) {
+    const station = await this.stationsService.findOne(id);
+    if (station.role === StationRole.ADMIN) {
+      throw new Error(`Le poste ${station.name} est un administrateur et a été exclu de l'action.`);
+    }
+    await fn(station.stationId);
   }
 
   async syncContent(stationIds: string[]): Promise<BulkActionResult> {
