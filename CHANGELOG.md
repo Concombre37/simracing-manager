@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.188 — Nom corrigé dans le classement de fin
+
+- La ligne du pilote utilise désormais le nom corrigé de la voiture, comme l’en-tête du résultat.
+
 ## v2.2.187 — Maintien du mode kiosque Windows
 
 - La barre des tâches est remasquée automatiquement pendant toute la session de jeu si Windows la fait réapparaître.

@@ -703,7 +703,10 @@ export class BlankingManager {
       const currentEntry: LeaderboardEntry = {
         position: 0,
         name: summary.clientName ?? 'Pilote',
-        car: summary.carAcId ?? '-',
+        // The session summary already carries the display label resolved by
+        // the server. Never leak the raw AC id into the local context row
+        // when this driver's fresh lap is inserted into the archived table.
+        car: summary.carName?.trim() || summary.carAcId || '-',
         laps: 0,
         bestLapMs: summary.bestLapMs ?? 0,
       };
