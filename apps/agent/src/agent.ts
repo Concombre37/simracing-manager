@@ -1402,6 +1402,7 @@ export class SimRacingAgent {
         position: number;
         driver: string;
         carAcId: string;
+        carName?: string;
         timeMs: number;
       };
       const load = async (carAcId?: string): Promise<HistoricalApiEntry[]> => {
@@ -1440,7 +1441,7 @@ export class SimRacingAgent {
         entries: apiEntries.map((entry) => ({
           position: entry.position,
           name: entry.driver,
-          car: entry.carAcId,
+          car: entry.carName?.trim() || entry.carAcId,
           laps: 0,
           bestLapMs: entry.timeMs,
         })),

@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.183 — Noms personnalisés des voitures dans les résultats
+
+- Le classement de fin de session utilise désormais le même nom de voiture personnalisé que l’en-tête du résultat.
+
 ## v2.2.182 — Heure fixe en plein jour pour les serveurs dédiés
 
 - Les serveurs dédiés démarrent toujours à 16:30, indépendamment de l’ancien réglage du format de course.

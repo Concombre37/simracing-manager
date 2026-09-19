@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ContentLabelsService } from '../content-labels/content-labels.service';
 
 interface RaceOutLap {
   car: number;
@@ -70,6 +71,8 @@ export interface HistoricalLeaderboardEntry {
   position: number;
   driver: string;
   carAcId: string;
+  /** Resolved custom car label, when configured in Content names. */
+  carName: string;
   timeMs: number;
   sessionId: string;
   date: string;
@@ -145,7 +148,10 @@ export function bestCleanLap(
 
 @Injectable()
 export class LeaderboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly contentLabelsService: ContentLabelsService,
+  ) {}
 
   /**
    * Returns only laps already archived before the current session started.
@@ -188,6 +194,7 @@ export class LeaderboardService {
       orderBy: { createdAt: 'asc' },
     });
 
+    const labelMap = await this.contentLabelsService.getMap();
     return sessions
       .map((session) => {
         const lap = bestCleanLap(session.result, session.clientName);
@@ -196,6 +203,7 @@ export class LeaderboardService {
           position: 0,
           driver: session.clientName?.trim() || 'Pilote inconnu',
           carAcId: session.carAcId,
+          carName: labelMap.car[session.carAcId] || session.carAcId,
           timeMs: lap.timeMs,
           sessionId: session.id,
           date: (session.endedAt ?? session.createdAt).toISOString(),
