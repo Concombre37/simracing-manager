@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.190 — Position du timer ajustée
+
+- Le timer de session est positionné à 75 % de la largeur de l’écran, en conservant sa taille compacte.
+
 ## v2.2.189 — Timer de session visible en conduite
 
 - Ajout d’un compteur compact en haut à droite, synchronisé avec la durée réelle de la session et masqué hors conduite.
