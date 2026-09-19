@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.189 — Timer de session visible en conduite
+
+- Ajout d’un compteur compact en haut à droite, synchronisé avec la durée réelle de la session et masqué hors conduite.
+
 ## v2.2.188 — Nom corrigé dans le classement de fin
 
 - La ligne du pilote utilise désormais le nom corrigé de la voiture, comme l’en-tête du résultat.

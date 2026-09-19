@@ -50,6 +50,7 @@ import { runWolDiagnostics } from './wolDiagnostics';
 import { WatchdogManager } from './watchdogManager';
 import { SpectatorManager } from './spectatorManager';
 import { LiveCaptureManager } from './liveCaptureManager';
+import { SessionTimerManager } from './sessionTimerManager';
 
 const execFileAsync = promisify(execFile);
 
@@ -119,6 +120,7 @@ export class SimRacingAgent {
   private watchdogManager: WatchdogManager;
   private spectatorManager: SpectatorManager;
   private liveCaptureManager: LiveCaptureManager;
+  private sessionTimerManager: SessionTimerManager;
 
   constructor(private readonly logger: Logger) {
     this.acLauncher = new AcLauncher(logger);
@@ -149,6 +151,7 @@ export class SimRacingAgent {
       config.STATION_ID,
       () => this.apiKey,
     );
+    this.sessionTimerManager = new SessionTimerManager(logger);
     this.processMonitor = new ProcessMonitor(logger);
     this.raceResultReader = new RaceResultReader(logger);
     this.kioskManager = new KioskManager(logger);
@@ -292,6 +295,7 @@ export class SimRacingAgent {
     await this.resolveAcPath();
     await this.ensureContentManagerPath();
     await this.kioskManager.init();
+    await this.sessionTimerManager.init();
     await this.acSharedMemory.init();
     await this.trayManager.init();
     void this.watchdogManager.ensureRunning();
@@ -958,6 +962,7 @@ export class SimRacingAgent {
     if (!this.currentSession || this.currentSession.revealed) return;
     this.currentSession.revealed = true;
     this.currentSession.startedAt = Date.now();
+    this.sessionTimerManager.start(this.currentSession.durationMinutes);
     this.socket?.emit('agent:session:started', { sessionId: this.currentSession.sessionId });
     if (this.currentSession.durationMinutes !== null) {
       this.scheduleSessionEnd();
@@ -1463,6 +1468,7 @@ export class SimRacingAgent {
    */
   private async endSession(): Promise<void> {
     this.logger.info('Ending session, returning POD to paddock');
+    this.sessionTimerManager.stop();
     const myGeneration = this.sessionGeneration;
     const session = this.currentSession;
     this.clearCurrentSession();
