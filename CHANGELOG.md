@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.186 — Association stricte des tours au pilote
+
+- Un tour n’est plus attribué au premier véhicule par défaut lorsque le pilote ne peut pas être identifié dans un résultat multi-joueurs.
+
 ## v2.2.185 — Skin sélectionné visible dans les logs admin
 
 - Chaque skin choisi au lancement est journalisé avec sa voiture et son emplacement pour vérification depuis l’administration.

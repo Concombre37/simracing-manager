@@ -16,6 +16,7 @@ interface RaceOutSession {
 
 interface RaceOutPlayer {
   name?: string;
+  car?: string;
 }
 
 interface RaceOutResult {
@@ -104,6 +105,7 @@ function normalizeDriverName(value: string | null | undefined): string {
 function resolveDriverCarIndex(
   players: RaceOutPlayer[] | undefined,
   clientName: string | null | undefined,
+  carAcId?: string | null,
 ): number | null {
   if (!players?.length) return null;
 
@@ -113,24 +115,34 @@ function resolveDriverCarIndex(
       (player) => normalizeDriverName(player.name) === wanted,
     );
     if (exact >= 0) return exact;
-    // AC normally keeps the station driver at car 0 even when its displayed
-    // name differs slightly from the session client name.
-    return 0;
+    // Some dedicated-server results omit the client name but keep the car
+    // model. Use it only when it identifies one player; never silently fall
+    // back to car 0, which assigns another driver's laps to this session.
+    if (carAcId) {
+      const matches = players
+        .map((player, index) => ({ player, index }))
+        .filter(({ player }) => player.car === carAcId);
+      if (matches.length === 1) return matches[0].index;
+    }
+    return -1;
   }
 
-  const firstNamed = players.findIndex(
-    (player) => normalizeDriverName(player.name).length > 0,
-  );
-  return firstNamed >= 0 ? firstNamed : 0;
+  const named = players
+    .map((player, index) => ({ player, index }))
+    .filter(({ player }) => normalizeDriverName(player.name).length > 0);
+  if (named.length === 1) return named[0].index;
+  return -1;
 }
 
 export function bestCleanLap(
   result: unknown,
   clientName?: string | null,
+  carAcId?: string | null,
 ): { timeMs: number; sessionType: string | null } | null {
   const data = result as RaceOutResult | null | undefined;
   if (!data?.sessions?.length) return null;
-  const driverCarIndex = resolveDriverCarIndex(data.players, clientName);
+  const driverCarIndex = resolveDriverCarIndex(data.players, clientName, carAcId);
+  if (driverCarIndex === -1) return null;
   let best: { timeMs: number; sessionType: string | null } | null = null;
   for (const session of data.sessions) {
     for (const lap of session.laps ?? []) {
@@ -197,7 +209,7 @@ export class LeaderboardService {
     const labelMap = await this.contentLabelsService.getMap();
     return sessions
       .map((session) => {
-        const lap = bestCleanLap(session.result, session.clientName);
+        const lap = bestCleanLap(session.result, session.clientName, session.carAcId);
         if (!lap || !session.carAcId) return null;
         return {
           position: 0,
@@ -248,7 +260,7 @@ export class LeaderboardService {
     const buckets = new Map<string, Bucket>();
 
     for (const s of sessions) {
-      const lap = bestCleanLap(s.result, s.clientName);
+      const lap = bestCleanLap(s.result, s.clientName, s.carAcId);
       if (lap === null || !s.track || !s.carAcId) continue;
 
       const trackLayout = s.trackLayout ?? '';

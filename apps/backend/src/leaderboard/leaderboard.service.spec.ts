@@ -38,6 +38,18 @@ describe('bestCleanLap', () => {
     });
   });
 
+  it('does not assign car 0 laps when the session owner cannot be matched', () => {
+    const result = {
+      players: [
+        { car: 'car_a', name: 'Pilote A' },
+        { car: 'car_b', name: 'Pilote B' },
+      ],
+      sessions: [{ name: 'Race', laps: [{ car: 0, time: 90000, cuts: 0 }] }],
+    };
+
+    expect(bestCleanLap(result, 'Pilote absent', 'car_b')).toBeNull();
+  });
+
   it('resolves the owner correctly when a session contains many players', () => {
     const result = {
       players: Array.from({ length: 10 }, (_, index) => ({
