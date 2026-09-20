@@ -1513,3 +1513,7 @@ Vérifié directement en base : sur un POD déjà mis à jour en v2.2.56, les 21
 - Fallback HTTP et fichier pour la télémétrie.
 
 
+# v2.2.191 — Synchronisation de l’heure des pods
+
+- Chaque agent Windows force le fuseau `Romance Standard Time` et demande une resynchronisation au service Windows Time au démarrage, puis périodiquement.
+- Les erreurs de droits ou de service sont journalisées sans empêcher le pod de démarrer.
