@@ -486,11 +486,8 @@ export class ServerLauncher {
       `TCP_PORT=${mainPort}`,
       `HTTP_PORT=${httpPort}`,
       `SERVER_IP=0.0.0.0`,
-      // Requested default for every dedicated server: clear weather
-      // (already covered below by [WEATHER_0] GRAPHICS=3_clear) at 16:30.
-      // AC has no direct "hour" field, only this sun-angle-from-solar-noon
-      // value. Calibrated live: SUN_ANGLE=48 showed as ~15:00 in-game,
-      // i.e. 48 units = 3h past noon (SUN_ANGLE=0) => ~16 units/hour =>
+      // Keep dedicated servers at solar noon. The hosting agent must be
+      // updated as well as the joining pods for this value to take effect.
       `SUN_ANGLE=${sunAngleFromTime(FIXED_SERVER_TIME)}`,
       'PICKUP_MODE_ENABLED=1',
       'LOOP_MODE=1',
@@ -628,7 +625,7 @@ export class ServerLauncher {
  * convert it only when writing server_cfg.ini. */
 function sunAngleFromTime(value: string): number {
   const match = /^(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return 72; // 16:30 fallback
+  if (!match) return 0; // noon fallback
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
   return Math.round((hours + minutes / 60 - 12) * 16);
