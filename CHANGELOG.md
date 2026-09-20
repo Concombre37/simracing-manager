@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.199 — Soleil moins haut
+
+- Les pods et les serveurs dédiés utilisent un angle solaire de `24`, environ 13 h 30 selon la conversion du projet, pour une lumière de jour moins intense que le midi solaire.
+- Une seule constante aligne les courses locales, les connexions aux serveurs et la configuration de l'hôte.
+
 ## v2.2.198 — Éclairage de jour sur les pods
 
 - Les fichiers `race.ini` générés pour les sessions directes et les connexions aux serveurs utilisent désormais `SUN_ANGLE=0` au lieu de `-48`.

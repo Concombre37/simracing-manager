@@ -12,6 +12,7 @@ import {
   GridType,
 } from '@simracing/shared';
 import { resolveAcInstallPath } from './acPathResolver';
+import { DAYLIGHT_SUN_ANGLE } from './daylight';
 
 const execFileAsync = promisify(execFile);
 
@@ -38,12 +39,9 @@ const DEFAULT_RACE_FORMAT: RaceFormatConfig = {
   weatherGraphics: ['3_clear'],
 };
 
-// Dedicated servers must always open in a predictable, bright daytime
-// setting.  The race-format editor still keeps its value for display and
-// future use, but it must not make a server unexpectedly start at night.
-// A true solar-noon setting keeps every circuit visibly bright. The previous
-// 16:30 angle still produced a low sun on several tracks and looked dark.
-const FIXED_SERVER_TIME = '12:00';
+// Keep dedicated servers at the same moderate daylight angle as joining pods.
+// The race-format time remains stored for display, but does not override this
+// venue-wide lighting choice.
 
 /** AC's `REVERSED_GRID_RACE_POSITIONS` ([RACE] section): 0 disables it,
  * -1 fully reverses the grid, N reverses only the top N qualifying
@@ -486,9 +484,7 @@ export class ServerLauncher {
       `TCP_PORT=${mainPort}`,
       `HTTP_PORT=${httpPort}`,
       `SERVER_IP=0.0.0.0`,
-      // Keep dedicated servers at solar noon. The hosting agent must be
-      // updated as well as the joining pods for this value to take effect.
-      `SUN_ANGLE=${sunAngleFromTime(FIXED_SERVER_TIME)}`,
+      `SUN_ANGLE=${DAYLIGHT_SUN_ANGLE}`,
       'PICKUP_MODE_ENABLED=1',
       'LOOP_MODE=1',
       'SLEEP_TIME=1',
@@ -618,17 +614,6 @@ export class ServerLauncher {
     });
     return lines;
   }
-}
-
-/** Assetto Corsa expresses time as a sun angle, roughly 16 units per hour
- * after solar noon. Keep the friendly HH:mm setting in the dashboard and
- * convert it only when writing server_cfg.ini. */
-function sunAngleFromTime(value: string): number {
-  const match = /^(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return 0; // noon fallback
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  return Math.round((hours + minutes / 60 - 12) * 16);
 }
 
 /** Returns the real skin directory names installed for an AC car. */

@@ -10,6 +10,7 @@ import { LuaBridge } from './luaBridge';
 import { findContentManagerExe } from './cmLocator';
 import { ProcessMonitor } from './processMonitor';
 import { resolveAcInstallPath } from './acPathResolver';
+import { DAYLIGHT_SUN_ANGLE } from './daylight';
 
 const execFileAsync = promisify(execFile);
 
@@ -285,7 +286,7 @@ export class AcLauncher {
       'SPEED_KMH_MAX=0',
       '',
       '[LIGHTING]',
-      'SUN_ANGLE=0',
+      `SUN_ANGLE=${DAYLIGHT_SUN_ANGLE}`,
       'TIME_MULT=1',
       'CLOUD_SPEED=0.2',
       '',
@@ -580,7 +581,7 @@ export class AcLauncher {
       'SPEED_KMH_MAX=0',
       '',
       '[LIGHTING]',
-      'SUN_ANGLE=0',
+      `SUN_ANGLE=${DAYLIGHT_SUN_ANGLE}`,
       'TIME_MULT=1',
       'CLOUD_SPEED=0.2',
       '',
