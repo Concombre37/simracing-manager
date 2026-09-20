@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.195 — Version agent correctement publiée
+
+- Le numéro de version du package agent et du lockfile est maintenant synchronisé avec le binaire publié, afin que les pods détectent bien la mise à jour.
+
 ## v2.2.194 — Catalogue des skins
 
 - Les agents remontent désormais tous les dossiers de skins installés pour chaque voiture.
