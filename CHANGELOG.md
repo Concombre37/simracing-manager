@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.192 — Sortie propre du spectateur
+
+- La sortie du spectateur réinitialise son état et remet l’agent en attente après l’arrêt d’Assetto Corsa.
+- L’écran de transition reste actif pendant le changement puis est fermé uniquement quand le nouveau serveur est prêt.
+- Correction de la route backend qui était interceptée par la route dynamique d’arrêt d’un serveur.
+
 ## v2.2.191 — Synchronisation de l’heure des pods
 
 - Chaque agent Windows force le fuseau `Romance Standard Time` et demande une resynchronisation au service Windows Time au démarrage, puis périodiquement.

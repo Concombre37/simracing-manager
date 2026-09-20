@@ -105,6 +105,23 @@ export class DedicatedServersController {
     });
   }
 
+  /** Stop the spectator before any dynamic `:id/stop` route can match it. */
+  @Post('spectate/stop')
+  @Roles(UserRole.ADMIN)
+  async stopSpectating(@Body() body: { assignmentId?: string }) {
+    const assignmentId = String(body.assignmentId ?? '').trim();
+    if (!assignmentId) throw new BadRequestException('Spectator assignment is required');
+    const assignment = await this.prisma.spectatorAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { station: true },
+    });
+    if (!assignment) throw new BadRequestException('Spectator assignment not found');
+
+    await this.agentGateway.emitStop(assignment.station.stationId);
+    await this.prisma.spectatorAssignment.delete({ where: { id: assignment.id } });
+    return { success: true, spectatorStationId: assignment.station.stationId };
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.TECHNICIAN)
   findOne(@Param('id') id: string) {
@@ -238,27 +255,6 @@ export class DedicatedServersController {
     }
 
     return { success: true, sessions };
-  }
-
-  /**
-   * Stops the spectator before the dynamic `:id/spectate` route below.
-   * Nest/Express otherwise reads "spectate" as a server UUID for the URL
-   * `/spectate/stop` and the stop command can never reach the agent.
-   */
-  @Post('spectate/stop')
-  @Roles(UserRole.ADMIN)
-  async stopSpectating(@Body() body: { assignmentId?: string }) {
-    const assignmentId = String(body.assignmentId ?? '').trim();
-    if (!assignmentId) throw new BadRequestException('Spectator assignment is required');
-    const assignment = await this.prisma.spectatorAssignment.findUnique({
-      where: { id: assignmentId },
-      include: { station: true },
-    });
-    if (!assignment) throw new BadRequestException('Spectator assignment not found');
-
-    await this.agentGateway.emitStop(assignment.station.stationId);
-    await this.prisma.spectatorAssignment.delete({ where: { id: assignment.id } });
-    return { success: true, spectatorStationId: assignment.station.stationId };
   }
 
   /**

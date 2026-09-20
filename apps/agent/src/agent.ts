@@ -91,6 +91,8 @@ export class SimRacingAgent {
   } | null = null;
   /** Enabled only while the spectator switches between dedicated servers. */
   private spectatorTransitionActive = false;
+  /** True while this station is actively driving the spectator slot. */
+  private spectatorModeActive = false;
   private resultsTimeout: NodeJS.Timeout | null = null;
   /** Bumped by every new session start (handleLaunch/handleJoinServer).
    * endSession()'s teardown spans several long awaits (acLauncher.quit() —
@@ -849,6 +851,7 @@ export class SimRacingAgent {
 
   private async handleStop(): Promise<void> {
     this.logger.info('Received stop command');
+    const stoppingSpectator = this.spectatorModeActive;
     if (this.currentSession) {
       // A tracked (timed / dedicated-server) session must end the same way
       // regardless of whether the timer ran out, was reduced to zero, or
@@ -888,6 +891,13 @@ export class SimRacingAgent {
     this.blankingManager.setPodInGame(false);
     this.blankingManager.clearResults();
     this.blankingManager.setAuto();
+    if (stoppingSpectator) {
+      this.spectatorModeActive = false;
+      this.spectatorTransitionActive = false;
+      // A spectator is not a simulator session: leave its browser wall open,
+      // but return the agent to its neutral waiting state after AC exits.
+      this.blankingManager.setEnabled(false);
+    }
     this.kioskManager.exit();
     this.setReportedStatus(StationStatus.ONLINE);
   }
@@ -1264,6 +1274,7 @@ export class SimRacingAgent {
     const isSpectatorTransition = payload.spectator === true;
     if (isSpectatorTransition) {
       this.spectatorTransitionActive = true;
+      this.spectatorModeActive = true;
       // A previous server can still expose shared memory while AC is being
       // replaced. Reset it so it cannot reveal the new loading screen.
       this.blankingManager.setAcRunning(false);
@@ -1341,6 +1352,7 @@ export class SimRacingAgent {
       // there was never a game to reveal it from.
       this.blankingManager.setAuto();
       if (isSpectatorTransition) {
+        this.spectatorModeActive = false;
         this.spectatorTransitionActive = false;
         this.blankingManager.setEnabled(false);
       }
