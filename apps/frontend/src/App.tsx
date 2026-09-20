@@ -46,6 +46,7 @@ const Mods = lazy(() => import('./pages/Mods').then((m) => ({ default: m.Mods })
 const ContentNames = lazy(() =>
   import('./pages/ContentNames').then((m) => ({ default: m.ContentNames })),
 );
+const CarSkins = lazy(() => import('./pages/CarSkins').then((m) => ({ default: m.CarSkins })));
 const ContentCategories = lazy(() =>
   import('./pages/ContentCategories').then((m) => ({ default: m.ContentCategories })),
 );
@@ -251,6 +252,7 @@ function AnimatedRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route path="/car-skins" element={<ProtectedRoute adminOnly><CarSkins /></ProtectedRoute>} />
           <Route
             path="/mods"
             element={

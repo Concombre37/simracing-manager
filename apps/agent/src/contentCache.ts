@@ -21,7 +21,8 @@ interface CachedTrack extends Track {
 // v10: track layout files are part of the mtime fingerprint. Existing caches
 // must be rescanned once so layouts installed after the first scan are picked
 // up even when the track root itself did not change.
-const CACHE_VERSION = 10;
+// v11: cars include the installed skin folder names.
+const CACHE_VERSION = 11;
 
 interface CacheData {
   version?: number;

@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.194 — Catalogue des skins
+
+- Les agents remontent désormais tous les dossiers de skins installés pour chaque voiture.
+- Ajout d’un onglet admin « Skins voitures » et utilisation de cette liste réelle pour le tirage aléatoire des serveurs dédiés.
+
 ## v2.2.193 — Suppression de l’avertissement active content
 
 - Les blanking HTML sont désormais injectés en mémoire avec `NavigateToString`, sans ouverture de fichier `file://` dans le moteur IE embarqué.

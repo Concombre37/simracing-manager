@@ -28,6 +28,7 @@ import {
   ChevronUp,
   MoreHorizontal,
   Package,
+  Car,
 } from 'lucide-react';
 
 // L'essentiel du quotidien : toujours en pleine évidence, jamais replié.
@@ -49,6 +50,7 @@ const secondaryNavItems = [
 const adminNavItems = [
   { path: '/users', label: 'Utilisateurs', icon: Users },
   { path: '/content-previews', label: 'Images', icon: Image },
+  { path: '/car-skins', label: 'Skins voitures', icon: Car },
   { path: '/mods', label: 'Mods', icon: Package },
   { path: '/content-names', label: 'Noms', icon: Tag },
   { path: '/content-categories', label: 'Catégories', icon: Tags },
@@ -71,6 +73,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/sessions/history': ['Historique'],
   '/users': ['Utilisateurs'],
   '/content-previews': ['Images'],
+  '/car-skins': ['Skins voitures'],
   '/mods': ['Mods'],
   '/content-names': ['Noms'],
   '/content-categories': ['Catégories'],

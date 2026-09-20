@@ -15,6 +15,8 @@ export interface Car {
   brand?: string;
   category?: string;
   preview?: string;
+  /** Installed skin folder names, used by the admin catalog and server setup. */
+  skins: string[];
 }
 
 export interface TrackLayout {
@@ -463,7 +465,13 @@ export class ContentScanner {
         const uiPathNested = path.join(carDir, 'ui', 'ui_car.json');
         const uiPathRoot = path.join(carDir, 'ui_car.json');
         const previewPaths = await this.getCarPreviewPaths(carDir);
-        const updatedAt = await maxMtime(uiPathNested, uiPathRoot, ...previewPaths);
+        const skinsDir = path.join(carDir, 'skins');
+        const skins = await this.listCarSkins(skinsDir);
+        const skinDirMtime = await fs.stat(skinsDir).then((stat) => stat.mtimeMs).catch(() => 0);
+        const updatedAt = Math.max(
+          await maxMtime(uiPathNested, uiPathRoot, ...previewPaths),
+          skinDirMtime,
+        );
         const cached = this.cache.getCar(entry);
 
         if (cached && cached.updatedAt === updatedAt && cached.preview !== undefined) {
@@ -473,6 +481,7 @@ export class ContentScanner {
             brand: cached.brand,
             category: cached.category,
             preview: cached.preview,
+            skins,
           });
           continue;
         }
@@ -491,6 +500,7 @@ export class ContentScanner {
           brand: uiJson?.brand,
           category: uiJson?.class,
           preview: await findCarPreview(this.logger, carDir, entry),
+          skins,
         };
         this.cache.setCar({ ...car, updatedAt });
         content.cars.push(car);
@@ -628,6 +638,19 @@ export class ContentScanner {
       'Assetto Corsa content scanned',
     );
     return content;
+  }
+
+  private async listCarSkins(skinsDir: string): Promise<string[]> {
+    try {
+      const entries = await fs.readdir(skinsDir, { withFileTypes: true });
+      return entries
+        .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.'))
+        .map((entry) => entry.name)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+    } catch {
+      return [];
+    }
   }
 
   private async getCarPreviewPaths(carDir: string): Promise<string[]> {
