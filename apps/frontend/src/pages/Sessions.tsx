@@ -149,6 +149,58 @@ export function Sessions() {
   const { data: stations } = useQuery({ queryKey: ['stations'], queryFn: stationsApi.getAll });
   const [liveData, setLiveData] = useState<Record<string, TelemetrySnapshot>>({});
   const [now, setNow] = useState(Date.now());
+  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+  const [stoppingSelected, setStoppingSelected] = useState(false);
+  const [stopFeedback, setStopFeedback] = useState<string | null>(null);
+
+  const selectedActiveSessions = (sessions ?? []).filter((session) => selectedSessionIds.has(session.id));
+
+  function toggleSelectedSession(id: string) {
+    setSelectedSessionIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setStopFeedback(null);
+  }
+
+  async function stopSelectedSessions() {
+    const targets = selectedActiveSessions;
+    if (targets.length === 0 || stoppingSelected) return;
+    setStoppingSelected(true);
+    setStopFeedback(null);
+    let next = 0;
+    const succeeded: string[] = [];
+    const failed: string[] = [];
+    const workers = Array.from({ length: Math.min(4, targets.length) }, async () => {
+      while (next < targets.length) {
+        const session = targets[next++];
+        try {
+          await sessionsApi.stop(session.id);
+          succeeded.push(session.id);
+        } catch {
+          failed.push(session.station.name);
+        }
+      }
+    });
+    try {
+      await Promise.all(workers);
+      setSelectedSessionIds((current) => {
+        const remaining = new Set(current);
+        succeeded.forEach((id) => remaining.delete(id));
+        return remaining;
+      });
+      setStopFeedback(
+        failed.length === 0
+          ? `${succeeded.length} session(s) arrêtée(s).`
+          : `${succeeded.length} arrêtée(s), ${failed.length} échec(s) : ${failed.join(', ')}.`,
+      );
+      await queryClient.invalidateQueries({ queryKey: ['sessions', 'active'] });
+    } finally {
+      setStoppingSelected(false);
+    }
+  }
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
@@ -278,6 +330,43 @@ export function Sessions() {
           </div>
         )}
 
+        {!isLoading && count > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-4 py-3">
+            <span className="mr-auto font-hud text-sm font-bold text-gray-300">
+              {selectedActiveSessions.length} / {count} POD sélectionné(s)
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedSessionIds(new Set((sessions ?? []).map((session) => session.id)))}
+              disabled={stoppingSelected}
+              className="rounded border border-white/10 px-3 py-2 font-hud text-xs font-bold text-gray-300 hover:border-racing-cyan/40 hover:text-white disabled:opacity-40"
+            >
+              Tout sélectionner
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedSessionIds(new Set())}
+              disabled={stoppingSelected}
+              className="rounded border border-white/10 px-3 py-2 font-hud text-xs font-bold text-gray-300 hover:border-racing-cyan/40 hover:text-white disabled:opacity-40"
+            >
+              Tout désélectionner
+            </button>
+            <ConfirmButton
+              onConfirm={() => void stopSelectedSessions()}
+              disabled={stoppingSelected || selectedActiveSessions.length === 0}
+              className="rounded border border-red-500/50 bg-red-500/10 px-4 py-2 font-hud text-xs font-bold text-red-300 hover:bg-red-500/20 disabled:opacity-40"
+              idleContent={`Arrêter la sélection (${selectedActiveSessions.length})`}
+              confirmContent="Confirmer l’arrêt ?"
+            />
+          </div>
+        )}
+
+        {stopFeedback && (
+          <p role="status" className="rounded border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-gray-300">
+            {stopFeedback}
+          </p>
+        )}
+
         {isLoading && (
           <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-white/10 py-16">
             <Flag className="mb-3 h-9 w-9 animate-pulse text-gray-600" />
@@ -296,6 +385,16 @@ export function Sessions() {
                 exit={{ opacity: 0, scale: 0.96 }}
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as const }}
               >
+                <label className="mb-2 flex cursor-pointer items-center gap-2 rounded border border-white/10 bg-white/[0.025] px-3 py-2 font-hud text-xs font-bold text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={selectedSessionIds.has(session.id)}
+                    onChange={() => toggleSelectedSession(session.id)}
+                    disabled={stoppingSelected}
+                    className="h-4 w-4 accent-racing-cyan"
+                  />
+                  Sélectionner {session.station.name}
+                </label>
                 <SessionCard
                   session={session}
                   telemetry={liveData[session.station.stationId]}
