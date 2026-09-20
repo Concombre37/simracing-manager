@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.197 — Barre des tâches masquée sur le spectateur
+
+- Le poste spectateur masque la barre des tâches Windows dès que son rôle est connu et la maintient masquée sur l'écran d'attente, pendant une course et après l'arrêt d'Assetto Corsa.
+- La barre des tâches est restaurée lorsque le poste quitte le rôle spectateur ou quand l'agent s'arrête.
+
 ## v2.2.196 — Journée lumineuse sur les serveurs
 
 - Les serveurs dédiés utilisent désormais le midi solaire (`SUN_ANGLE=0`) afin de garantir une luminosité de jour sur tous les circuits.

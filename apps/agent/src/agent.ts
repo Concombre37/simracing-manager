@@ -304,6 +304,7 @@ export class SimRacingAgent {
     await this.resolveAcPath();
     await this.ensureContentManagerPath();
     await this.kioskManager.init();
+    this.kioskManager.setSpectatorMode(config.STATION_ROLE === StationRole.SPECTATOR);
     await this.sessionTimerManager.init();
     await this.acSharedMemory.init();
     await this.trayManager.init();
@@ -610,6 +611,8 @@ export class SimRacingAgent {
     this.acSharedMemoryReader?.stop();
     this.trayManager.stop();
     this.spectatorManager.close();
+    this.kioskManager.setSpectatorMode(false);
+    this.kioskManager.exit();
     await this.liveCaptureManager.stop();
     // Child processes on Windows don't die with their parent automatically:
     // without this, every agent restart (update, crash recovery) piles up
@@ -1142,6 +1145,7 @@ export class SimRacingAgent {
   private handleStationRole(payload: { role: StationRole }): void {
     this.logger.info({ role: payload.role }, 'Station role received');
     this.blankingManager.setEnabled(payload.role === StationRole.SIMULATOR);
+    this.kioskManager.setSpectatorMode(payload.role === StationRole.SPECTATOR);
     if (payload.role === StationRole.SPECTATOR) {
       this.spectatorManager.open();
     } else {

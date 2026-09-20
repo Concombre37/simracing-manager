@@ -14,6 +14,8 @@ import { Logger } from 'pino';
 export class KioskManager {
   private scriptPath: string | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
+  private sessionActive = false;
+  private spectatorActive = false;
 
   constructor(private readonly logger: Logger) {}
 
@@ -36,17 +38,25 @@ export class KioskManager {
    * actually hides, otherwise the game would visually cover the blanking
    * screen well before its grace period elapses. Fire-and-forget. */
   enter(gameProcessName = 'acs'): void {
+    this.sessionActive = true;
     this.logger.info({ gameProcessName }, 'Entering kiosk mode');
     this.run(['-Action', 'Enter', '-GameProcessName', gameProcessName]);
 
     // Windows occasionally restores the shell taskbar when Content Manager,
     // AC or a driver dialog changes the foreground window.  Keep the kiosk
     // state alive for the whole session instead of relying on a one-shot hide.
-    if (!this.refreshTimer) {
-      this.refreshTimer = setInterval(() => {
-        this.run(['-Action', 'Refresh', '-GameProcessName', gameProcessName]);
-      }, 1500);
-      this.refreshTimer.unref();
+    this.startRefresh();
+  }
+
+  /** Keep the Windows taskbar hidden while the spectator wall is displayed. */
+  setSpectatorMode(enabled: boolean): void {
+    if (this.spectatorActive === enabled) return;
+    this.spectatorActive = enabled;
+    if (enabled) {
+      this.run(['-Action', 'Refresh']);
+      this.startRefresh();
+    } else if (!this.sessionActive) {
+      this.restoreTaskbar();
     }
   }
 
@@ -64,6 +74,21 @@ export class KioskManager {
   /** Restores the taskbar when a session ends. */
   exit(): void {
     this.logger.info('Exiting kiosk mode');
+    this.sessionActive = false;
+    if (this.spectatorActive) {
+      this.run(['-Action', 'Refresh']);
+      return;
+    }
+    this.restoreTaskbar();
+  }
+
+  private startRefresh(): void {
+    if (this.refreshTimer) return;
+    this.refreshTimer = setInterval(() => this.run(['-Action', 'Refresh']), 1500);
+    this.refreshTimer.unref();
+  }
+
+  private restoreTaskbar(): void {
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer);
       this.refreshTimer = null;
