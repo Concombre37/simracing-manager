@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.196 — Journée lumineuse sur les serveurs
+
+- Les serveurs dédiés utilisent désormais le midi solaire (`SUN_ANGLE=0`) afin de garantir une luminosité de jour sur tous les circuits.
+
 ## v2.2.195 — Version agent correctement publiée
 
 - Le numéro de version du package agent et du lockfile est maintenant synchronisé avec le binaire publié, afin que les pods détectent bien la mise à jour.

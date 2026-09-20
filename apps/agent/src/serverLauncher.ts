@@ -41,7 +41,9 @@ const DEFAULT_RACE_FORMAT: RaceFormatConfig = {
 // Dedicated servers must always open in a predictable, bright daytime
 // setting.  The race-format editor still keeps its value for display and
 // future use, but it must not make a server unexpectedly start at night.
-const FIXED_SERVER_TIME = '16:30';
+// A true solar-noon setting keeps every circuit visibly bright. The previous
+// 16:30 angle still produced a low sun on several tracks and looked dark.
+const FIXED_SERVER_TIME = '12:00';
 
 /** AC's `REVERSED_GRID_RACE_POSITIONS` ([RACE] section): 0 disables it,
  * -1 fully reverses the grid, N reverses only the top N qualifying
