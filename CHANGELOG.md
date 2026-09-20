@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.191 — Synchronisation de l’heure des pods
+
+- Chaque agent Windows force le fuseau `Romance Standard Time` et demande une resynchronisation au service Windows Time au démarrage, puis périodiquement.
+- Les erreurs de droits ou de service sont journalisées sans empêcher le pod de démarrer.
+
 ## v2.2.190 — Position du timer ajustée
 
 - Le timer de session est positionné à 75 % de la largeur de l’écran, en conservant sa taille compacte.
