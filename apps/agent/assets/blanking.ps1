@@ -105,6 +105,20 @@ if ($ResultsHtmlPath -and (Test-Path $ResultsHtmlPath)) {
   [void]$grid.Children.Add($webBrowser)
 }
 
+function Show-ResultsHtml {
+  if ($webBrowser -eq $null -or -not $ResultsHtmlPath) { return }
+  try {
+    # NavigateToString keeps the generated document in the in-memory about:blank
+    # document instead of the IE Local Machine zone. This removes the legacy
+    # "active content" information bar that appeared over every blanking screen
+    # when the same trusted local HTML was opened through file://.
+    $html = Get-Content -LiteralPath $ResultsHtmlPath -Raw -ErrorAction Stop
+    $webBrowser.NavigateToString($html)
+  } catch {
+    Write-Warning "Failed to display blanking HTML $ResultsHtmlPath : $_"
+  }
+}
+
 if (-not $webBrowser -and $items.Count -eq 0 -and $Message -and $Message -ne '') {
   $label = New-Object System.Windows.Controls.Label
   $label.Content = $Message
@@ -217,7 +231,7 @@ $window.Add_Loaded({
   # guessing with a fixed delay that's wrong on both slow and fast machines.
   Write-Host 'BLANKING_WINDOW_READY'
   if ($webBrowser -ne $null) {
-    $webBrowser.Navigate([System.Uri]::new($ResultsHtmlPath))
+    Show-ResultsHtml
   } elseif ($items.Count -gt 0) {
     Show-CurrentSlide -SkipAnimation
   }
@@ -262,7 +276,7 @@ if ($webBrowser -ne $null -and $ResultsHtmlPath) {
         $writeTime = [System.IO.File]::GetLastWriteTimeUtc($ResultsHtmlPath)
         if ($writeTime -ne $script:lastResultsWriteTime) {
           $script:lastResultsWriteTime = $writeTime
-          $webBrowser.Navigate([System.Uri]::new($ResultsHtmlPath))
+          Show-ResultsHtml
         }
       }
     } catch {

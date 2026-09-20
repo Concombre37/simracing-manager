@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.193 — Suppression de l’avertissement active content
+
+- Les blanking HTML sont désormais injectés en mémoire avec `NavigateToString`, sans ouverture de fichier `file://` dans le moteur IE embarqué.
+
 ## v2.2.192 — Sortie propre du spectateur
 
 - La sortie du spectateur réinitialise son état et remet l’agent en attente après l’arrêt d’Assetto Corsa.
