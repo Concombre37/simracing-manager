@@ -13,7 +13,9 @@ export interface BulkActionResult {
  * stations d'un coup, en réutilisant tel quel le chemin déjà emprunté par
  * l'action équivalente à l'unité (PowerManagementService, AgentGateway) —
  * aucune nouvelle logique de commande, juste l'orchestration groupée. Une
- * station en échec ne bloque jamais les autres (Promise.allSettled). */
+ * station en échec ne bloque jamais les autres. Les actions sont limitées à
+ * quelques postes à la fois afin d'éviter un pic de connexions Prisma et de
+ * reconnexions WebSocket lorsque toute la flotte redémarre ensemble. */
 @Injectable()
 export class BulkActionsService {
   constructor(
@@ -113,16 +115,34 @@ export class BulkActionsService {
     stationIds: string[],
     fn: (id: string) => Promise<unknown>,
   ): Promise<BulkActionResult> {
-    const results = await Promise.allSettled(stationIds.map((id) => fn(id)));
+    // Un clic répété ne doit pas doubler les commandes. Quatre workers
+    // maintiennent un débit suffisant sans saturer l'API ou la base.
+    const ids = [...new Set(stationIds)];
+    const results: PromiseSettledResult<unknown>[] = new Array(ids.length);
+    let next = 0;
+    const worker = async () => {
+      while (true) {
+        const index = next++;
+        if (index >= ids.length) return;
+        try {
+          results[index] = { status: 'fulfilled', value: await fn(ids[index]) };
+        } catch (reason) {
+          results[index] = { status: 'rejected', reason };
+        }
+      }
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(4, ids.length) }, () => worker()),
+    );
     const succeeded: string[] = [];
     const failed: { stationId: string; error: string }[] = [];
 
     results.forEach((result, index) => {
       if (result.status === 'fulfilled') {
-        succeeded.push(stationIds[index]);
+        succeeded.push(ids[index]);
       } else {
         failed.push({
-          stationId: stationIds[index],
+          stationId: ids[index],
           error:
             result.reason instanceof Error
               ? result.reason.message
