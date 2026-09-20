@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.200 — Angle solaire à 50
+
+- Les pods et les serveurs dédiés utilisent `SUN_ANGLE=50` pour les courses locales, les connexions aux serveurs et les sessions hébergées.
+
 ## v2.2.199 — Soleil moins haut
 
 - Les pods et les serveurs dédiés utilisent un angle solaire de `24`, environ 13 h 30 selon la conversion du projet, pour une lumière de jour moins intense que le midi solaire.
