@@ -149,14 +149,30 @@ export function Sessions() {
   const { data: stations } = useQuery({ queryKey: ['stations'], queryFn: stationsApi.getAll });
   const [liveData, setLiveData] = useState<Record<string, TelemetrySnapshot>>({});
   const [now, setNow] = useState(Date.now());
-  const [selectedSessionIds, setSelectedSessionIds] = useState<Set<string>>(new Set());
+  const [selectedPodIds, setSelectedPodIds] = useState<Set<string>>(new Set());
   const [stoppingSelected, setStoppingSelected] = useState(false);
   const [stopFeedback, setStopFeedback] = useState<string | null>(null);
 
-  const selectedActiveSessions = (sessions ?? []).filter((session) => selectedSessionIds.has(session.id));
+  const podTargets = useMemo(() => {
+    const tracked = Array.from(
+      new Map(
+        (sessions ?? []).map((session) => [
+          session.station.id,
+          { id: session.station.id, name: session.station.name, sessionId: session.id },
+        ]),
+      ).values(),
+    );
+    const trackedIds = new Set(tracked.map((pod) => pod.id));
+    const untracked = (stations ?? [])
+      .filter((station) => station.role === 'simulator' && station.status === 'in_game' && !trackedIds.has(station.id))
+      .map((station) => ({ id: station.id, name: station.name, sessionId: null }));
+    return [...tracked, ...untracked];
+  }, [sessions, stations]);
+  const selectedPods = podTargets.filter((pod) => selectedPodIds.has(pod.id));
+  const untrackedPods = podTargets.filter((pod) => pod.sessionId === null);
 
-  function toggleSelectedSession(id: string) {
-    setSelectedSessionIds((current) => {
+  function toggleSelectedPod(id: string) {
+    setSelectedPodIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -166,7 +182,7 @@ export function Sessions() {
   }
 
   async function stopSelectedSessions() {
-    const targets = selectedActiveSessions;
+    const targets = selectedPods;
     if (targets.length === 0 || stoppingSelected) return;
     setStoppingSelected(true);
     setStopFeedback(null);
@@ -175,18 +191,19 @@ export function Sessions() {
     const failed: string[] = [];
     const workers = Array.from({ length: Math.min(4, targets.length) }, async () => {
       while (next < targets.length) {
-        const session = targets[next++];
+        const pod = targets[next++];
         try {
-          await sessionsApi.stop(session.id);
-          succeeded.push(session.id);
+          if (pod.sessionId) await sessionsApi.stop(pod.sessionId);
+          else await stationsApi.stop(pod.id);
+          succeeded.push(pod.id);
         } catch {
-          failed.push(session.station.name);
+          failed.push(pod.name);
         }
       }
     });
     try {
       await Promise.all(workers);
-      setSelectedSessionIds((current) => {
+      setSelectedPodIds((current) => {
         const remaining = new Set(current);
         succeeded.forEach((id) => remaining.delete(id));
         return remaining;
@@ -197,6 +214,7 @@ export function Sessions() {
           : `${succeeded.length} arrêtée(s), ${failed.length} échec(s) : ${failed.join(', ')}.`,
       );
       await queryClient.invalidateQueries({ queryKey: ['sessions', 'active'] });
+      await queryClient.invalidateQueries({ queryKey: ['stations'] });
     } finally {
       setStoppingSelected(false);
     }
@@ -280,20 +298,20 @@ export function Sessions() {
           <div className="flex items-center gap-3">
             <div
               className={`flex items-center gap-2 whitespace-nowrap rounded border px-3.5 py-2 font-hud text-[13px] font-bold tracking-wide ${
-                count > 0
+                podTargets.length > 0
                   ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
                   : 'border-white/10 bg-white/[0.03] text-gray-500'
               }`}
             >
               <span className="relative flex h-1.5 w-1.5">
-                {count > 0 && (
+                {podTargets.length > 0 && (
                   <span className="absolute inline-flex h-full w-full animate-ring-pulse rounded-full bg-emerald-400" />
                 )}
                 <span
-                  className={`relative inline-flex h-1.5 w-1.5 rounded-full ${count > 0 ? 'bg-emerald-400' : 'bg-gray-500'}`}
+                  className={`relative inline-flex h-1.5 w-1.5 rounded-full ${podTargets.length > 0 ? 'bg-emerald-400' : 'bg-gray-500'}`}
                 />
               </span>
-              {count} POD{count > 1 ? 'S' : ''} EN SESSION
+              {podTargets.length} POD{podTargets.length > 1 ? 'S' : ''} EN JEU
             </div>
             <Link
               to="/en-cours/kiosk"
@@ -330,14 +348,14 @@ export function Sessions() {
           </div>
         )}
 
-        {!isLoading && count > 0 && (
+        {!isLoading && podTargets.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/[0.025] px-4 py-3">
             <span className="mr-auto font-hud text-sm font-bold text-gray-300">
-              {selectedActiveSessions.length} / {count} POD sélectionné(s)
+              {selectedPods.length} / {podTargets.length} POD sélectionné(s)
             </span>
             <button
               type="button"
-              onClick={() => setSelectedSessionIds(new Set((sessions ?? []).map((session) => session.id)))}
+              onClick={() => setSelectedPodIds(new Set(podTargets.map((pod) => pod.id)))}
               disabled={stoppingSelected}
               className="rounded border border-white/10 px-3 py-2 font-hud text-xs font-bold text-gray-300 hover:border-racing-cyan/40 hover:text-white disabled:opacity-40"
             >
@@ -345,7 +363,7 @@ export function Sessions() {
             </button>
             <button
               type="button"
-              onClick={() => setSelectedSessionIds(new Set())}
+              onClick={() => setSelectedPodIds(new Set())}
               disabled={stoppingSelected}
               className="rounded border border-white/10 px-3 py-2 font-hud text-xs font-bold text-gray-300 hover:border-racing-cyan/40 hover:text-white disabled:opacity-40"
             >
@@ -353,9 +371,9 @@ export function Sessions() {
             </button>
             <ConfirmButton
               onConfirm={() => void stopSelectedSessions()}
-              disabled={stoppingSelected || selectedActiveSessions.length === 0}
+              disabled={stoppingSelected || selectedPods.length === 0}
               className="rounded border border-red-500/50 bg-red-500/10 px-4 py-2 font-hud text-xs font-bold text-red-300 hover:bg-red-500/20 disabled:opacity-40"
-              idleContent={`Arrêter la sélection (${selectedActiveSessions.length})`}
+              idleContent={`Arrêter la sélection (${selectedPods.length})`}
               confirmContent="Confirmer l’arrêt ?"
             />
           </div>
@@ -388,8 +406,8 @@ export function Sessions() {
                 <label className="mb-2 flex cursor-pointer items-center gap-2 rounded border border-white/10 bg-white/[0.025] px-3 py-2 font-hud text-xs font-bold text-gray-300">
                   <input
                     type="checkbox"
-                    checked={selectedSessionIds.has(session.id)}
-                    onChange={() => toggleSelectedSession(session.id)}
+                    checked={selectedPodIds.has(session.station.id)}
+                    onChange={() => toggleSelectedPod(session.station.id)}
                     disabled={stoppingSelected}
                     className="h-4 w-4 accent-racing-cyan"
                   />
@@ -412,7 +430,27 @@ export function Sessions() {
           </AnimatePresence>
         </div>
 
-        {!isLoading && count === 0 && <EmptyState />}
+        {untrackedPods.length > 0 && (
+          <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4">
+            <h2 className="mb-3 font-hud text-sm font-bold text-white">Autres POD en jeu</h2>
+            <div className="flex flex-wrap gap-2">
+              {untrackedPods.map((pod) => (
+                <label key={pod.id} className="flex cursor-pointer items-center gap-2 rounded border border-racing-cyan/20 bg-racing-cyan/[0.05] px-3 py-2 font-hud text-xs font-bold text-sky-200">
+                  <input
+                    type="checkbox"
+                    checked={selectedPodIds.has(pod.id)}
+                    onChange={() => toggleSelectedPod(pod.id)}
+                    disabled={stoppingSelected}
+                    className="h-4 w-4 accent-racing-cyan"
+                  />
+                  {pod.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isLoading && podTargets.length === 0 && <EmptyState />}
       </div>
     </PageTransition>
   );
