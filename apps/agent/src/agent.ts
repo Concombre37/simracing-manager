@@ -51,6 +51,7 @@ import { WatchdogManager } from './watchdogManager';
 import { SpectatorManager } from './spectatorManager';
 import { LiveCaptureManager } from './liveCaptureManager';
 import { SessionTimerManager } from './sessionTimerManager';
+import { synchronizeSystemClock } from './timeSync';
 
 const execFileAsync = promisify(execFile);
 
@@ -121,6 +122,7 @@ export class SimRacingAgent {
   private spectatorManager: SpectatorManager;
   private liveCaptureManager: LiveCaptureManager;
   private sessionTimerManager: SessionTimerManager;
+  private clockSyncTimeout: NodeJS.Timeout | null = null;
 
   constructor(private readonly logger: Logger) {
     this.acLauncher = new AcLauncher(logger);
@@ -276,6 +278,11 @@ export class SimRacingAgent {
   }
 
   async start(): Promise<void> {
+    await synchronizeSystemClock(this.logger);
+    this.clockSyncTimeout = setInterval(
+      () => void synchronizeSystemClock(this.logger),
+      6 * 60 * 60 * 1000,
+    );
     // Blanking must be the very first thing on screen, before anything that
     // can be slow or even block (resolveAcPath() scans multiple Steam
     // directories; ensureContentManagerPath() can pop a blocking prompt if
@@ -592,6 +599,10 @@ export class SimRacingAgent {
   }
 
   async stop(): Promise<void> {
+    if (this.clockSyncTimeout) {
+      clearInterval(this.clockSyncTimeout);
+      this.clockSyncTimeout = null;
+    }
     this.stopHeartbeat();
     this.stopTelemetry();
     this.acSharedMemoryReader?.stop();
