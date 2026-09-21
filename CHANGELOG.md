@@ -1,5 +1,9 @@
 # Changelog
 
+## Correctif — Arrêt du spectateur
+
+- La commande « Retirer du serveur » utilise désormais une route distincte qui ne peut plus être confondue avec l'arrêt d'un serveur dédié.
+
 ## v2.2.201 — Shell Windows coupé pendant le mode spectateur
 
 - Le poste spectateur arrête complètement `explorer.exe` lorsqu'il rejoint un serveur, ce qui empêche la barre des tâches de réapparaître pendant la course.

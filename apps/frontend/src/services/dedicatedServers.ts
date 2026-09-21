@@ -116,5 +116,5 @@ export const dedicatedServersApi = {
   getSpectateStatus: () =>
     api.get<SpectatorAssignment[]>('/dedicated-servers/spectate-status').then((res) => res.data),
   stopSpectating: (assignmentId: string) =>
-    api.post('/dedicated-servers/spectate/stop', { assignmentId }).then((res) => res.data),
+    api.post('/dedicated-servers/spectator-stop', { assignmentId }).then((res) => res.data),
 };

@@ -105,8 +105,8 @@ export class DedicatedServersController {
     });
   }
 
-  /** Stop the spectator before any dynamic `:id/stop` route can match it. */
-  @Post('spectate/stop')
+  /** Dedicated path that cannot be mistaken for the dynamic `:id/stop` route. */
+  @Post('spectator-stop')
   @Roles(UserRole.ADMIN)
   async stopSpectating(@Body() body: { assignmentId?: string }) {
     const assignmentId = String(body.assignmentId ?? '').trim();
