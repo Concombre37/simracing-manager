@@ -1,5 +1,9 @@
 # Changelog
 
+## Amélioration — Accès rapide aux sessions en cours
+
+- Le dashboard propose maintenant un bouton « En cours » dans ses actions rapides.
+
 ## Correctif — Arrêt du spectateur
 
 - La commande « Retirer du serveur » utilise désormais une route distincte qui ne peut plus être confondue avec l'arrêt d'un serveur dédié.

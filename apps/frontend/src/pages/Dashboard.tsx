@@ -242,6 +242,13 @@ export function Dashboard() {
                 <Plus className="h-3.5 w-3.5" />
                 Nouveau serveur
               </Link>
+              <Link
+                to="/en-cours"
+                className="flex items-center gap-2 whitespace-nowrap rounded-md border border-racing-cyan/30 bg-racing-cyan/10 px-4 py-2.5 font-hud text-sm font-bold tracking-wide text-sky-200 transition-colors hover:border-racing-cyan/60 hover:bg-racing-cyan/15 hover:text-white"
+              >
+                <Zap className="h-3.5 w-3.5" />
+                En cours
+              </Link>
             </div>
           </div>
 
