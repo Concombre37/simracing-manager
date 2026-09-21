@@ -242,13 +242,6 @@ export function Dashboard() {
                 <Plus className="h-3.5 w-3.5" />
                 Nouveau serveur
               </Link>
-              <Link
-                to="/en-cours"
-                className="flex items-center gap-2 whitespace-nowrap rounded-md border border-racing-cyan/30 bg-racing-cyan/10 px-4 py-2.5 font-hud text-sm font-bold tracking-wide text-sky-200 transition-colors hover:border-racing-cyan/60 hover:bg-racing-cyan/15 hover:text-white"
-              >
-                <Zap className="h-3.5 w-3.5" />
-                En cours
-              </Link>
             </div>
           </div>
 
@@ -374,6 +367,16 @@ export function Dashboard() {
             bordered
           />
         </section>
+
+        <div className="flex justify-center">
+          <Link
+            to="/en-cours"
+            className="flex items-center gap-2 whitespace-nowrap rounded-md border border-racing-cyan/30 bg-racing-cyan/10 px-6 py-3 font-hud text-sm font-bold tracking-wide text-sky-200 shadow-[0_0_24px_rgba(0,194,255,0.12)] transition-all hover:border-racing-cyan/60 hover:bg-racing-cyan/15 hover:text-white hover:shadow-[0_0_30px_rgba(0,194,255,0.22)]"
+          >
+            <Zap className="h-4 w-4" />
+            En cours
+          </Link>
+        </div>
 
         <FleetQuickControl stations={stations ?? []} />
 
