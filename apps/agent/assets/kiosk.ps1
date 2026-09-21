@@ -1,5 +1,5 @@
 param(
-  [ValidateSet('Enter', 'Refresh', 'Foreground', 'Exit')]
+  [ValidateSet('Enter', 'EnterWithoutExplorer', 'Refresh', 'Foreground', 'RestoreExplorerHidden', 'Exit')]
   [string]$Action = 'Enter',
   [string]$GameProcessName = 'acs',
   [string]$SkipTitle = 'SimRacingBlanking',
@@ -84,6 +84,24 @@ function Hide-Taskbar {
 function Show-Taskbar {
   foreach ($h in Get-TaskbarHandles) {
     [SimRacingKiosk]::ShowWindow($h, $SW_SHOW) | Out-Null
+  }
+}
+
+function Stop-ExplorerShell {
+  Get-Process -Name explorer -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+}
+
+function Start-ExplorerShell {
+  if (-not (Get-Process -Name explorer -ErrorAction SilentlyContinue)) {
+    Start-Process explorer.exe
+  }
+
+  # Explorer creates the taskbar asynchronously. Wait briefly for the shell,
+  # then hide every taskbar before returning to the spectator wall.
+  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    if ([SimRacingKiosk]::FindWindow('Shell_TrayWnd', $null) -ne [IntPtr]::Zero) { break }
+    Start-Sleep -Milliseconds 100
   }
 }
 
@@ -194,6 +212,14 @@ switch ($Action) {
     Hide-Taskbar
     Minimize-OtherWindows -SkipTitle $SkipTitle -GameProcessName $GameProcessName
   }
+  'EnterWithoutExplorer' {
+    # The spectator has no use for the Windows shell while it is connected
+    # to a server. Stopping Explorer removes the taskbar instead of relying
+    # on Windows to keep a hidden shell window hidden through focus changes.
+    Hide-Taskbar
+    Minimize-OtherWindows -SkipTitle $SkipTitle -GameProcessName $GameProcessName
+    Stop-ExplorerShell
+  }
   'Refresh' {
     # Shell/foreground changes can make Windows show the taskbar again while
     # a session is running. This action is intentionally limited to the
@@ -210,7 +236,12 @@ switch ($Action) {
     $ok = Set-GameForeground -ProcessName $GameProcessName -TimeoutMs $ForegroundTimeoutMs
     if (-not $ok) { exit 1 }
   }
+  'RestoreExplorerHidden' {
+    Start-ExplorerShell
+    Hide-Taskbar
+  }
   'Exit' {
+    Start-ExplorerShell
     Show-Taskbar
   }
 }

@@ -16,6 +16,7 @@ export class KioskManager {
   private refreshTimer: NodeJS.Timeout | null = null;
   private sessionActive = false;
   private spectatorActive = false;
+  private explorerStoppedForSession = false;
 
   constructor(private readonly logger: Logger) {}
 
@@ -37,10 +38,16 @@ export class KioskManager {
    * game's foreground state — call revealGame() for that once blanking
    * actually hides, otherwise the game would visually cover the blanking
    * screen well before its grace period elapses. Fire-and-forget. */
-  enter(gameProcessName = 'acs'): void {
+  enter(gameProcessName = 'acs', stopExplorer = false): void {
     this.sessionActive = true;
-    this.logger.info({ gameProcessName }, 'Entering kiosk mode');
-    this.run(['-Action', 'Enter', '-GameProcessName', gameProcessName]);
+    this.explorerStoppedForSession = stopExplorer;
+    this.logger.info({ gameProcessName, stopExplorer }, 'Entering kiosk mode');
+    this.run([
+      '-Action',
+      stopExplorer ? 'EnterWithoutExplorer' : 'Enter',
+      '-GameProcessName',
+      gameProcessName,
+    ]);
 
     // Windows occasionally restores the shell taskbar when Content Manager,
     // AC or a driver dialog changes the foreground window.  Keep the kiosk
@@ -75,6 +82,12 @@ export class KioskManager {
   exit(): void {
     this.logger.info('Exiting kiosk mode');
     this.sessionActive = false;
+    if (this.explorerStoppedForSession) {
+      this.explorerStoppedForSession = false;
+      this.run(['-Action', this.spectatorActive ? 'RestoreExplorerHidden' : 'Exit']);
+      if (this.spectatorActive) this.startRefresh();
+      return;
+    }
     if (this.spectatorActive) {
       this.run(['-Action', 'Refresh']);
       return;

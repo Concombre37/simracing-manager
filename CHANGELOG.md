@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.201 — Shell Windows coupé pendant le mode spectateur
+
+- Le poste spectateur arrête complètement `explorer.exe` lorsqu'il rejoint un serveur, ce qui empêche la barre des tâches de réapparaître pendant la course.
+- Explorer est relancé à la sortie du serveur et sa barre reste masquée sur l'écran spectateur.
+
 ## v2.2.200 — Angle solaire à 50
 
 - Les pods et les serveurs dédiés utilisent `SUN_ANGLE=50` pour les courses locales, les connexions aux serveurs et les sessions hébergées.
