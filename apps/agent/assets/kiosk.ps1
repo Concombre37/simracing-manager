@@ -3,7 +3,7 @@ param(
   [string]$Action = 'Enter',
   [string]$GameProcessName = 'acs',
   [string]$SkipTitle = 'SimRacingBlanking',
-  [string]$GuardFile = (Join-Path $env:TEMP 'simracing-manager\spectator-explorer.guard'),
+  [int]$OwnerPid = 0,
   [int]$ForegroundTimeoutMs = 6000
 )
 
@@ -91,32 +91,6 @@ function Show-Taskbar {
 function Stop-ExplorerShell {
   Get-Process -Name explorer -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
-}
-
-function Start-ExplorerGuard {
-  $guardDirectory = Split-Path -Parent $GuardFile
-  if ($guardDirectory) {
-    New-Item -ItemType Directory -Path $guardDirectory -Force | Out-Null
-  }
-  Set-Content -LiteralPath $GuardFile -Value $PID -Force
-
-  # Run an independent hidden watchdog. Windows may restart Explorer after a
-  # forced stop, so a one-shot Stop-Process is insufficient for kiosk use.
-  $arguments = @(
-    '-NoProfile',
-    '-WindowStyle', 'Hidden',
-    '-ExecutionPolicy', 'Bypass',
-    '-File', ('"' + $PSCommandPath + '"'),
-    '-Action', 'ExplorerGuard',
-    '-GuardFile', ('"' + $GuardFile + '"')
-  )
-  Start-Process -FilePath 'powershell.exe' -ArgumentList $arguments -WindowStyle Hidden | Out-Null
-}
-
-function Stop-ExplorerGuard {
-  Remove-Item -LiteralPath $GuardFile -Force -ErrorAction SilentlyContinue
-  # Let the watchdog observe the removed guard before Explorer is restored.
-  Start-Sleep -Milliseconds 350
 }
 
 function Start-ExplorerShell {
@@ -246,17 +220,18 @@ switch ($Action) {
     Hide-Taskbar
     Minimize-OtherWindows -SkipTitle $SkipTitle -GameProcessName $GameProcessName
     Stop-ExplorerShell
-    Start-ExplorerGuard
   }
   'ExplorerGuard' {
-    # Explorer is a self-healing Windows shell and can be restarted by the OS,
-    # keyboard shortcuts or other software. While the guard exists, remove it
-    # immediately and hide every taskbar first to prevent even a short flash.
-    while (Test-Path -LiteralPath $GuardFile) {
+    if ($OwnerPid -le 0) { exit 2 }
+    # The agent owns this process directly and stops it when kiosk mode ends.
+    # If the agent crashes, keep the guard until the game itself has closed.
+    while ((Get-Process -Id $OwnerPid -ErrorAction SilentlyContinue) -or
+           (Get-Process -Name 'acs' -ErrorAction SilentlyContinue)) {
       Hide-Taskbar
       Stop-ExplorerShell
       Start-Sleep -Milliseconds 100
     }
+    Start-ExplorerShell
   }
   'Refresh' {
     # Shell/foreground changes can make Windows show the taskbar again while
@@ -275,12 +250,12 @@ switch ($Action) {
     if (-not $ok) { exit 1 }
   }
   'RestoreExplorerHidden' {
-    Stop-ExplorerGuard
     Start-ExplorerShell
     Hide-Taskbar
   }
   'Exit' {
-    Stop-ExplorerGuard
+    # The agent has stopped the guard process before requesting this action.
+    Start-Sleep -Milliseconds 200
     Start-ExplorerShell
     Show-Taskbar
   }

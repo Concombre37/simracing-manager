@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.203 — Barre Windows supprimée pendant Assetto
+
+- Le script PowerShell qui arrête Explorer est désormais lancé et surveillé directement par l'agent ; il redémarre en cas d'arrêt inattendu.
+- La protection s'applique à toutes les sessions Assetto, sur les pods comme sur le spectateur. Sur le spectateur, elle reste active sur l'écran d'attente.
+- Le shell Windows est restauré après la session d'un pod ou l'arrêt de l'agent spectateur.
+
 ## v2.2.202 — Verrouillage permanent de la barre Windows
 
 - Pendant une session spectateur, un processus PowerShell caché surveille le shell Windows et arrête immédiatement toute relance d'`explorer.exe`.

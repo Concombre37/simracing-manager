@@ -1310,7 +1310,7 @@ export class SimRacingAgent {
       // Only the game should be visible during a session: hide the
       // taskbar, minimize whatever else was open, and bring the game
       // window to the foreground once it appears.
-      this.kioskManager.enter('acs', isSpectatorTransition);
+      this.kioskManager.enter();
       this.logger.info('Join server command completed');
 
       // Shared-memory telemetry (the only reliable source for the

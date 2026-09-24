@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { ChildProcess, spawn } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import { Logger } from 'pino';
@@ -13,11 +13,12 @@ import { Logger } from 'pino';
  */
 export class KioskManager {
   private scriptPath: string | null = null;
-  private explorerGuardPath: string | null = null;
+  private explorerGuard: ChildProcess | null = null;
+  private guardRestartTimer: NodeJS.Timeout | null = null;
+  private guardWanted = false;
   private refreshTimer: NodeJS.Timeout | null = null;
   private sessionActive = false;
   private spectatorActive = false;
-  private explorerStoppedForSession = false;
 
   constructor(private readonly logger: Logger) {}
 
@@ -28,8 +29,6 @@ export class KioskManager {
       const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
       await fs.mkdir(tmpDir, { recursive: true });
       this.scriptPath = path.join(tmpDir, 'kiosk.ps1');
-      this.explorerGuardPath = path.join(tmpDir, 'spectator-explorer.guard');
-      await fs.rm(this.explorerGuardPath, { force: true });
       const content = await fs.readFile(src, 'utf-8');
       await fs.writeFile(this.scriptPath, content, 'utf-8');
     } catch (err) {
@@ -41,16 +40,16 @@ export class KioskManager {
    * game's foreground state — call revealGame() for that once blanking
    * actually hides, otherwise the game would visually cover the blanking
    * screen well before its grace period elapses. Fire-and-forget. */
-  enter(gameProcessName = 'acs', stopExplorer = false): void {
+  enter(gameProcessName = 'acs'): void {
     this.sessionActive = true;
-    this.explorerStoppedForSession = stopExplorer;
-    this.logger.info({ gameProcessName, stopExplorer }, 'Entering kiosk mode');
+    this.logger.info({ gameProcessName }, 'Entering kiosk mode');
     this.run([
       '-Action',
-      stopExplorer ? 'EnterWithoutExplorer' : 'Enter',
+      'EnterWithoutExplorer',
       '-GameProcessName',
       gameProcessName,
     ]);
+    this.startExplorerGuard();
 
     // Windows occasionally restores the shell taskbar when Content Manager,
     // AC or a driver dialog changes the foreground window.  Keep the kiosk
@@ -63,9 +62,10 @@ export class KioskManager {
     if (this.spectatorActive === enabled) return;
     this.spectatorActive = enabled;
     if (enabled) {
-      this.run(['-Action', 'Refresh']);
+      this.startExplorerGuard();
       this.startRefresh();
     } else if (!this.sessionActive) {
+      this.stopExplorerGuard();
       this.restoreTaskbar();
     }
   }
@@ -85,17 +85,43 @@ export class KioskManager {
   exit(): void {
     this.logger.info('Exiting kiosk mode');
     this.sessionActive = false;
-    if (this.explorerStoppedForSession) {
-      this.explorerStoppedForSession = false;
-      this.run(['-Action', this.spectatorActive ? 'RestoreExplorerHidden' : 'Exit']);
-      if (this.spectatorActive) this.startRefresh();
-      return;
-    }
     if (this.spectatorActive) {
       this.run(['-Action', 'Refresh']);
       return;
     }
+    this.stopExplorerGuard();
     this.restoreTaskbar();
+  }
+
+  private startExplorerGuard(): void {
+    if (process.platform !== 'win32' || !this.scriptPath) return;
+    this.guardWanted = true;
+    if (this.explorerGuard || this.guardRestartTimer) return;
+
+    const guard = spawn('powershell.exe', this.buildArgs([
+      '-Action', 'ExplorerGuard', '-OwnerPid', String(process.pid),
+    ]), { windowsHide: true, stdio: 'ignore' });
+    this.explorerGuard = guard;
+    guard.on('error', (err) => this.logger.error({ err }, 'Explorer guard failed to start'));
+    guard.on('close', (code) => {
+      if (this.explorerGuard !== guard) return;
+      this.explorerGuard = null;
+      if (!this.guardWanted) return;
+      this.logger.warn({ code }, 'Explorer guard exited; restarting');
+      this.guardRestartTimer = setTimeout(() => {
+        this.guardRestartTimer = null;
+        this.startExplorerGuard();
+      }, 1000);
+      this.guardRestartTimer.unref();
+    });
+  }
+
+  private stopExplorerGuard(): void {
+    this.guardWanted = false;
+    if (this.guardRestartTimer) clearTimeout(this.guardRestartTimer);
+    this.guardRestartTimer = null;
+    this.explorerGuard?.kill();
+    this.explorerGuard = null;
   }
 
   private startRefresh(): void {
@@ -121,7 +147,6 @@ export class KioskManager {
       'Bypass',
       '-File',
       this.scriptPath as string,
-      ...(this.explorerGuardPath ? ['-GuardFile', this.explorerGuardPath] : []),
       ...extraArgs,
     ];
   }
