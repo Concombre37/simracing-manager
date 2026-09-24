@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.202 — Verrouillage permanent de la barre Windows
+
+- Pendant une session spectateur, un processus PowerShell caché surveille le shell Windows et arrête immédiatement toute relance d'`explorer.exe`.
+- Toutes les barres des tâches principales et secondaires sont masquées en continu jusqu'à la sortie du serveur.
+- Le verrou est supprimé à l'arrêt, puis Explorer est relancé proprement sur l'écran spectateur.
+
 ## Amélioration — Accès rapide aux sessions en cours
 
 - Le dashboard propose maintenant un bouton « En cours » dans ses actions rapides.

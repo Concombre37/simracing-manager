@@ -13,6 +13,7 @@ import { Logger } from 'pino';
  */
 export class KioskManager {
   private scriptPath: string | null = null;
+  private explorerGuardPath: string | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
   private sessionActive = false;
   private spectatorActive = false;
@@ -27,6 +28,8 @@ export class KioskManager {
       const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
       await fs.mkdir(tmpDir, { recursive: true });
       this.scriptPath = path.join(tmpDir, 'kiosk.ps1');
+      this.explorerGuardPath = path.join(tmpDir, 'spectator-explorer.guard');
+      await fs.rm(this.explorerGuardPath, { force: true });
       const content = await fs.readFile(src, 'utf-8');
       await fs.writeFile(this.scriptPath, content, 'utf-8');
     } catch (err) {
@@ -118,6 +121,7 @@ export class KioskManager {
       'Bypass',
       '-File',
       this.scriptPath as string,
+      ...(this.explorerGuardPath ? ['-GuardFile', this.explorerGuardPath] : []),
       ...extraArgs,
     ];
   }
