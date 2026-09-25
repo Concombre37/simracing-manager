@@ -1,11 +1,97 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bestCleanLapForDriver,
   cleanupRaceResult,
   getLeaderboard,
   selectResultsEntries,
   selectResultsGroups,
   type RaceResultData,
 } from './raceResultCleaner';
+
+describe('bestCleanLapForDriver', () => {
+  it('ignores cut laps across Practice, Qualifying and Race while keeping them in the JSON', () => {
+    const result: RaceResultData = {
+      players: [
+        { name: 'Alice', car: 'car_a' },
+        { name: 'Bob', car: 'car_b' },
+      ],
+      sessions: [
+        { name: 'Practice', laps: [{ car: 0, time: 92000, cuts: 0 }] },
+        { name: 'Qualifying', laps: [{ car: 0, time: 78000, cuts: 2 }] },
+        {
+          name: 'Race',
+          laps: [
+            { car: 0, time: 88000, cuts: 0 },
+            { car: 0, time: 75000, cuts: 1 },
+            { car: 1, time: 70000, cuts: 0 },
+          ],
+        },
+      ],
+    };
+
+    expect(bestCleanLapForDriver(result, 'Alice', 'car_a')).toEqual({
+      status: 'valid',
+      timeMs: 88000,
+    });
+    expect(result.sessions[1].laps?.[0]).toEqual({ car: 0, time: 78000, cuts: 2 });
+  });
+
+  it('reports no valid score when every lap is cut', () => {
+    const result: RaceResultData = {
+      players: [{ name: 'Alice', car: 'car_a' }],
+      sessions: [{ name: 'Race', laps: [{ car: 0, time: 75000, cuts: 1 }] }],
+    };
+    expect(bestCleanLapForDriver(result, 'Alice', 'car_a')).toEqual({ status: 'no-valid' });
+  });
+
+  it('uses the unique car match when the display name differs', () => {
+    const result: RaceResultData = {
+      players: [
+        { name: 'AC Driver', car: 'car_a' },
+        { name: 'Bob', car: 'car_b' },
+      ],
+      sessions: [{ name: 'Race', laps: [{ car: 0, time: 81000, cuts: 0 }] }],
+    };
+    expect(bestCleanLapForDriver(result, 'Customer', 'car_a')).toEqual({
+      status: 'valid',
+      timeMs: 81000,
+    });
+  });
+
+  it('keeps a valid lap when lapstotal is missing or zero', () => {
+    const result: RaceResultData = {
+      players: [{ name: 'Alice' }, { name: 'Bob' }],
+      sessions: [
+        { name: 'Qualifying', lapstotal: [0, 0], laps: [{ car: 1, time: 83000, cuts: 0 }] },
+      ],
+    };
+    const cleaned = cleanupRaceResult(result);
+    expect(cleaned.valid).toBe(true);
+    expect(bestCleanLapForDriver(cleaned.resultData!, 'Bob')).toEqual({
+      status: 'valid',
+      timeMs: 83000,
+    });
+  });
+
+  it('never attributes another driver’s lap when identity is ambiguous', () => {
+    const result: RaceResultData = {
+      players: [
+        { name: 'Alice', car: 'car_a' },
+        { name: 'Bob', car: 'car_a' },
+      ],
+      sessions: [{ name: 'Race', laps: [{ car: 1, time: 71000, cuts: 0 }] }],
+    };
+    expect(bestCleanLapForDriver(result, 'Customer', 'car_a')).toEqual({ status: 'unmatched' });
+  });
+
+  it('marks a bestLaps-only format as unverifiable', () => {
+    const result: RaceResultData = {
+      players: [{ name: 'Alice' }],
+      sessions: [{ name: 'Race', lapstotal: [1], bestLaps: [{ car: 0, time: 81000 }] }],
+    };
+    expect(bestCleanLapForDriver(result, 'Alice')).toEqual({ status: 'unverifiable' });
+  });
+});
 
 describe('getLeaderboard', () => {
   it('uses the Race session when Practice and Qualifying precede it', () => {
@@ -44,6 +130,20 @@ describe('getLeaderboard', () => {
     };
 
     expect(getLeaderboard(result).map((entry) => entry.name)).toEqual(['Alice', 'Bob']);
+  });
+
+  it('does not use a cut lap or an unverified bestLaps entry as a score', () => {
+    const result: RaceResultData = {
+      players: [{ name: 'Alice' }],
+      sessions: [
+        {
+          name: 'Race',
+          laps: [{ car: 0, time: 70000, cuts: 1 }],
+          bestLaps: [{ car: 0, time: 70000 }],
+        },
+      ],
+    };
+    expect(getLeaderboard(result)[0].bestLapMs).toBe(0);
   });
 
   it('keeps the race order when all recorded times are invalid', () => {

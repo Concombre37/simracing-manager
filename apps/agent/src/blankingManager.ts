@@ -3,13 +3,7 @@ import fs from 'fs/promises';
 import { writeFileSync, existsSync, readFileSync, unlinkSync } from 'fs';
 import path from 'path';
 import { Logger } from 'pino';
-import {
-  LeaderboardEntry,
-  RaceResultData,
-  getLeaderboard,
-  selectResultsEntries,
-  selectResultsGroups,
-} from './raceResultCleaner';
+import { LeaderboardEntry, selectResultsEntries, selectResultsGroups } from './raceResultCleaner';
 import { config } from './config';
 
 export type BlankingOverride = 'auto' | 'hide' | 'show';
@@ -67,7 +61,12 @@ interface SessionResultsSummary {
   trackName?: string;
   trackLayout?: string;
   bestLapMs?: number;
-  result?: RaceResultData;
+  /** False when race_out.json could not be read; no score can be confirmed. */
+  resultVerified?: boolean;
+  /** False when the station driver cannot be identified in a valid results file. */
+  driverMatched?: boolean;
+  /** The result contains a time but no lap-level cut information to verify it. */
+  scoreUnverifiable?: boolean;
   /** Historical entries loaded from the backend. When provided (including an
    * empty array), these are the only entries used for the final screen. */
   archivedEntries?: LeaderboardEntry[];
@@ -667,17 +666,12 @@ export class BlankingManager {
   private generateResultsHtml(summary: SessionResultsSummary): void {
     const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
     const htmlPath = path.join(tmpDir, 'session-results.html');
-    const bestLap = formatLapTime(summary.bestLapMs ?? 0);
+    const bestLap = summary.pending ? '-' : formatLapTime(summary.bestLapMs ?? 0);
     const trackLabel = summary.trackName ?? summary.track;
     const carLabel = summary.carName ?? summary.carAcId;
     const trackDisplay = trackLabel ?? '-';
 
-    let entries =
-      summary.archivedEntries !== undefined
-        ? summary.archivedEntries
-        : summary.result
-          ? getLeaderboard(summary.result)
-          : [];
+    let entries = summary.archivedEntries ?? [];
     const ownName = normalizeDriverName(summary.clientName ?? '');
     let ownEntry = ownName
       ? entries.find((e) => normalizeDriverName(e.name) === ownName)
@@ -726,23 +720,33 @@ export class BlankingManager {
     const visibleEntries = ownEntry
       ? selectResultsEntries(entries, ownEntry.position)
       : selectResultsEntries(entries);
-    const noValidTimes = entries.length === 0 || !entries.some((entry) => entry.bestLapMs > 0);
+    const noArchivedTimes = entries.length === 0 || !entries.some((entry) => entry.bestLapMs > 0);
+    const sessionNotice = summary.pending
+      ? ''
+      : summary.resultVerified === false
+        ? 'Résultats indisponibles — aucun tour valide confirmé'
+        : summary.driverMatched === false
+          ? 'Pilote non identifié dans les résultats — aucun tour confirmé'
+          : summary.scoreUnverifiable
+            ? 'Tours enregistrés sans détails de validité — aucun temps confirmé'
+            : !summary.bestLapMs || summary.bestLapMs <= 0
+              ? 'Aucun tour valide dans cette session'
+              : '';
     const historyNotice = summary.archivedCarFallback
       ? 'Aucun temps archivé avec cette voiture — classement du circuit affiché'
-      : summary.archivedEntries !== undefined && noValidTimes && summary.carAcId
+      : summary.archivedEntries !== undefined && noArchivedTimes && summary.carAcId
         ? 'Aucun temps archivé avec cette voiture'
-        : noValidTimes
-          ? 'Aucun temps valide dans cette session'
-          : '';
+        : '';
+    const notices = [sessionNotice, historyNotice].filter(Boolean);
 
     const leaderboard =
       visibleEntries.length > 0
-        ? `${this.renderLeaderboard(visibleEntries, ownEntry?.position)}${
-            historyNotice ? `<div class="no-valid-time">${historyNotice}</div>` : ''
-          }`
+        ? `${this.renderLeaderboard(visibleEntries, ownEntry?.position)}${notices
+            .map((notice) => `<div class="no-valid-time">${notice}</div>`)
+            .join('')}`
         : summary.pending
           ? `<div class="placeholder-box"><div class="spinner"></div>Chargement du classement…</div>`
-          : `<div class="placeholder-box"><div class="no-valid-time">${historyNotice || 'Aucun temps valide dans cette session'}</div></div>`;
+          : `<div class="placeholder-box"><div class="no-valid-time">${notices.join(' — ') || 'Aucun temps archivé'}</div></div>`;
 
     const html = `<!DOCTYPE html>
 <html lang="fr">

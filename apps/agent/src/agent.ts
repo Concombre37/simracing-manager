@@ -35,7 +35,12 @@ import { TelemetryReceiver } from './telemetryReceiver';
 import { TelemetryFileReader } from './telemetryFileReader';
 import { AcSharedMemoryReader } from './acSharedMemoryReader';
 import { RaceResultReader } from './raceResultReader';
-import { cleanupRaceResult, LeaderboardEntry, RaceResultData } from './raceResultCleaner';
+import {
+  bestCleanLapForDriver,
+  cleanupRaceResult,
+  LeaderboardEntry,
+  RaceResultData,
+} from './raceResultCleaner';
 import { waitForServerReachable } from './serverReachability';
 import { agentLogRingBuffer } from './logRingBuffer';
 import { LapTelemetryRecorder } from './lapTelemetryRecorder';
@@ -1527,7 +1532,6 @@ export class SimRacingAgent {
         track: session.track,
         trackName: session.trackName,
         trackLayout: session.trackLayout,
-        bestLapMs: session.bestLapMs,
         pending: true,
       });
     } else {
@@ -1585,6 +1589,9 @@ export class SimRacingAgent {
             this.logger.info({ sessionId: session.sessionId }, 'Session results pushed to backend');
           }
         }
+        const verifiedLap = raceResult
+          ? bestCleanLapForDriver(raceResult, session.clientName, session.carAcId)
+          : undefined;
         const archivedLeaderboard = await this.fetchArchivedLeaderboard({
           track: session.track,
           trackLayout: session.trackLayout,
@@ -1598,7 +1605,10 @@ export class SimRacingAgent {
           track: session.track,
           trackName: session.trackName,
           trackLayout: session.trackLayout,
-          bestLapMs: session.bestLapMs,
+          bestLapMs: verifiedLap?.status === 'valid' ? verifiedLap.timeMs : undefined,
+          resultVerified: Boolean(raceResult),
+          driverMatched: verifiedLap?.status !== 'unmatched',
+          scoreUnverifiable: verifiedLap?.status === 'unverifiable',
           // The final classification is deliberately historical. The local
           // race_out.json belongs to the session that just ended and must not
           // be used to build this archived ranking.

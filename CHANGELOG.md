@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.2.207 — Validation des temps de l’écran de fin
+
+- Le meilleur tour affiché est confirmé à partir des tours de `race_out.json` sans coupure, pour Practice, Qualifying et Race. Les tours invalides restent conservés dans les résultats JSON.
+- Tant que le fichier de résultats n’est pas prêt, aucun temps provisoire n’est présenté comme valide. Si aucun tour valide n’existe, l’écran l’indique explicitement, même quand un classement historique est visible.
+- Le message distingue un résultat sans tour valide d’un fichier indisponible ou d’un pilote impossible à identifier.
+
 ## v2.2.206 — Temps valides sur l’écran de fin
 
 - L’écran de fin du POD affiche seulement le meilleur tour valide. Le tour coupé reste conservé dans les résultats JSON, sans tuile « non valide » sur le blanking.

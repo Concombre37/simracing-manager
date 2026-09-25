@@ -635,6 +635,60 @@ describe('BlankingManager', () => {
     expect(html).not.toContain('non valide (cut)');
   });
 
+  it('explains when the current session has no valid lap even if history has valid scores', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({
+      clientName: 'Alice',
+      carAcId: 'car_a',
+      resultVerified: true,
+      archivedEntries: [{ position: 1, name: 'Bob', car: 'car_a', laps: 1, bestLapMs: 90000 }],
+    });
+    const html = readFileSync(lastSpawnArgs().resultsHtmlPath!, 'utf-8');
+    expect(html).toContain('Aucun tour valide dans cette session');
+    expect(html).toContain('1:30.000');
+  });
+
+  it('does not present a telemetry time as confirmed while results are pending', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({ clientName: 'Alice', bestLapMs: 72000, pending: true });
+    const html = readFileSync(lastSpawnArgs().resultsHtmlPath!, 'utf-8');
+    expect(html).not.toContain('1:12.000');
+    expect(html).toContain('Chargement du classement');
+  });
+
+  it('distinguishes a missing results file from zero valid laps', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({ clientName: 'Alice', resultVerified: false, archivedEntries: [] });
+    const html = readFileSync(lastSpawnArgs().resultsHtmlPath!, 'utf-8');
+    expect(html).toContain('Résultats indisponibles');
+    expect(html).not.toContain('Aucun tour valide dans cette session');
+  });
+
+  it('does not call an unidentified driver’s session invalid', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({ clientName: 'Alice', resultVerified: true, driverMatched: false });
+    const html = readFileSync(lastSpawnArgs().resultsHtmlPath!, 'utf-8');
+    expect(html).toContain('Pilote non identifié dans les résultats');
+    expect(html).not.toContain('Aucun tour valide dans cette session');
+  });
+
+  it('does not display an unverified bestLaps-only score', () => {
+    manager.setAuto();
+    manager.setAcRunning(false);
+    manager.showResults({
+      clientName: 'Alice',
+      resultVerified: true,
+      scoreUnverifiable: true,
+    });
+    const html = readFileSync(lastSpawnArgs().resultsHtmlPath!, 'utf-8');
+    expect(html).toContain('Tours enregistrés sans détails de validité');
+    expect(html).not.toContain('Aucun tour valide dans cette session');
+  });
+
   it('reveals the game only once the grace period elapses, not when AC is first detected', () => {
     // The kiosk manager brings the game window to the foreground on this
     // callback. Firing it early would visually cover blanking well before

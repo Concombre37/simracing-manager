@@ -10,6 +10,7 @@ export interface RaceResultPlayer {
 export interface RaceResultLap {
   car: number;
   time: number;
+  cuts?: number;
   sectors?: number[];
 }
 
@@ -76,6 +77,11 @@ export function cleanupRaceResult(resultData: unknown): CleanedRaceResult {
         }
       });
     }
+    // Some result formats omit lapstotal or leave it at zero despite
+    // recording laps. Keep those drivers so their clean laps can be checked.
+    session.laps?.forEach((lap) => {
+      if (lap.car >= 0 && lap.car < data.players.length) playersWithLapsIndices.add(lap.car);
+    });
   });
 
   if (playersWithLapsIndices.size === 0) {
@@ -154,6 +160,59 @@ export interface LeaderboardEntry {
   bestLapMs: number;
 }
 
+export type VerifiedLapResult =
+  { status: 'valid'; timeMs: number } | { status: 'no-valid' | 'unverifiable' | 'unmatched' };
+
+/** Only a lap listed in race_out.json with no cuts can confirm a score. */
+export function bestCleanLapForDriver(
+  result: RaceResultData,
+  clientName?: string,
+  carAcId?: string,
+): VerifiedLapResult {
+  const players = result.players ?? [];
+  const normalizedName = (clientName ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+  let playerIndex = normalizedName
+    ? players.findIndex(
+        (player) =>
+          (player.name ?? '').trim().replace(/\s+/g, ' ').toLocaleLowerCase() === normalizedName,
+      )
+    : -1;
+  if (playerIndex < 0 && carAcId) {
+    const matches = players
+      .map((player, index) => ({ player, index }))
+      .filter(({ player }) => player.car === carAcId);
+    if (matches.length === 1) playerIndex = matches[0].index;
+  }
+  if (playerIndex < 0 && players.length === 1 && (!carAcId || players[0].car === carAcId)) {
+    playerIndex = 0;
+  }
+  if (playerIndex < 0) return { status: 'unmatched' };
+
+  let best: number | null = null;
+  for (const session of result.sessions ?? []) {
+    for (const lap of session.laps ?? []) {
+      if (
+        lap.car !== playerIndex ||
+        (lap.cuts ?? 0) > 0 ||
+        !Number.isFinite(lap.time) ||
+        lap.time <= 0
+      )
+        continue;
+      if (best === null || lap.time < best) best = lap.time;
+    }
+  }
+  if (best !== null) return { status: 'valid', timeMs: best };
+  const hasLapsWithoutDetails = result.sessions.some(
+    (session) =>
+      (session.lapstotal?.[playerIndex] ?? 0) > 0 &&
+      !(session.laps ?? []).some((lap) => lap.car === playerIndex),
+  );
+  const hasUnverifiedBestLap = result.sessions.some((session) =>
+    (session.bestLaps ?? []).some((lap) => lap.car === playerIndex && lap.time > 0),
+  );
+  return { status: hasLapsWithoutDetails || hasUnverifiedBestLap ? 'unverifiable' : 'no-valid' };
+}
+
 export function getLeaderboard(resultData: RaceResultData): LeaderboardEntry[] {
   // AC writes one result block per enabled session. Prefer the final Race
   // block (identified by a raceResult), then a named Race block, and only
@@ -175,15 +234,15 @@ export function getLeaderboard(resultData: RaceResultData): LeaderboardEntry[] {
 
   const entries = players.map((player, index) => {
     const bestLap = bestLaps.find((bl) => bl.car === index);
-    const fallbackLap = (session.laps ?? [])
-      .filter((lap) => lap.car === index && lap.time > 0)
+    const cleanLap = (session.laps ?? [])
+      .filter((lap) => lap.car === index && (lap.cuts ?? 0) === 0 && lap.time > 0)
       .sort((a, b) => a.time - b.time)[0];
     return {
       position: 0,
       name: player.name || `Pilote ${index + 1}`,
       car: player.car || '-',
       laps: lapstotal[index] ?? 0,
-      bestLapMs: bestLap?.time ?? fallbackLap?.time ?? 0,
+      bestLapMs: session.laps?.length ? (cleanLap?.time ?? 0) : (bestLap?.time ?? 0),
     };
   });
 
