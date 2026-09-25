@@ -65,6 +65,7 @@ const Settings = lazy(() => import('./pages/Settings').then((m) => ({ default: m
 const PodsControl = lazy(() =>
   import('./pages/PodsControl').then((m) => ({ default: m.PodsControl })),
 );
+const PodHealth = lazy(() => import('./pages/PodHealth').then((m) => ({ default: m.PodHealth })));
 const Spectator = lazy(() => import('./pages/Spectator').then((m) => ({ default: m.Spectator })));
 const SpectatorScreen = lazy(() =>
   import('./pages/SpectatorScreen').then((m) => ({ default: m.SpectatorScreen })),
@@ -252,7 +253,14 @@ function AnimatedRoutes() {
               </ProtectedRoute>
             }
           />
-          <Route path="/car-skins" element={<ProtectedRoute adminOnly><CarSkins /></ProtectedRoute>} />
+          <Route
+            path="/car-skins"
+            element={
+              <ProtectedRoute adminOnly>
+                <CarSkins />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/mods"
             element={
@@ -318,6 +326,14 @@ function AnimatedRoutes() {
             element={
               <ProtectedRoute adminOnly>
                 <PodsControl />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pod-health"
+            element={
+              <ProtectedRoute adminOnly>
+                <PodHealth />
               </ProtectedRoute>
             }
           />

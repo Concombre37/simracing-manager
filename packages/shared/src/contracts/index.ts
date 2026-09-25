@@ -34,6 +34,7 @@ export interface AgentToServerEvents {
    * last ~100 log lines (same content shown in its local tray console),
    * so an admin can check what happened on a POD without walking up to it. */
   'agent:logs': (payload: { stationId: string; lines: string[] }) => void;
+  'agent:diagnostics': (payload: StationDiagnostics) => void;
 }
 
 export interface ServerToAgentEvents {
@@ -56,11 +57,7 @@ export interface ServerToAgentEvents {
   'wol:send': (payload: { targetMac: string; targetIp?: string }) => void;
   'content:sync': () => void;
   /** Ask this station to archive one installed mod and upload it to the server. */
-  'content:share': (payload: {
-    type: 'car' | 'track';
-    acId: string;
-    targets: string[];
-  }) => void;
+  'content:share': (payload: { type: 'car' | 'track'; acId: string; targets: string[] }) => void;
   'server:join': (payload: {
     host: string;
     port: number;
@@ -96,6 +93,31 @@ export interface ServerToAgentEvents {
   'station:role': (payload: { role: StationRole }) => void;
   /** Asks the agent to send back its current log ring buffer via 'agent:logs'. */
   'logs:request': () => void;
+  'diagnostics:request': (payload: { requestId: string }) => void;
+}
+
+export interface DiagnosticCheck {
+  id: string;
+  label: string;
+  status: 'ok' | 'missing' | 'warning' | 'unknown';
+  detail: string;
+  version?: string;
+}
+
+export interface DiagnosticDriver {
+  name: string;
+  provider: string;
+  version: string;
+  date?: string;
+}
+
+export interface StationDiagnostics {
+  requestId: string;
+  stationId: string;
+  scannedAt: string;
+  agentVersion: string;
+  checks: DiagnosticCheck[];
+  drivers: DiagnosticDriver[];
 }
 
 export interface ServerToClientEvents {

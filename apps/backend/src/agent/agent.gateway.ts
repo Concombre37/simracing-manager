@@ -7,7 +7,12 @@ import {
 } from '@nestjs/websockets';
 import { Inject, forwardRef } from '@nestjs/common';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards, OnModuleInit } from '@nestjs/common';
+import {
+  Logger,
+  UseGuards,
+  OnModuleInit,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { StationsService } from '../stations/stations.service';
 import { SessionsService } from '../sessions/sessions.service';
@@ -25,6 +30,7 @@ import {
   StatusPayload,
   SessionStatus,
   StationRole,
+  StationDiagnostics,
 } from '@simracing/shared';
 import { DashboardGateway } from '../dashboard/dashboard.gateway';
 import { TelemetryService } from '../telemetry/telemetry.service';
@@ -32,6 +38,7 @@ import { SettingsService } from '../settings/settings.service';
 import { TelemetrySnapshot, RaceFormatConfig } from '@simracing/shared';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 
 interface AuthenticatedSocket extends Socket {
   stationId?: string;
@@ -61,6 +68,15 @@ export class AgentGateway
   private readonly pendingLogRequests = new Map<
     string,
     { resolve: (lines: string[]) => void; timeout: NodeJS.Timeout }
+  >();
+  private readonly pendingDiagnostics = new Map<
+    string,
+    {
+      stationId: string;
+      resolve: (report: StationDiagnostics) => void;
+      reject: (error: Error) => void;
+      timeout: NodeJS.Timeout;
+    }
   >();
 
   @WebSocketServer()
@@ -139,7 +155,11 @@ export class AgentGateway
 
     this.eventEmitter.on(
       'content.shared',
-      async (payload: { targets: string[]; type: 'car' | 'track'; acId: string }) => {
+      async (payload: {
+        targets: string[];
+        type: 'car' | 'track';
+        acId: string;
+      }) => {
         for (const target of payload.targets) {
           await this.emitContentSync(target);
         }
@@ -517,6 +537,44 @@ export class AgentGateway
 
   async emitContentSync(stationId: string): Promise<void> {
     this.server.to(`station:${stationId}`).emit('content:sync');
+  }
+
+  @SubscribeMessage('agent:diagnostics')
+  handleDiagnostics(
+    client: AuthenticatedSocket,
+    payload: StationDiagnostics,
+  ): void {
+    if (!payload || client.stationId !== payload.stationId) return;
+    const pending = this.pendingDiagnostics.get(payload.requestId);
+    if (!pending || pending.stationId !== payload.stationId) return;
+    clearTimeout(pending.timeout);
+    this.pendingDiagnostics.delete(payload.requestId);
+    pending.resolve(payload);
+  }
+
+  async requestDiagnostics(stationId: string): Promise<StationDiagnostics> {
+    const room = `station:${stationId}`;
+    const sockets = await this.server.in(room).fetchSockets();
+    if (sockets.length === 0)
+      throw new ServiceUnavailableException('Agent hors ligne');
+    const requestId = randomUUID();
+    return new Promise<StationDiagnostics>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingDiagnostics.delete(requestId);
+        reject(
+          new ServiceUnavailableException(
+            'Agent trop ancien ou diagnostic expiré',
+          ),
+        );
+      }, 25000);
+      this.pendingDiagnostics.set(requestId, {
+        stationId,
+        resolve,
+        reject,
+        timeout,
+      });
+      this.server.to(room).emit('diagnostics:request', { requestId });
+    });
   }
 
   async emitContentShare(

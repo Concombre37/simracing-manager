@@ -29,6 +29,7 @@ import {
   MoreHorizontal,
   Package,
   Car,
+  HeartPulse,
 } from 'lucide-react';
 
 // L'essentiel du quotidien : toujours en pleine évidence, jamais replié.
@@ -59,6 +60,7 @@ const adminNavItems = [
   { path: '/arcade', label: 'Arcade', icon: Gamepad2 },
   { path: '/blanking-media', label: 'Écrans', icon: MonitorPlay },
   { path: '/pods-control', label: 'Contrôle flotte', icon: Zap },
+  { path: '/pod-health', label: 'Santé des PODs', icon: HeartPulse },
   { path: '/settings', label: 'Paramètres', icon: Settings },
 ];
 
@@ -82,6 +84,7 @@ const BREADCRUMBS: Record<string, string[]> = {
   '/arcade': ['Arcade'],
   '/blanking-media': ['Écrans'],
   '/settings': ['Paramètres'],
+  '/pod-health': ['Santé des PODs'],
 };
 
 export function Layout({ children }: { children: React.ReactNode }) {

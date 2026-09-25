@@ -52,6 +52,7 @@ import { SpectatorManager } from './spectatorManager';
 import { LiveCaptureManager } from './liveCaptureManager';
 import { SessionTimerManager } from './sessionTimerManager';
 import { synchronizeSystemClock } from './timeSync';
+import { collectDiagnostics } from './diagnostics';
 
 const execFileAsync = promisify(execFile);
 
@@ -544,6 +545,11 @@ export class SimRacingAgent {
     this.socket.on('system:restart', () => this.handleRestart());
     this.socket.on('wol:send', (payload) => this.handleWakeOnLan(payload));
     this.socket.on('logs:request', () => this.handleLogsRequest());
+    this.socket.on('diagnostics:request', ({ requestId }) => {
+      void collectDiagnostics(requestId, this.logger)
+        .then((report) => this.socket?.emit('agent:diagnostics', report))
+        .catch((error) => this.logger.error({ error }, 'Diagnostics scan failed'));
+    });
   }
 
   private async handleLogsRequest(): Promise<void> {
@@ -1389,7 +1395,10 @@ export class SimRacingAgent {
     acId: string;
     targets: string[];
   }): Promise<void> {
-    this.logger.info({ type: payload.type, acId: payload.acId, targets: payload.targets }, 'Content share requested');
+    this.logger.info(
+      { type: payload.type, acId: payload.acId, targets: payload.targets },
+      'Content share requested',
+    );
     try {
       await this.contentSync.share(payload.type, payload.acId, payload.targets);
     } catch (err) {

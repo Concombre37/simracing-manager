@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.2.204 — Diagnostic de santé des PODs
+
+- Nouvelle page d'administration « Santé des PODs » : scan à la demande des prérequis Assetto Corsa, Content Manager, CSP, application Lua, assistant Drive et ViGEmBus.
+- Inventaire en lecture seule des versions de pilotes graphiques et de périphériques de simulation installés sur Windows.
+- Comparaison des versions de pilotes entre PODs à configuration similaire, avec le premier POD scanné comme référence.
+- Actions de mise à jour de l'agent et de synchronisation des mods reliées aux commandes existantes ; les diagnostics signalent clairement les agents hors ligne ou trop anciens.
+
 ## v2.2.203 — Barre Windows supprimée pendant Assetto
 
 - Le script PowerShell qui arrête Explorer est désormais lancé et surveillé directement par l'agent ; il redémarre en cas d'arrêt inattendu.
@@ -131,15 +138,13 @@
 - Les formats de course permettent de choisir l’heure simulée (16:30 par défaut) et les effets météo Assetto Corsa.
 - L’agent convertit l’heure choisie en SUN_ANGLE lors de la génération du serveur dédié.
 
-
-
 ## v2.2.177 — Transfert réel des mods\n\n- Corrige l’URL des archives partagées afin que les agents téléchargent bien le ZIP authentifié.\n- Le suivi Mods attend maintenant l’inventaire de chaque poste cible avant d’indiquer le transfert terminé.\n\n
+
 ## v2.2.176 — WoL dual-interface et relais admin
 
 - Le relais WoL peut maintenant utiliser un agent admin connecté même si son heartbeat remonte l’autre carte réseau.
 - L’agent essaie les broadcasts disponibles sur ses interfaces réseau pour les postes équipés de plusieurs cartes.
 - Les diagnostics et tests couvrent le relais dual-homed.
-
 
 ## v2.2.175 — Partage des mods depuis la flotte
 
@@ -1583,7 +1588,6 @@ Vérifié directement en base : sur un POD déjà mis à jour en v2.2.56, les 21
 - Page `/telemetry` affichant vitesse, RPM, meilleur tour, position, progression piste.
 - Stream UDP local depuis l'app CSP Lua vers l'agent.
 - Fallback HTTP et fichier pour la télémétrie.
-
 
 # v2.2.191 — Synchronisation de l’heure des pods
 

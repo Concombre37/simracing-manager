@@ -1,5 +1,11 @@
 # SimRacing Manager
 
+## Santé des PODs
+
+La page d'administration `/pod-health` lance un diagnostic à la demande sur les PODs en ligne. Elle vérifie Assetto Corsa, Content Manager, Custom Shaders Patch, l'application Lua SimCenter, l'assistant Drive et ViGEmBus, puis affiche les versions des pilotes graphiques et des périphériques de simulation détectés sous Windows. Elle compare les pilotes des PODs similaires au premier POD scanné. Le scan exige un agent v2.2.204 ou plus récent ; un agent plus ancien affiche une erreur explicite après expiration.
+
+Les boutons « Mettre à jour l'agent » et « Synchroniser les mods » réutilisent les commandes existantes. La page Mods permet de comparer les voitures et circuits par poste et de propager les éléments manquants. Le diagnostic n'affirme pas qu'un pilote est à jour : la comparaison avec la version publiée par son fabricant et son installation restent à faire séparément.
+
 Professional sim racing station management system.
 
 ## Overview

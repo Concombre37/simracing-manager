@@ -38,6 +38,21 @@ export interface StationWithApiKey extends Station {
   apiKey: string;
 }
 
+export interface StationDiagnostics {
+  requestId: string;
+  stationId: string;
+  scannedAt: string;
+  agentVersion: string;
+  checks: {
+    id: string;
+    label: string;
+    status: 'ok' | 'missing' | 'warning' | 'unknown';
+    detail: string;
+    version?: string;
+  }[];
+  drivers: { name: string; provider: string; version: string; date?: string }[];
+}
+
 export type BlankingMediaCategory = 'idle' | 'launching' | 'results';
 
 export interface BlankingMediaFile {
@@ -67,9 +82,13 @@ export const stationsApi = {
   launch: (id: string) => api.post(`/stations/${id}/launch`).then((res) => res.data),
   stop: (id: string) => api.post(`/stations/${id}/stop`).then((res) => res.data),
   updateAgent: (id: string) => api.post(`/stations/${id}/update-agent`).then((res) => res.data),
+  diagnostics: (id: string) =>
+    api.post<StationDiagnostics>(`/stations/${id}/diagnostics`).then((res) => res.data),
   syncContent: (id: string) => api.post(`/stations/${id}/sync-content`).then((res) => res.data),
-  shareContent: (id: string, data: { type: 'car' | 'track'; acId: string; targetStationIds: string[] }) =>
-    api.post(`/stations/${id}/share-content`, data).then((res) => res.data),
+  shareContent: (
+    id: string,
+    data: { type: 'car' | 'track'; acId: string; targetStationIds: string[] },
+  ) => api.post(`/stations/${id}/share-content`, data).then((res) => res.data),
   getLogs: (id: string) =>
     api.get<{ lines: string[] }>(`/stations/${id}/logs`).then((res) => res.data),
   getBlankingMedia: (id: string, category: BlankingMediaCategory = 'idle') =>
