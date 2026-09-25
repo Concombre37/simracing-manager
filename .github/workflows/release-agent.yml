@@ -49,6 +49,9 @@ jobs:
           cd apps/agent
           npm run package:win
           Move-Item -Path "exe/agent.exe" -Destination "exe/sim-center-agent-win.exe" -Force
+          New-Item -ItemType Directory -Path "exe/tools" -Force | Out-Null
+          Copy-Item -Path "tools/PressDriveKey.exe" -Destination "exe/tools/PressDriveKey.exe" -Force
+          if (-not (Test-Path "exe/tools/PressDriveKey.exe")) { throw "Drive helper not staged" }
           @'
           ;!@Install@!UTF-8!
           Title="SimCenter Agent"
@@ -73,12 +76,12 @@ jobs:
           # assumed root-level placement, so this also fixes the SFX's
           # self-launch after a manual extract.
           Push-Location exe
-          & $7z a -sfx"$sfx" -r -y ..\sim-center-agent-win-setup.exe config.txt sim-center-agent-win.exe start-agent.vbs build
+          & $7z a -sfx"$sfx" -r -y ..\sim-center-agent-win-setup.exe config.txt sim-center-agent-win.exe start-agent.vbs build tools
           Pop-Location
           Move-Item -Path sim-center-agent-win-setup.exe -Destination exe\sim-center-agent-win-setup.exe -Force
           if (-not (Test-Path exe\sim-center-agent-win-setup.exe)) { throw "SFX not created" }
           Push-Location exe
-          & $7z a -tzip -r -y ..\sim-center-agent-win.zip sim-center-agent-win.exe start-agent.vbs build
+          & $7z a -tzip -r -y ..\sim-center-agent-win.zip sim-center-agent-win.exe start-agent.vbs build tools
           Pop-Location
           Move-Item -Path sim-center-agent-win.zip -Destination exe\sim-center-agent-win.zip -Force
           if (-not (Test-Path exe\sim-center-agent-win.zip)) { throw "ZIP not created" }

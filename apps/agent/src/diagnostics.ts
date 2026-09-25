@@ -45,6 +45,18 @@ async function windowsDrivers(): Promise<DiagnosticDriver[]> {
     .slice(0, 40);
 }
 
+async function hasVigemService(): Promise<boolean> {
+  if (process.platform !== 'win32') return false;
+  try {
+    await execFileAsync('reg', ['query', 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\ViGEmBus'], {
+      timeout: 5000,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function collectDiagnostics(
   requestId: string,
   logger: Logger,
@@ -116,14 +128,15 @@ export async function collectDiagnostics(
     });
   }
 
-  const vigem = drivers.some((driver) => /ViGEm|Nefarius/i.test(driver.name));
+  const vigem =
+    drivers.some((driver) => /ViGEm|Nefarius/i.test(driver.name)) || (await hasVigemService());
   checks.push({
     id: 'vigem',
     label: 'ViGEmBus',
-    status: process.platform !== 'win32' || driverScanFailed ? 'unknown' : vigem ? 'ok' : 'warning',
+    status: vigem ? 'ok' : process.platform !== 'win32' || driverScanFailed ? 'unknown' : 'warning',
     detail: vigem
       ? 'Pilote ViGEmBus détecté.'
-      : 'Non détecté dans les pilotes Plug and Play ; vérifier si le bouton Drive automatique échoue.',
+      : 'ViGEmBus non détecté ; vérifier si le bouton Drive automatique échoue.',
   });
 
   const luaApp =

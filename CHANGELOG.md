@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.2.205 — Correctif du paquet de diagnostic
+
+- Le paquet Windows inclut `tools/PressDriveKey.exe` comme fichier séparé, à l'emplacement où l'agent le cherche pour l'écran Drive.
+- Le diagnostic ViGEmBus vérifie aussi son service Windows, car le pilote ne figure pas toujours sous ce nom dans l'inventaire Plug and Play.
+
 ## v2.2.204 — Diagnostic de santé des PODs
 
 - Nouvelle page d'administration « Santé des PODs » : scan à la demande des prérequis Assetto Corsa, Content Manager, CSP, application Lua, assistant Drive et ViGEmBus.
