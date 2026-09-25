@@ -1,5 +1,9 @@
 # Changelog
 
+## v2.2.206 — Temps valides sur l’écran de fin
+
+- L’écran de fin du POD affiche seulement le meilleur tour valide. Le tour coupé reste conservé dans les résultats JSON, sans tuile « non valide » sur le blanking.
+
 ## v2.2.205 — Correctif du paquet de diagnostic
 
 - Le paquet Windows inclut `tools/PressDriveKey.exe` comme fichier séparé, à l'emplacement où l'agent le cherche pour l'écran Drive.

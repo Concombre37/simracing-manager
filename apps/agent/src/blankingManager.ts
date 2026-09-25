@@ -67,9 +67,6 @@ interface SessionResultsSummary {
   trackName?: string;
   trackLayout?: string;
   bestLapMs?: number;
-  /** Fastest lap AC rejected as invalid (cut, etc.) — only set when it would
-   * otherwise have beaten bestLapMs. */
-  bestInvalidLapMs?: number;
   result?: RaceResultData;
   /** Historical entries loaded from the backend. When provided (including an
    * empty array), these are the only entries used for the final screen. */
@@ -671,10 +668,6 @@ export class BlankingManager {
     const tmpDir = path.join(process.env.TEMP || '/tmp', 'simracing-manager');
     const htmlPath = path.join(tmpDir, 'session-results.html');
     const bestLap = formatLapTime(summary.bestLapMs ?? 0);
-    const bestInvalidLap =
-      summary.bestInvalidLapMs && summary.bestInvalidLapMs > 0
-        ? formatLapTime(summary.bestInvalidLapMs)
-        : null;
     const trackLabel = summary.trackName ?? summary.track;
     const carLabel = summary.carName ?? summary.carAcId;
     const trackDisplay = trackLabel ?? '-';
@@ -808,15 +801,6 @@ export class BlankingManager {
           <div class="tile-spacer"></div>
           <div class="tile-value accent-orange">${bestLap}</div>
         </div>
-        ${
-          bestInvalidLap
-            ? `<div class="tile accent-orange">
-          <div class="tile-label">Meilleur tour non valide (cut)</div>
-          <div class="tile-spacer"></div>
-          <div class="tile-value accent-orange">${bestInvalidLap}</div>
-        </div>`
-            : ''
-        }
       </div>
 
       <div class="tiles-spacer"></div>

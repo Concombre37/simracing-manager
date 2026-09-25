@@ -1528,7 +1528,6 @@ export class SimRacingAgent {
         trackName: session.trackName,
         trackLayout: session.trackLayout,
         bestLapMs: session.bestLapMs,
-        bestInvalidLapMs: session.bestInvalidLapMs,
         pending: true,
       });
     } else {
@@ -1600,7 +1599,6 @@ export class SimRacingAgent {
           trackName: session.trackName,
           trackLayout: session.trackLayout,
           bestLapMs: session.bestLapMs,
-          bestInvalidLapMs: session.bestInvalidLapMs,
           // The final classification is deliberately historical. The local
           // race_out.json belongs to the session that just ended and must not
           // be used to build this archived ranking.
